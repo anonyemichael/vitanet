@@ -72,4 +72,4 @@ Thumbs.db
 
 # Large files (>100MB) exceeding GitHub file size limit
 data/data.csv
-notebooks/disease_prediction_model.pkl
+
