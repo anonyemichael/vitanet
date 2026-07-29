@@ -1,0 +1,1 @@
+# DATABASE_URL=postgresql://postgres:Bizpalvin@localhost:5432/vitanet_db
