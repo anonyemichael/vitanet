@@ -26,8 +26,8 @@ import 'package:vitanet/features/auth/screens/patient_login_screen.dart';
 import 'package:vitanet/features/auth/screens/registration_form_screen.dart';
 import 'package:vitanet/features/auth/screens/patient_completion_screen.dart';
 
-// Admin screens (we will create these next)
-import 'package:vitanet/features/admin/screens/admin_dashboard_screen.dart';
+// Admin screens
+import 'package:vitanet/features/admin/screens/admin_main_navigation_screen.dart';
 import 'package:vitanet/features/admin/screens/case_management_screen.dart';
 
 import 'package:vitanet/features/devices/screens/device_connection_screen.dart';
@@ -47,10 +47,16 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         if (!isHealthWorker) {
           return '/home'; // Redirect normal users away from admin dashboard
         }
+      } else if (state.uri.path == '/home' && isHealthWorker) {
+        return '/admin'; // Redirect health workers to their admin UI
       }
       return null;
     },
     routes: [
+      GoRoute(
+        path: '/admin',
+        builder: (context, state) => const AdminMainNavigationScreen(),
+      ),
       GoRoute(
         path: '/splash',
         builder: (context, state) => const SplashScreen(),
@@ -140,11 +146,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
-          final profile = ref.read(userProfileProvider);
-          final isHealthWorker = profile?.role == 'health_worker' || profile?.role == 'admin';
           return _ScaffoldWithNavBar(
             navigationShell: navigationShell,
-            showAdminTabs: isHealthWorker,
           );
         },
         branches: [
@@ -154,10 +157,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
                 path: '/home',
                 builder: (context, state) => const HomeScreen(),
               ),
-              GoRoute(
-                path: '/admin',
-                builder: (context, state) => const AdminDashboardScreen(),
-              ),
             ],
           ),
           StatefulShellBranch(
@@ -165,10 +164,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/chat',
                 builder: (context, state) => const ChatScreen(),
-              ),
-              GoRoute(
-                path: '/admin/cases',
-                builder: (context, state) => const CaseManagementScreen(),
               ),
             ],
           ),
@@ -194,17 +189,18 @@ final goRouterProvider = Provider<GoRouter>((ref) {
   );
 });
 
-class _ScaffoldWithNavBar extends StatelessWidget {
+class _ScaffoldWithNavBar extends ConsumerWidget {
   final StatefulNavigationShell navigationShell;
-  final bool showAdminTabs;
 
   const _ScaffoldWithNavBar({
     required this.navigationShell,
-    this.showAdminTabs = false,
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profile = ref.watch(userProfileProvider);
+    final isHealthWorker = profile?.role == 'health_worker' || profile?.role == 'admin';
+
     return Scaffold(
       extendBody: true,
       body: navigationShell,
@@ -227,19 +223,21 @@ class _ScaffoldWithNavBar extends StatelessWidget {
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: _buildNavItems(context),
+            children: _buildNavItems(context, isHealthWorker),
           ),
         ),
       ),
     );
   }
 
-  List<Widget> _buildNavItems(BuildContext context) {
+  List<Widget> _buildNavItems(BuildContext context, bool showAdminTabs) {
     final items = showAdminTabs
         ? [
-            _NavItem(icon: Icons.dashboard_outlined, activeIcon: Icons.dashboard_rounded, label: 'Dashboard'),
-            _NavItem(icon: Icons.local_hospital_outlined, activeIcon: Icons.local_hospital_rounded, label: 'Cases'),
-            _NavItem(icon: Icons.person_outline_rounded, activeIcon: Icons.person_rounded, label: 'Profile'),
+            _NavItem(icon: Icons.home_outlined, activeIcon: Icons.home, label: 'Home'),
+            _NavItem(icon: Icons.notifications_outlined, activeIcon: Icons.notifications, label: 'Alerts'),
+            _NavItem(icon: Icons.person_outline, activeIcon: Icons.person, label: 'Patients'),
+            _NavItem(icon: Icons.business_outlined, activeIcon: Icons.business, label: 'Hospital'),
+            _NavItem(icon: Icons.settings_outlined, activeIcon: Icons.settings, label: 'Settings'),
           ]
         : [
             _NavItem(icon: Icons.home_outlined, activeIcon: Icons.home_rounded, label: 'Home'),
