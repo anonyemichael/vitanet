@@ -34,7 +34,9 @@ RUN echo "alembic==1.18.5" > /code/requirements.txt && \
     echo "SQLAlchemy==2.0.51" >> /code/requirements.txt && \
     echo "starlette==1.3.1" >> /code/requirements.txt && \
     echo "typing_extensions==4.16.0" >> /code/requirements.txt && \
-    echo "uvicorn==0.51.0" >> /code/requirements.txt
+    echo "uvicorn==0.51.0" >> /code/requirements.txt && \
+    echo "africastalking" >> /code/requirements.txt && \
+    echo "requests" >> /code/requirements.txt
 
 RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
 
