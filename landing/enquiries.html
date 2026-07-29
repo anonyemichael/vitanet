@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Contact the VitaNet team — product questions, support, press, and partnership enquiries." />
+  <meta name="theme-color" content="#0A5C56" />
+  <title>Enquiries — VitaNet</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230A5C56'/%3E%3Cpath d='M6 16h4l2-5 4 10 2-5h8' fill='none' stroke='%235EEAD4' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="page" data-page="inner">
+  <a class="skip" href="#main">Skip to content</a>
+  <div class="noise" aria-hidden="true"></div>
+
+  <header class="header header--solid is-on" id="top">
+    <div class="header__bar">
+      <a class="logo" href="index.html" aria-label="VitaNet home">
+        <svg class="logo__mark" width="28" height="28" viewBox="0 0 32 32" aria-hidden="true">
+          <rect width="32" height="32" rx="7" fill="currentColor" />
+          <path d="M6 16h4l2-5 4 10 2-5h8" fill="none" stroke="#ECF8F5" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        <span class="logo__word">VitaNet</span>
+      </a>
+
+      <button class="menu-btn" type="button" aria-expanded="false" aria-controls="menu" aria-label="Open menu">
+        <span class="menu-btn__lines" aria-hidden="true"></span>
+      </button>
+
+      <nav class="menu" id="menu" aria-label="Primary">
+        <a href="index.html#about">About</a>
+        <a href="features.html">Features</a>
+        <a href="index.html#faq">FAQ</a>
+        <a href="enquiries.html" aria-current="page">Enquiries</a>
+        <a class="btn btn--solid" href="index.html#get">Get the app</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main" class="page-main">
+    <div class="wrap">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <ol>
+          <li><a href="index.html">Home</a></li>
+          <li aria-current="page">Enquiries</li>
+        </ol>
+      </nav>
+
+      <header class="page-hero">
+        <p class="kicker">Contact</p>
+        <h1>Enquiries</h1>
+        <p class="lede">
+          Product questions, support, press, or partnerships — send a note and we’ll get back to you.
+        </p>
+      </header>
+
+      <div class="enquiry">
+        <form class="form" id="enquiry-form" novalidate>
+          <div class="form__row">
+            <label for="name">Full name</label>
+            <input id="name" name="name" type="text" autocomplete="name" required placeholder="Alex Morgan" />
+          </div>
+
+          <div class="form__row">
+            <label for="email">Email</label>
+            <input id="email" name="email" type="email" autocomplete="email" required placeholder="you@example.com" />
+          </div>
+
+          <div class="form__row">
+            <label for="topic">Topic</label>
+            <select id="topic" name="topic" required>
+              <option value="" disabled selected>Select a topic</option>
+              <option value="support">App support</option>
+              <option value="product">Product question</option>
+              <option value="press">Press / media</option>
+              <option value="partnership">Partnership</option>
+              <option value="privacy">Privacy request</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+
+          <div class="form__row">
+            <label for="message">Message</label>
+            <textarea id="message" name="message" rows="6" required placeholder="How can we help?"></textarea>
+          </div>
+
+          <div class="form__row form__row--check">
+            <label>
+              <input type="checkbox" name="consent" id="consent" required />
+              <span>I agree that VitaNet may use these details to respond to my enquiry. See the <a class="text-link" href="privacy.html">Privacy Policy</a>.</span>
+            </label>
+          </div>
+
+          <p class="form__note">
+            VitaNet does not provide emergency medical assistance. If this is urgent, call local emergency services.
+          </p>
+
+          <button class="btn btn--solid btn--lg" type="submit">Send enquiry</button>
+          <p class="form__status" id="form-status" role="status" aria-live="polite" hidden></p>
+        </form>
+
+        <aside class="enquiry__aside">
+          <figure class="media-block">
+            <img src="pharmacy.jpg" alt="Calm professional health setting" width="1400" height="1050" loading="lazy" />
+          </figure>
+          <div class="enquiry__card">
+            <h2>Other ways to reach us</h2>
+            <p><strong>General</strong><br /><a class="text-link" href="mailto:hello@vitanet.app">hello@vitanet.app</a></p>
+            <p><strong>Privacy</strong><br /><a class="text-link" href="mailto:privacy@vitanet.app">privacy@vitanet.app</a></p>
+            <p><strong>Response time</strong><br />We typically reply within 1–2 business days.</p>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap footer__grid">
+      <div class="footer__brand">
+        <p class="logo__word">VitaNet</p>
+        <p class="footer__tag">AI Health Triage Assistant</p>
+      </div>
+      <nav class="footer__nav" aria-label="Footer">
+        <div>
+          <p class="footer__heading">Legal</p>
+          <a href="privacy.html">Privacy Policy</a>
+          <a href="index.html#disclaimer">Medical disclaimer</a>
+        </div>
+        <div>
+          <p class="footer__heading">Company</p>
+          <a href="enquiries.html" aria-current="page">Enquiries</a>
+          <a href="index.html">Home</a>
+        </div>
+      </nav>
+      <div class="footer__meta">
+        <p class="footer__copy">&copy; <span data-year></span> VitaNet. All rights reserved.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

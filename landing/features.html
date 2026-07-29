@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Explore VitaNet features — AI symptom chat, triage results, history, health profile, on-device privacy, and more." />
+  <meta name="theme-color" content="#0A5C56" />
+  <title>Features — VitaNet</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230A5C56'/%3E%3Cpath d='M6 16h4l2-5 4 10 2-5h8' fill='none' stroke='%235EEAD4' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="page" data-page="inner">
+  <a class="skip" href="#main">Skip to content</a>
+  <div class="noise" aria-hidden="true"></div>
+
+  <header class="header header--solid is-on" id="top">
+    <div class="header__bar">
+      <a class="logo" href="index.html" aria-label="VitaNet home">
+        <svg class="logo__mark" width="28" height="28" viewBox="0 0 32 32" aria-hidden="true">
+          <rect width="32" height="32" rx="7" fill="currentColor" />
+          <path d="M6 16h4l2-5 4 10 2-5h8" fill="none" stroke="#ECF8F5" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        <span class="logo__word">VitaNet</span>
+      </a>
+
+      <button class="menu-btn" type="button" aria-expanded="false" aria-controls="menu" aria-label="Open menu">
+        <span class="menu-btn__lines" aria-hidden="true"></span>
+      </button>
+
+      <nav class="menu" id="menu" aria-label="Primary">
+        <a href="index.html#about">About</a>
+        <a href="features.html" aria-current="page">Features</a>
+        <a href="index.html#faq">FAQ</a>
+        <a href="enquiries.html">Enquiries</a>
+        <a class="btn btn--solid" href="index.html#get">Get the app</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main" class="page-main">
+    <div class="wrap">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <ol>
+          <li><a href="index.html">Home</a></li>
+          <li aria-current="page">Features</li>
+        </ol>
+      </nav>
+
+      <header class="page-hero">
+        <p class="kicker">Product</p>
+        <h1>Everything you need for a clearer next step.</h1>
+        <p class="lede">
+          Real VitaNet capabilities — from the first symptom check to history, profile, and privacy controls.
+        </p>
+      </header>
+
+      <nav class="feat-jump" aria-label="Feature sections">
+        <a href="#chat">Symptom chat</a>
+        <a href="#result">Triage result</a>
+        <a href="#home">Home</a>
+        <a href="#history">History</a>
+        <a href="#profile">Profile</a>
+        <a href="#privacy-feat">Privacy</a>
+        <a href="#more">More</a>
+      </nav>
+    </div>
+
+    <!-- Symptom chat -->
+    <section class="feat" id="chat" aria-labelledby="chat-h">
+      <div class="wrap feat__grid">
+        <div class="feat__copy">
+          <p class="kicker">01 — Symptom check</p>
+          <h2 id="chat-h">Conversational triage that asks what matters.</h2>
+          <p class="lede">
+            Describe how you feel in plain language. VitaNet guides a short flow — symptoms, severity,
+            duration, related signs, and conditions — then recommends a care path.
+          </p>
+          <ul class="ticks">
+            <li>Free-text chat with quick-reply chips</li>
+            <li>Typing indicator and calm pacing</li>
+            <li>Ends in a clear triage result — not a diagnosis</li>
+          </ul>
+        </div>
+        <div class="feat__visual" aria-hidden="true">
+          <div class="phone-ui">
+            <div class="phone-ui__bezel">
+              <div class="phone-ui__notch"></div>
+              <div class="phone-ui__screen phone-ui__screen--chat">
+                <div class="ui-top">
+                  <span class="ui-back">‹</span>
+                  <span>Symptom Check</span>
+                  <span></span>
+                </div>
+                <div class="ui-thread">
+                  <div class="ui-bubble ui-bubble--bot">What symptoms are you experiencing today?</div>
+                  <div class="ui-bubble ui-bubble--user">Headache and mild nausea since this morning.</div>
+                  <div class="ui-bubble ui-bubble--bot">How severe would you rate it?</div>
+                  <div class="ui-chips">
+                    <span>Mild</span>
+                    <span class="is-on">Moderate</span>
+                    <span>Severe</span>
+                  </div>
+                </div>
+                <div class="ui-input">Describe your symptoms…</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Triage result -->
+    <section class="feat feat--alt" id="result" aria-labelledby="result-h">
+      <div class="wrap feat__grid feat__grid--flip">
+        <div class="feat__copy">
+          <p class="kicker">02 — Triage result</p>
+          <h2 id="result-h">Three paths. Color-coded. Actionable.</h2>
+          <p class="lede">
+            Every check ends with Manage at Home, Visit a Pharmacist, or Seek Urgent Care — plus a summary,
+            what to monitor, and a medical disclaimer.
+          </p>
+          <ul class="ticks">
+            <li>Share your summary with someone who can help</li>
+            <li>Start a new check anytime</li>
+            <li>Urgent path surfaces emergency guidance</li>
+          </ul>
+        </div>
+        <div class="feat__visual" aria-hidden="true">
+          <div class="phone-ui">
+            <div class="phone-ui__bezel">
+              <div class="phone-ui__notch"></div>
+              <div class="phone-ui__screen phone-ui__screen--result">
+                <div class="ui-result-head">
+                  <span class="ui-result-level">Manage at Home</span>
+                  <p>Mild symptoms that appear stable for now.</p>
+                </div>
+                <div class="ui-result-body">
+                  <p class="ui-label">Recommendation</p>
+                  <p>Rest, hydrate, and monitor for 24–48 hours.</p>
+                  <p class="ui-label">What to monitor</p>
+                  <ul>
+                    <li>Fever rising above 38.5°C</li>
+                    <li>Worsening headache or vomiting</li>
+                    <li>New neurological symptoms</li>
+                  </ul>
+                  <div class="ui-actions">
+                    <span class="ui-btn">Share</span>
+                    <span class="ui-btn ui-btn--ghost">New Check</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Home -->
+    <section class="feat" id="home" aria-labelledby="home-h">
+      <div class="wrap feat__grid">
+        <div class="feat__copy">
+          <p class="kicker">03 — Home</p>
+          <h2 id="home-h">Start a check in one tap.</h2>
+          <p class="lede">
+            A calm dashboard greets you by name, offers a daily health tip, shows recent triage,
+            and keeps emergency contacts within reach.
+          </p>
+          <ul class="ticks">
+            <li>“How are you feeling?” hero starts chat</li>
+            <li>Recent results with View All → History</li>
+            <li>Quick access to emergency numbers</li>
+          </ul>
+        </div>
+        <div class="feat__visual" aria-hidden="true">
+          <div class="phone-ui">
+            <div class="phone-ui__bezel">
+              <div class="phone-ui__notch"></div>
+              <div class="phone-ui__screen phone-ui__screen--home">
+                <p class="ui-greet">Good evening</p>
+                <p class="ui-name">Hi, Alex</p>
+                <div class="ui-hero-cta">
+                  <strong>How are you feeling?</strong>
+                  <span>Start a symptom check</span>
+                </div>
+                <p class="ui-label">Daily tip</p>
+                <div class="ui-tip">Hydration supports recovery — keep water nearby when symptoms start.</div>
+                <p class="ui-label">Recent</p>
+                <div class="ui-recent">
+                  <span class="dot dot--home"></span>
+                  <div>
+                    <strong>Manage at Home</strong>
+                    <small>Yesterday · Headache</small>
+                  </div>
+                </div>
+                <div class="ui-nav">
+                  <span class="is-on">Home</span>
+                  <span>History</span>
+                  <span>Profile</span>
+                  <span>Settings</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- History -->
+    <section class="feat feat--alt" id="history" aria-labelledby="history-h">
+      <div class="wrap feat__grid feat__grid--flip">
+        <div class="feat__copy">
+          <p class="kicker">04 — History</p>
+          <h2 id="history-h">Your past checks, filterable and private.</h2>
+          <p class="lede">
+            Review earlier triage outcomes, filter by care level, swipe to delete, or clear everything
+            from Settings when you want a clean slate.
+          </p>
+          <ul class="ticks">
+            <li>Filters: All · Self-Care · Pharmacist · Urgent</li>
+            <li>Swipe-to-delete with confirmation</li>
+            <li>Stored on your device</li>
+          </ul>
+        </div>
+        <div class="feat__visual" aria-hidden="true">
+          <div class="phone-ui">
+            <div class="phone-ui__bezel">
+              <div class="phone-ui__notch"></div>
+              <div class="phone-ui__screen">
+                <div class="ui-top">
+                  <span></span>
+                  <span>History</span>
+                  <span></span>
+                </div>
+                <div class="ui-filters">
+                  <span class="is-on">All</span>
+                  <span>Self-Care</span>
+                  <span>Pharmacist</span>
+                  <span>Urgent</span>
+                </div>
+                <div class="ui-hist">
+                  <div class="ui-hist__row">
+                    <span class="dot dot--home"></span>
+                    <div>
+                      <strong>Manage at Home</strong>
+                      <small>Headache · 2 days ago</small>
+                    </div>
+                  </div>
+                  <div class="ui-hist__row">
+                    <span class="dot dot--pharm"></span>
+                    <div>
+                      <strong>Visit a Pharmacist</strong>
+                      <small>Sore throat · Last week</small>
+                    </div>
+                  </div>
+                  <div class="ui-hist__row">
+                    <span class="dot dot--urgent"></span>
+                    <div>
+                      <strong>Seek Urgent Care</strong>
+                      <small>Chest tightness · Mar 12</small>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Profile -->
+    <section class="feat" id="profile" aria-labelledby="profile-h">
+      <div class="wrap feat__grid">
+        <div class="feat__copy">
+          <p class="kicker">05 — Health profile</p>
+          <h2 id="profile-h">Keep the context that matters to you.</h2>
+          <p class="lede">
+            Save name, age, sex, conditions, and allergies on your device. Optional Google sign-in
+            is available for account access.
+          </p>
+          <ul class="ticks">
+            <li>Condition and allergy chips you control</li>
+            <li>Local storage with a clear privacy note</li>
+            <li>Sign in / sign out from Profile</li>
+          </ul>
+        </div>
+        <div class="feat__visual" aria-hidden="true">
+          <div class="phone-ui">
+            <div class="phone-ui__bezel">
+              <div class="phone-ui__notch"></div>
+              <div class="phone-ui__screen">
+                <div class="ui-top">
+                  <span></span>
+                  <span>Profile</span>
+                  <span></span>
+                </div>
+                <div class="ui-profile">
+                  <div class="ui-avatar">A</div>
+                  <strong>Alex Morgan</strong>
+                  <small>32 · Prefers local storage</small>
+                </div>
+                <p class="ui-label">Conditions</p>
+                <div class="ui-chips">
+                  <span class="is-on">Asthma</span>
+                  <span>Migraine</span>
+                  <span>+ Add</span>
+                </div>
+                <p class="ui-label">Allergies</p>
+                <div class="ui-chips">
+                  <span class="is-on">Penicillin</span>
+                  <span>+ Add</span>
+                </div>
+                <div class="ui-btn ui-btn--wide">Save profile</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Privacy -->
+    <section class="feat feat--alt" id="privacy-feat" aria-labelledby="privacy-feat-h">
+      <div class="wrap feat__grid feat__grid--flip">
+        <div class="feat__copy">
+          <p class="kicker">06 — Privacy &amp; settings</p>
+          <h2 id="privacy-feat-h">On-device by design. Controls you can find.</h2>
+          <p class="lede">
+            Triage history, profile, theme, and onboarding state stay on your device. Settings holds
+            theme preference, clear history, About, disclaimer, and privacy info.
+          </p>
+          <ul class="ticks">
+            <li>Light, Dark, or System theme</li>
+            <li>Clear triage history with confirmation</li>
+            <li><a class="text-link" href="privacy.html">Full Privacy Policy</a></li>
+          </ul>
+        </div>
+        <div class="feat__visual" aria-hidden="true">
+          <div class="readout readout--lg">
+            <span class="readout__label">History</span>
+            <span class="readout__value">On device</span>
+            <span class="readout__label">Profile</span>
+            <span class="readout__value">On device</span>
+            <span class="readout__label">Theme</span>
+            <span class="readout__value">System</span>
+            <span class="readout__label">Remote PHI</span>
+            <span class="readout__value readout__value--ok">None</span>
+            <svg class="readout__wave" viewBox="0 0 280 56" preserveAspectRatio="none">
+              <path d="M0 28 H40 L52 28 L64 10 L76 46 L88 28 H140 L152 28 L164 14 L176 42 L188 28 H280" />
+            </svg>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- More -->
+    <section class="feat" id="more" aria-labelledby="more-h">
+      <div class="wrap">
+        <header class="band__head">
+          <p class="kicker">Also included</p>
+          <h2 id="more-h">Small details that make triage feel safer.</h2>
+        </header>
+
+        <div class="more-grid">
+          <article class="more-item">
+            <h3>Onboarding</h3>
+            <p>Three short screens explain companion care, triage levels, and on-device privacy before first use.</p>
+          </article>
+          <article class="more-item">
+            <h3>Emergency contacts</h3>
+            <p>Keep emergency, poison control, and crisis numbers visible from Home when seconds matter.</p>
+          </article>
+          <article class="more-item">
+            <h3>Share result</h3>
+            <p>Send a triage summary — level, bullets, and disclaimer — through your device share sheet.</p>
+          </article>
+          <article class="more-item">
+            <h3>Medical framing</h3>
+            <p>Disclaimers stay visible on results and in Settings so guidance never pretends to be a diagnosis.</p>
+          </article>
+        </div>
+
+        <div class="feat-cta">
+          <a class="btn btn--solid btn--lg" href="index.html#get">Get the app</a>
+          <a class="btn btn--ghost-dark btn--lg" href="enquiries.html">Ask a question</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap footer__grid">
+      <div class="footer__brand">
+        <p class="logo__word">VitaNet</p>
+        <p class="footer__tag">AI Health Triage Assistant</p>
+      </div>
+      <nav class="footer__nav" aria-label="Footer">
+        <div>
+          <p class="footer__heading">Product</p>
+          <a href="features.html" aria-current="page">Features</a>
+          <a href="index.html#how">How it works</a>
+          <a href="index.html#faq">FAQ</a>
+        </div>
+        <div>
+          <p class="footer__heading">Company</p>
+          <a href="enquiries.html">Enquiries</a>
+          <a href="index.html">Home</a>
+        </div>
+        <div>
+          <p class="footer__heading">Legal</p>
+          <a href="privacy.html">Privacy Policy</a>
+          <a href="index.html#disclaimer">Medical disclaimer</a>
+        </div>
+      </nav>
+      <div class="footer__meta">
+        <p class="footer__copy">&copy; <span data-year></span> VitaNet. All rights reserved.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
