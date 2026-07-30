@@ -1,4 +1,6 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+import re
 
 
 
@@ -14,6 +16,27 @@ app = FastAPI(
     title="VitaNet API"
 )
 
+# Allow all localhost origins (any port) for Flutter web dev, plus any
+# additional origins configured via the ALLOWED_ORIGINS env var.
+_extra_origins = [
+    o.strip()
+    for o in os.getenv("ALLOWED_ORIGINS", "").split(",")
+    if o.strip()
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost",
+        "http://127.0.0.1",
+        *_extra_origins,
+    ],
+    # Allow all localhost ports via regex pattern
+    allow_origin_regex=r"http://(localhost|127\.0\.0\.1)(:\d+)?",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 app.include_router(users.router)
 app.include_router(care_circles.router)
 app.include_router(vitals.router)
