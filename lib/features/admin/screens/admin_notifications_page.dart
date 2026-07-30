@@ -97,19 +97,27 @@ class _AdminNotificationsPageState extends State<AdminNotificationsPage> {
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : (_alerts == null || _alerts!.isEmpty)
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+      body: RefreshIndicator(
+        onRefresh: _loadAlerts,
+        color: colorScheme.primary,
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : (_alerts == null || _alerts!.isEmpty)
+                ? Stack(
                     children: [
-                      Icon(Icons.check_circle_outline, size: 64, color: colorScheme.primary.withAlpha(100)),
-                      const SizedBox(height: 16),
-                      const Text('No active clinical alerts', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
+                      ListView(), // Empty listview to enable pull-to-refresh
+                      Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.check_circle_outline, size: 64, color: colorScheme.primary.withAlpha(100)),
+                            const SizedBox(height: 16),
+                            const Text('No active clinical alerts', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
+                          ],
+                        ),
+                      ),
                     ],
-                  ),
-                )
+                  )
               : LayoutBuilder(
                   builder: (context, constraints) {
                     double horizontalPadding = constraints.maxWidth > 600 ? constraints.maxWidth * 0.15 : 16;
@@ -121,15 +129,19 @@ class _AdminNotificationsPageState extends State<AdminNotificationsPage> {
                         return Container(
                           margin: const EdgeInsets.only(bottom: 16),
                           decoration: BoxDecoration(
-                            color: isDark ? colorScheme.surfaceContainerLow : Colors.white,
+                            color: isDark ? colorScheme.surfaceContainerHighest.withAlpha(50) : Colors.white,
                             borderRadius: BorderRadius.circular(24),
-                            boxShadow: [
+                            boxShadow: isDark ? [] : [
                               BoxShadow(
-                                color: Colors.black.withAlpha(isDark ? 0 : 5),
+                                color: Colors.black.withAlpha(5),
                                 blurRadius: 10,
                                 offset: const Offset(0, 4),
                               ),
                             ],
+                            border: Border.all(
+                              color: isDark ? colorScheme.outlineVariant : Colors.transparent,
+                              width: 1,
+                            ),
                           ),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(24),
@@ -205,6 +217,7 @@ class _AdminNotificationsPageState extends State<AdminNotificationsPage> {
                     );
                   },
                 ),
+      ),
     );
   }
 }

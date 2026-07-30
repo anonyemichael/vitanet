@@ -194,13 +194,15 @@ class _PatientCompletionScreenState extends ConsumerState<PatientCompletionScree
       }
 
       final payload = {
-        "firebase_uid": currentUser.uid,
-        "full_name": currentUser.displayName ?? 'Patient',
-        "email": currentUser.email ?? '',
-        "phone_number": _phoneController.text.trim(),
-        "date_of_birth": _dobController.text.trim(),
-        "account_type": "patient",
-        "emergency_contacts": emergencyContactsJson,
+        "user": {
+          "firebase_uid": currentUser.uid,
+          "full_name": currentUser.displayName ?? 'Patient',
+          "email": currentUser.email ?? '',
+          "phone_number": _phoneController.text.trim(),
+          "date_of_birth": _dobController.text.trim(),
+          "account_type": "patient",
+        },
+        "care_circle": emergencyContactsJson,
       };
 
       await ref.read(apiServiceProvider).registerUser(payload);

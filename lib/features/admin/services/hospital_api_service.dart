@@ -1,69 +1,106 @@
+import 'package:dio/dio.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import '../models/patient.dart';
 import '../models/alert.dart';
 import '../models/hospital_data.dart';
 
 class ApiService {
-  // Simulate network delay
-  Future<void> _delay() => Future.delayed(const Duration(milliseconds: 800));
+  final Dio _dio;
+  static const String _baseUrl = 'https://vitanet-backend-api.onrender.com/';
 
-  Future<HospitalStats> getDashboardStats() async {
-    await _delay();
-    // This will eventually call: http.get(Uri.parse('$baseUrl/stats'));
-    return HospitalStats(
-      activePatients: 1240,
-      availableWards: 12,
-      systemHealth: '98%',
-      staffOnDuty: 24,
+  ApiService() : _dio = Dio(BaseOptions(baseUrl: _baseUrl)) {
+    _dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) async {
+          final currentUser = FirebaseAuth.instance.currentUser;
+          if (currentUser != null) {
+            final idToken = await currentUser.getIdToken();
+            if (idToken != null) {
+              options.headers['Authorization'] = 'Bearer $idToken';
+            }
+          }
+          return handler.next(options);
+        },
+      ),
     );
   }
 
+  Future<HospitalStats> getDashboardStats() async {
+    try {
+      final response = await _dio.get('admin/stats');
+      final data = response.data;
+      return HospitalStats(
+        activePatients: data['activePatients'] ?? 0,
+        availableWards: data['availableWards'] ?? 0,
+        systemHealth: data['systemHealth'] ?? 'Unknown',
+        staffOnDuty: data['staffOnDuty'] ?? 0,
+      );
+    } catch (e) {
+      debugPrint('Error fetching stats: $e');
+      return HospitalStats(activePatients: 0, availableWards: 0, systemHealth: 'N/A', staffOnDuty: 0);
+    }
+  }
+
   Future<List<Patient>> getPatients() async {
-    await _delay();
-    return List.generate(10, (index) => Patient(
-      id: 'PT-${4590 + index}',
-      name: 'Patient Case #${1000 + index}',
-      age: 30 + index,
-      gender: index % 2 == 0 ? 'Male' : 'Female',
-      status: 'Monitored',
-      lastUpdated: DateTime.now().subtract(Duration(minutes: index * 10)),
-    ));
+    try {
+      final response = await _dio.get('admin/patients');
+      return (response.data as List).map((p) => Patient(
+        id: p['id'] ?? '',
+        name: p['name'] ?? 'Unknown',
+        age: p['age'] ?? 0,
+        gender: p['gender'] ?? 'Unknown',
+        status: p['status'] ?? 'Unknown',
+        lastUpdated: p['lastUpdated'] != null ? DateTime.parse(p['lastUpdated']) : DateTime.now(),
+      )).toList();
+    } catch (e) {
+      debugPrint('Error fetching patients: $e');
+      return [];
+    }
   }
 
   Future<List<ClinicalAlert>> getAlerts() async {
-    await _delay();
-    return [
-      ClinicalAlert(
-        id: '1',
-        title: 'High Priority',
-        description: 'Urgent attention required in Room 402. Patient vitals fluctuating.',
-        isCritical: true,
-        timestamp: DateTime.now().subtract(const Duration(minutes: 5)),
-      ),
-      ClinicalAlert(
-        id: '2',
-        title: 'General Update',
-        description: 'Daily ward rotation schedule for next week is now available.',
-        isCritical: false,
-        timestamp: DateTime.now().subtract(const Duration(minutes: 17)),
-      ),
-    ];
+    try {
+      final response = await _dio.get('admin/alerts');
+      return (response.data as List).map((a) => ClinicalAlert(
+        id: a['id'] ?? '',
+        title: a['severity'] == 'urgent' ? 'Urgent Alert' : 'Watch Alert',
+        description: a['message'] ?? '',
+        isCritical: a['severity'] == 'urgent',
+        timestamp: a['created_at'] != null ? DateTime.parse(a['created_at']) : DateTime.now(),
+      )).toList();
+    } catch (e) {
+      debugPrint('Error fetching alerts: $e');
+      return [];
+    }
   }
 
   Future<List<WardInfo>> getWards() async {
-    await _delay();
-    return [
-      WardInfo(name: 'Intensive Care Unit (ICU)', occupied: 4, total: 5, type: 'Critical'),
-      WardInfo(name: 'Post-Operative Recovery', occupied: 12, total: 15, type: 'Standard'),
-      WardInfo(name: 'Maternity Ward', occupied: 2, total: 10, type: 'Standard'),
-    ];
+    try {
+      final response = await _dio.get('admin/wards');
+      return (response.data as List).map((w) => WardInfo(
+        name: w['name'] ?? '',
+        occupied: w['occupied'] ?? 0,
+        total: w['total'] ?? 0,
+        type: w['type'] ?? '',
+      )).toList();
+    } catch (e) {
+      debugPrint('Error fetching wards: $e');
+      return [];
+    }
   }
 
   Future<List<StaffInfo>> getStaff() async {
-    await _delay();
-    return [
-      StaffInfo(name: 'Lead Medical Officer', role: 'Clinical Oversight', status: 'On Duty'),
-      StaffInfo(name: 'Nursing Supervisor', role: 'Shift Management', status: 'Active'),
-      StaffInfo(name: 'Diagnostics Specialist', role: 'Lab Operations', status: 'Available'),
-    ];
+    try {
+      final response = await _dio.get('admin/staff');
+      return (response.data as List).map((s) => StaffInfo(
+        name: s['name'] ?? '',
+        role: s['role'] ?? '',
+        status: s['status'] ?? '',
+      )).toList();
+    } catch (e) {
+      debugPrint('Error fetching staff: $e');
+      return [];
+    }
   }
 }

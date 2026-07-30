@@ -385,6 +385,23 @@ class _SignInTabState extends ConsumerState<_SignInTab> {
         throw Exception(authState.errorMessage);
       }
 
+      if (authState.user != null) {
+        final backendUser = await ref.read(apiServiceProvider).getUserByFirebaseUid(authState.user!.uid);
+        if (backendUser != null) {
+          // The backend returns user details under 'full_name' and 'account_type'.
+          final accountType = backendUser['account_type'];
+          final role = (accountType == 'healthcare_professional' || accountType == 'admin') ? 'admin' : 'user';
+          ref.read(userProfileProvider.notifier).updateProfile(
+            UserProfile(name: backendUser['full_name'] ?? 'Provider', role: role),
+          );
+        } else {
+          // Fallback if backend fetch fails or no user found
+          ref.read(userProfileProvider.notifier).updateProfile(
+            UserProfile(name: 'Provider', role: 'admin'),
+          );
+        }
+      }
+
       if (mounted) context.go('/admin');
     } catch (e) {
       if (mounted) context.showSnack('Sign In failed: $e');
@@ -504,11 +521,14 @@ class _SignUpTabState extends ConsumerState<_SignUpTab> {
       );
 
       final payload = {
-        "account_type": "hospital_personnel",
-        "full_name": name,
-        "email": email,
-        "phone_number": phone,
-        "firebase_uid": currentUser.uid,
+        "user": {
+          "account_type": "healthcare_professional",
+          "full_name": name,
+          "email": email,
+          "phone_number": phone,
+          "firebase_uid": currentUser.uid,
+        },
+        "care_circle": [],
       };
 
       await ref.read(apiServiceProvider).registerUser(payload);

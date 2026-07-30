@@ -2,7 +2,7 @@ from fastapi import FastAPI
 
 
 
-from app.routes import chat, health_alert, health_profile, user_location, user_settings, users, care_circles, vitals, hospitals, sms_router
+from app.routes import chat, health_alert, health_profile, user_location, user_settings, users, care_circles, vitals, hospitals, sms_router, admin
 
 import os
 if os.getenv("DEV_BYPASS_AUTH", "false").lower() == "true":
@@ -24,6 +24,7 @@ app.include_router(user_settings.router)
 app.include_router(chat.router)
 app.include_router(health_alert.router)
 app.include_router(sms_router.router)
+app.include_router(admin.router)
 
 @app.get("/")
 def root():

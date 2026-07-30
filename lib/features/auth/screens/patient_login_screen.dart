@@ -18,24 +18,41 @@ class PatientLoginScreen extends ConsumerStatefulWidget {
 class _PatientLoginScreenState extends ConsumerState<PatientLoginScreen> {
   @override
   Widget build(BuildContext context) {
-    ref.listen<AuthState>(authProvider, (previous, next) {
+    ref.listen<AuthState>(authProvider, (previous, next) async {
       if (next.status == AuthStatus.authenticated || next.status == AuthStatus.anonymous) {
-        var profile = ref.read(userProfileProvider);
         
-        // If profile doesn't exist, route to completion screen for real users.
-        if (profile == null) {
-          if (next.status == AuthStatus.anonymous) {
-            profile = UserProfile(name: 'Guest User', role: 'user');
-            ref.read(userProfileProvider.notifier).updateProfile(profile);
-            context.go('/home');
+        if (next.status == AuthStatus.anonymous) {
+           var profile = const UserProfile(name: 'Guest User', role: 'user');
+           ref.read(userProfileProvider.notifier).updateProfile(profile);
+           if (mounted) context.go('/home');
+           return;
+        }
+
+        // It is an authenticated user. Check backend.
+        try {
+          final backendUser = await ref.read(apiServiceProvider).getUserByFirebaseUid(next.user!.uid);
+          
+          if (backendUser != null) {
+            final role = (backendUser['account_type'] == 'healthcare_professional' || backendUser['account_type'] == 'admin') ? 'admin' : 'user';
+            ref.read(userProfileProvider.notifier).updateProfile(
+              UserProfile(name: backendUser['full_name'] ?? 'Patient', role: role),
+            );
+            
+            if (mounted) {
+              if (role == 'admin') {
+                context.go('/admin');
+              } else {
+                context.go('/home');
+              }
+            }
           } else {
             // New user, push to the completion form!
-            context.go('/login/patient_completion');
+            if (mounted) context.go('/login/patient_completion');
           }
-        } else {
-          // Returning user
-          context.go('/home');
+        } catch (e) {
+           if (mounted) context.showSnack('Failed to fetch profile: $e');
         }
+
       } else if (next.status == AuthStatus.error) {
         context.showSnack(next.errorMessage ?? 'Authentication failed');
       }

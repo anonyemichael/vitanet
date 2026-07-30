@@ -156,7 +156,9 @@ class _AdminPatientDataPageState extends State<AdminPatientDataPage> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : LayoutBuilder(
+          : RefreshIndicator(
+              onRefresh: _loadPatients,
+              child: LayoutBuilder(
               builder: (context, constraints) {
                 double horizontalPadding = constraints.maxWidth > 800 ? (constraints.maxWidth - 800) / 2 : 16;
                 return ListView.builder(
@@ -164,48 +166,86 @@ class _AdminPatientDataPageState extends State<AdminPatientDataPage> {
                   itemCount: _filteredPatients?.length ?? 0,
                   itemBuilder: (context, index) {
                     final patient = _filteredPatients![index];
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      decoration: BoxDecoration(
-                        color: isDark ? colorScheme.surfaceContainerLow : Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        leading: Container(
-                          width: 50,
-                          height: 50,
-                          decoration: BoxDecoration(
-                            color: colorScheme.primary.withAlpha(20),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(Icons.person_4_outlined, color: colorScheme.primary),
-                        ),
-                        title: Text(
-                          patient.name,
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        subtitle: Text(
-                          'ID: ${patient.id} • ${patient.gender} • ${patient.age} Yrs',
-                          style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
-                        ),
-                        trailing: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFE8F5E9),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            patient.status,
-                            style: const TextStyle(color: Color(0xFF2E7D32), fontWeight: FontWeight.bold, fontSize: 11),
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          color: isDark ? colorScheme.surfaceContainerHighest.withAlpha(50) : Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: isDark ? [] : [
+                            BoxShadow(
+                              color: Colors.black.withAlpha(5),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            )
+                          ],
+                          border: Border.all(
+                            color: isDark ? colorScheme.outlineVariant : Colors.transparent,
+                            width: 1,
                           ),
                         ),
-                        onTap: () => _showPatientDetails(patient),
-                      ),
-                    );
-                  },
-                );
-              },
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          leading: Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: colorScheme.primary.withAlpha(20),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Icon(Icons.person_outline, color: colorScheme.primary),
+                          ),
+                          title: Text(
+                            patient.name,
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: colorScheme.onSurface,
+                            ),
+                          ),
+                          subtitle: Padding(
+                            padding: const EdgeInsets.only(top: 4.0),
+                            child: Text(
+                              'ID: ${patient.id} • ${patient.gender} • ${patient.age} Yrs',
+                              style: TextStyle(fontSize: 13, color: colorScheme.onSurfaceVariant),
+                            ),
+                          ),
+                          trailing: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: patient.status == 'Critical' 
+                                  ? Colors.red.withAlpha(20)
+                                  : patient.status == 'Monitored' 
+                                      ? Colors.orange.withAlpha(20)
+                                      : Colors.green.withAlpha(20),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: patient.status == 'Critical' 
+                                  ? Colors.red.withAlpha(50)
+                                  : patient.status == 'Monitored' 
+                                      ? Colors.orange.withAlpha(50)
+                                      : Colors.green.withAlpha(50),
+                              ),
+                            ),
+                            child: Text(
+                              patient.status,
+                              style: TextStyle(
+                                color: patient.status == 'Critical' 
+                                  ? Colors.red[700]
+                                  : patient.status == 'Monitored' 
+                                      ? Colors.orange[800]
+                                      : Colors.green[700],
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                          onTap: () => _showPatientDetails(patient),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
             ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _addPatient,
