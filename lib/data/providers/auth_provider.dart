@@ -224,7 +224,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
         await _googleSignIn!.signOut();
       }
       await _auth!.signOut();
-      // This will trigger authStateChanges, which will then sign in anonymously again
+      // authStateChanges listener will set state to unauthenticated,
+      // which the splash/router will redirect to /login.
     } catch (e) {
       state = state.copyWith(
         status: AuthStatus.error,

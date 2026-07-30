@@ -35,21 +35,54 @@ import 'package:vitanet/features/health_trends/screens/health_trends_screen.dart
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
+final _routerRefreshStream = Provider<_AuthChangeNotifier>((ref) {
+  final notifier = _AuthChangeNotifier();
+  ref.listen<AuthState>(authProvider, (_, next) {
+    notifier.notify();
+  });
+  return notifier;
+});
+
+/// A [ChangeNotifier] that [GoRouter] can listen to for refreshes.
+class _AuthChangeNotifier extends ChangeNotifier {
+  void notify() => notifyListeners();
+}
+
 final goRouterProvider = Provider<GoRouter>((ref) {
+  final refreshNotifier = ref.watch(_routerRefreshStream);
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: '/splash',
+    refreshListenable: refreshNotifier,
     redirect: (context, state) {
+      final authState = ref.read(authProvider);
       final profile = ref.read(userProfileProvider);
-      final isHealthWorker = profile?.role == 'health_worker' || profile?.role == 'admin';
-      
-      if (state.uri.path.startsWith('/admin')) {
-        if (!isHealthWorker) {
-          return '/home'; // Redirect normal users away from admin dashboard
-        }
-      } else if (state.uri.path == '/home' && isHealthWorker) {
-        return '/admin'; // Redirect health workers to their admin UI
+      final isHealthWorker =
+          profile?.role == 'health_worker' || profile?.role == 'admin';
+
+      final path = state.uri.path;
+
+      // Public routes — always accessible
+      final publicRoutes = ['/splash', '/login', '/onboarding'];
+      final isPublic =
+          publicRoutes.any((r) => path == r || path.startsWith('$r/'));
+
+      // If user is not authenticated and tries to access a protected route
+      final isUnauthenticated =
+          authState.status == AuthStatus.unauthenticated ||
+          authState.status == AuthStatus.error;
+      if (isUnauthenticated && !isPublic) {
+        return '/login';
       }
+
+      // Role-based routing
+      if (path.startsWith('/admin') && !isHealthWorker) {
+        return '/home'; // Redirect normal users away from admin
+      }
+      if (path == '/home' && isHealthWorker) {
+        return '/admin'; // Redirect health workers to admin UI
+      }
+
       return null;
     },
     routes: [

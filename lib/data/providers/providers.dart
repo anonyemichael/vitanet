@@ -36,19 +36,22 @@ final healthServiceProvider = Provider<HealthService>((ref) {
 
 final aiServiceProvider = Provider<AiService>((ref) {
   final profile = ref.watch(userProfileProvider);
-  final healthService = ref.watch(healthServiceProvider);
+  final apiService = ref.watch(apiServiceProvider);
   final history = ref.watch(triageHistoryProvider);
-  final service = AiService(healthService: healthService);
+  final service = AiService(apiService: apiService);
   service.updateContext(profile, pastTriages: history);
   return service;
 });
 
-final firestoreServiceProvider = Provider<FirestoreService>((ref) => FirestoreService());
+final firestoreServiceProvider = Provider<FirestoreService>(
+  (ref) => FirestoreService(),
+);
 
 // ─── Theme ───
 
-final themeModeProvider =
-    StateNotifierProvider<ThemeModeNotifier, ThemeMode>((ref) {
+final themeModeProvider = StateNotifierProvider<ThemeModeNotifier, ThemeMode>((
+  ref,
+) {
   final storage = ref.watch(localStorageProvider);
   return ThemeModeNotifier(storage);
 });
@@ -71,8 +74,9 @@ class ThemeModeNotifier extends StateNotifier<ThemeMode> {
 
   Future<void> setTheme(ThemeMode mode) async {
     state = mode;
-    final name =
-        mode == ThemeMode.light ? 'light' : (mode == ThemeMode.dark ? 'dark' : 'system');
+    final name = mode == ThemeMode.light
+        ? 'light'
+        : (mode == ThemeMode.dark ? 'dark' : 'system');
     await _storage.setThemeMode(name);
   }
 }
@@ -87,21 +91,23 @@ final onboardingCompleteProvider = StateProvider<bool>((ref) {
 
 final userProfileProvider =
     StateNotifierProvider<UserProfileNotifier, UserProfile?>((ref) {
-  final storage = ref.watch(localStorageProvider);
-  final api = ref.watch(apiServiceProvider);
-  return UserProfileNotifier(storage, api);
-});
+      final storage = ref.watch(localStorageProvider);
+      return UserProfileNotifier(storage);
+    });
 
 class UserProfileNotifier extends StateNotifier<UserProfile?> {
   final LocalStorageService _storage;
-  final ApiService _apiService;
 
-  UserProfileNotifier(this._storage, this._apiService) : super(_storage.getProfile());
+  UserProfileNotifier(this._storage) : super(_storage.getProfile());
 
   Future<void> updateProfile(UserProfile profile) async {
     await _storage.saveProfile(profile);
     state = profile;
-    await _apiService.syncUserProfile(profile);
+  }
+
+  Future<void> clearProfile() async {
+    await _storage.saveProfile(UserProfile(name: ''));
+    state = null;
   }
 }
 
@@ -109,8 +115,8 @@ class UserProfileNotifier extends StateNotifier<UserProfile?> {
 
 final chatMessagesProvider =
     StateNotifierProvider<ChatMessagesNotifier, List<ChatMessage>>((ref) {
-  return ChatMessagesNotifier();
-});
+      return ChatMessagesNotifier();
+    });
 
 class ChatMessagesNotifier extends StateNotifier<List<ChatMessage>> {
   ChatMessagesNotifier() : super([]);
@@ -149,27 +155,33 @@ final currentConversationIdProvider = StateProvider<String>((ref) {
   return const Uuid().v4();
 });
 
-final chatHistoryListProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+final chatHistoryListProvider = FutureProvider<List<Map<String, dynamic>>>((
+  ref,
+) async {
   final auth = ref.watch(authProvider);
   if (auth.user == null) return [];
-  
+
   final firestoreService = ref.watch(firestoreServiceProvider);
   return firestoreService.getUserConversations(auth.user!.uid);
 });
 
-final specificChatHistoryProvider = FutureProvider.family<List<ChatMessage>, String>((ref, conversationId) async {
-  final auth = ref.watch(authProvider);
-  if (auth.user == null) return [];
-  
-  final firestoreService = ref.watch(firestoreServiceProvider);
-  return firestoreService.getChatHistory(auth.user!.uid, conversationId);
-});
+final specificChatHistoryProvider =
+    FutureProvider.family<List<ChatMessage>, String>((
+      ref,
+      conversationId,
+    ) async {
+      final auth = ref.watch(authProvider);
+      if (auth.user == null) return [];
+
+      final firestoreService = ref.watch(firestoreServiceProvider);
+      return firestoreService.getChatHistory(auth.user!.uid, conversationId);
+    });
 
 final triageHistoryProvider =
     StateNotifierProvider<TriageHistoryNotifier, List<TriageResult>>((ref) {
-  final storage = ref.watch(localStorageProvider);
-  return TriageHistoryNotifier(storage);
-});
+      final storage = ref.watch(localStorageProvider);
+      return TriageHistoryNotifier(storage);
+    });
 
 class TriageHistoryNotifier extends StateNotifier<List<TriageResult>> {
   final LocalStorageService _storage;
@@ -197,4 +209,3 @@ final deviceConnectionProvider = FutureProvider<Map<String, bool>>((ref) async {
   final api = ref.watch(apiServiceProvider);
   return api.getDeviceConnections();
 });
-
