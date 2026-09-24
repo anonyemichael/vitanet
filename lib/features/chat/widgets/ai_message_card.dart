@@ -16,60 +16,24 @@ class AiMessageCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = context.isDark;
     
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.xl, left: 16, right: 32),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: isDark 
-                  ? context.colorScheme.surface.withValues(alpha: 0.6) 
-                  : Colors.white.withValues(alpha: 0.8),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: context.colorScheme.outlineVariant.withValues(alpha: 0.3),
-                width: 1.5,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: isDark 
-                      ? Colors.black.withValues(alpha: 0.2)
-                      : Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 20,
-                  offset: const Offset(0, 10),
-                ),
-              ],
-            ),
-            child: Column(
+    return Container(
+      margin: const EdgeInsets.only(bottom: 24, right: 48),
+        child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Header
                 Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF3B82F6), Color(0xFF10B981)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF3B82F6).withValues(alpha: 0.3),
-                            blurRadius: 8,
-                            spreadRadius: 1,
-                          ),
-                        ],
-                      ),
+                    ShaderMask(
+                      shaderCallback: (bounds) => const LinearGradient(
+                        colors: [Color(0xFF4285F4), Color(0xFF9b72cb), Color(0xFFd96570)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ).createShader(bounds),
                       child: const Icon(
-                        Icons.smart_toy_rounded,
+                        Icons.auto_awesome_rounded,
                         color: Colors.white,
-                        size: 16,
+                        size: 24,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -133,39 +97,8 @@ class AiMessageCard extends StatelessWidget {
                     ),
                   ),
                   
-                // Footer Disclaimer
-                const SizedBox(height: 20),
-                Divider(
-                  height: 1,
-                  color: context.colorScheme.outlineVariant.withValues(alpha: 0.3),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.verified_user_outlined,
-                      size: 14,
-                      color: context.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        'AI-generated health guidance. Always consult a real doctor.',
-                        style: TextStyle(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w500,
-                          color: context.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
               ],
             ),
-          ),
-        ),
-      ),
     );
   }
 

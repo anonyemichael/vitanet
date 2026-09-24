@@ -34,6 +34,13 @@ dependencies:
   health: ^13.3.1
   flutter_dotenv: ^6.0.1
   image_picker: ^1.2.3
+  http: ^1.6.0
+  speech_to_text: ^7.4.0
+  flutter_tts: ^4.2.5
+  geocoding: ^4.0.0
+  file_picker: ^11.0.3
+  youtube_player_iframe: ^6.0.2
+  confetti: ^0.8.0
 
 dev_dependencies:
   flutter_test:
@@ -44,8 +51,14 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
+    - assets/logo.png
+    - assets/logo_transparent.png
     - assets/images/
     - assets/images/onboarding/
+    - assets/health_library_data/articles/
+    - assets/health_library_data/videos/
+    - assets/health_library_data/images/
+    - assets/health_library_data/interactives/
     - .env
 
 flutter_launcher_icons:

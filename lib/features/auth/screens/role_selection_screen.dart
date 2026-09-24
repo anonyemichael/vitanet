@@ -150,6 +150,7 @@ class _ImageRoleCardState extends State<_ImageRoleCard> with SingleTickerProvide
               child: Image.asset(
                 widget.imagePath,
                 fit: BoxFit.cover,
+                cacheWidth: 600,
                 errorBuilder: (c, e, s) => Container(color: context.colorScheme.primary),
               ),
             ),
@@ -171,53 +172,57 @@ class _ImageRoleCardState extends State<_ImageRoleCard> with SingleTickerProvide
 
             // Content
             Padding(
-              padding: const EdgeInsets.all(AppSpacing.xxxl),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: _isHovered 
-                          ? context.colorScheme.primary 
-                          : Colors.white.withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: _isHovered ? Colors.transparent : Colors.white.withValues(alpha: 0.2),
-                        width: 2,
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxl, vertical: AppSpacing.md),
+              child: Center(
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: _isHovered 
+                              ? context.colorScheme.primary 
+                              : Colors.white.withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: _isHovered ? Colors.transparent : Colors.white.withValues(alpha: 0.2),
+                            width: 2,
+                          ),
+                        ),
+                        child: Icon(
+                          widget.icon,
+                          size: 64,
+                          color: Colors.white,
+                        ),
                       ),
-                    ),
-                    child: Icon(
-                      widget.icon,
-                      size: 64,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.xxl),
-                  Text(
-                    widget.title,
-                    style: context.textTheme.displaySmall?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -1.0,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  AnimatedOpacity(
-                    duration: const Duration(milliseconds: 300),
-                    opacity: _isHovered ? 1.0 : 0.7,
-                    child: Text(
-                      widget.subtitle,
-                      style: context.textTheme.titleLarge?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w400,
+                      const SizedBox(height: AppSpacing.xxl),
+                      Text(
+                        widget.title,
+                        style: context.textTheme.displaySmall?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: -1.0,
+                        ),
+                        textAlign: TextAlign.center,
                       ),
-                      textAlign: TextAlign.center,
-                    ),
+                      const SizedBox(height: AppSpacing.md),
+                      AnimatedOpacity(
+                        duration: const Duration(milliseconds: 300),
+                        opacity: _isHovered ? 1.0 : 0.7,
+                        child: Text(
+                          widget.subtitle,
+                          style: context.textTheme.titleLarge?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w400,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ],

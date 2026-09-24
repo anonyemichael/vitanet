@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 
 from google import genai
+from google.genai import types
 from app.core.config import settings as app_settings
 from app.models.health_alert import HealthAlert, AlertSeverity, AlertStatus
 from app.models.vitals import VitalType
@@ -33,8 +34,12 @@ def generate_alert_message(vital_type: str, latest_value: float, avg_value: floa
         f"Severity: {severity}. Do not diagnose. Do not use markdown."
     )
     try:
-        interaction = client.interactions.create(model="gemini-3.6-flash", input=prompt)
-        return interaction.output_text.strip()
+        response = client.models.generate_content(
+            model=app_settings.GEMINI_MODEL,
+            contents=prompt,
+            config=types.GenerateContentConfig(temperature=0.2, max_output_tokens=120),
+        )
+        return (response.text or "").strip()
     except Exception:
         # Fallback if Gemini fails — never let alerting silently break
         return f"Your {vital_type.replace('_', ' ')} reading ({latest_value}) is outside your usual range (avg {avg_value})."

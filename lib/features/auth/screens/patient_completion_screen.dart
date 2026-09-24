@@ -205,22 +205,22 @@ class _PatientCompletionScreenState
                     ? 1
                     : 0);
 
-      // Save profile to local storage — no backend call needed
-      await ref
-          .read(userProfileProvider.notifier)
-          .updateProfile(
-            UserProfile(
-              name: currentUser.displayName ?? 'Patient',
-              age: age,
-              role: 'user',
-              phone: _dobController.text.trim().isNotEmpty
-                  ? _phoneController.text.trim()
-                  : null,
-              dob: _dobController.text.trim(),
-              sex: _selectedSex,
-              emergencyContacts: finalContacts,
-            ),
-          );
+      final profile = UserProfile(
+        name: currentUser.displayName ?? 'Patient',
+        age: age,
+        role: 'user',
+        phone: _phoneController.text.trim().isNotEmpty
+            ? _phoneController.text.trim()
+            : null,
+        dob: _dobController.text.trim(),
+        sex: _selectedSex,
+        emergencyContacts: finalContacts,
+      );
+
+      // Save profile to local storage
+      await ref.read(userProfileProvider.notifier).updateProfile(profile);
+
+      // Profile is automatically persisted to Firestore by userProfileProvider
 
       if (mounted) context.go('/home');
     } catch (e) {

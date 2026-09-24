@@ -24,15 +24,15 @@ class AppColors {
   static const Color primaryContainerDark = Color(0xFF164E63); // Cyan 900
   static const Color secondaryDark = Color(0xFFA78BFA); // Violet 400
   static const Color secondaryContainerDark = Color(0xFF4C1D95); // Violet 900
-  static const Color surfaceDark = Color(0xFF111827); // Gray 900
-  static const Color surfaceVariantDark = Color(0xFF1E293B); // Slate 800
-  static const Color backgroundDark = Color(0xFF0B1120); // Obsidian Navy
+  static const Color surfaceDark = Color(0xFF1E1E1E); // Neutral Dark Gray (Cards)
+  static const Color surfaceVariantDark = Color(0xFF2A2A2A); // Lighter Gray
+  static const Color backgroundDark = Color(0xFF121212); // Deep Neutral Gray (Background)
   static const Color errorDark = Color(0xFFFCA5A5);
   static const Color warningDark = Color(0xFFFCD34D);
   static const Color successDark = Color(0xFF6EE7B7);
-  static const Color onSurfaceDark = Color(0xFFF1F5F9);
-  static const Color onSurfaceVariantDark = Color(0xFF94A3B8);
-  static const Color onPrimaryDark = Color(0xFF0B1120);
+  static const Color onSurfaceDark = Color(0xFFF5F5F5); // White-ish
+  static const Color onSurfaceVariantDark = Color(0xFFA3A3A3); // Light Gray
+  static const Color onPrimaryDark = Color(0xFF121212);
 
   // ── Triage Level Colors (shared) ──
   static const Color triageSelfCare = Color(0xFF10B981); // Green
@@ -52,4 +52,22 @@ class AppColors {
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
+
+  // ── Pre-computed transparent variants (avoid runtime withValues() calls) ──
+  // Dark mode card surfaces
+  static const Color darkCardSurface = Color(0xFF1E1E1E);
+  static const Color darkCardSurfaceLight = Color(0x0DFFFFFF); // white 5%
+  static const Color darkOverlay02 = Color(0x05FFFFFF);        // white 2%
+  static const Color darkOverlay10 = Color(0x1AFFFFFF);        // white 10%
+  static const Color darkBorder = Color(0x0DFFFFFF);           // white 5%
+  
+  // Light mode
+  static const Color lightShadow04 = Color(0x0A000000);       // black 4%
+  static const Color lightShadow05 = Color(0x0D000000);       // black 5%
+  static const Color lightShadow08 = Color(0x14000000);       // black 8%
+  static const Color lightBorder = Color(0x0D000000);          // black 5%
+
+  // Primary with alpha (for selected states)
+  static const Color primaryLight12 = Color(0x1F06B6D4);      // primary 12%
+  static const Color primaryDark12 = Color(0x1F22D3EE);       // primary 12%
 }

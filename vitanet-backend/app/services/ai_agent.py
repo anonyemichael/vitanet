@@ -1,135 +1,170 @@
-# app/services/ai_agent.py
+"""Server-side AI orchestration for the VitaNet chat assistant."""
+
+import base64
+import binascii
+import logging
 import json
 from uuid import UUID
 
-from google import genai
+import openai
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models.chat import MessageRole
-from app.services import chat_service, ai_tools, ai_blocks, user_settings_service
-from app.services.ai_system_prompt import build_system_prompt
 from app.schemas.chat_blocks import TextBlock
+from app.services import ai_blocks, ai_tools, chat_service, user_settings_service
+from app.services.ai_system_prompt import build_system_prompt
 
-client = genai.Client(api_key=settings.GEMINI_API_KEY)
-MODEL = "gemini-3.6-flash"
-MAX_TOOL_ITERATIONS = 5
+logger = logging.getLogger(__name__)
 
+# Use OpenRouter fallback keys
+or_keys = settings.OPENROUTER_API_KEYS.split(",") if settings.OPENROUTER_API_KEYS else []
+api_key = or_keys[0].strip() if or_keys else settings.GEMINI_API_KEY
+client = openai.OpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key)
 
-def build_tool_declarations():
-    return [{"type": "function", **tool} for tool in ai_tools.TOOL_DEFINITIONS]
-
-
-def build_history_input(db: Session, user_id: UUID) -> list[dict]:
-    """Translate our own capped chat history into Interactions API step format."""
-    messages = chat_service.get_recent_history(db, user_id)  # already limited, oldest-first
-    steps = []
-
-    for msg in messages:
-        if msg.role == MessageRole.USER:
-            steps.append({"type": "user_input", "content": [{"type": "text", "text": msg.content}]})
-
-        elif msg.role == MessageRole.ASSISTANT:
-            if msg.tool_calls:
-                for call in msg.tool_calls:
-                    steps.append({
-                        "type": "function_call",
-                        "id": call["id"],
-                        "name": call["name"],
-                        "arguments": call["arguments"],
-                    })
-            elif msg.content:
-                steps.append({
-                    "type": "model_output",
-                    "content": [{"type": "text", "text": msg.content}],
-                })
-        elif msg.role == MessageRole.TOOL:
-            call_id = None
-            if msg.tool_calls:
-                call_id = msg.tool_calls.get("call_id") if isinstance(msg.tool_calls, dict) else None
-            steps.append({
-                "type": "function_result",
-                "name": msg.tool_name,
-                "call_id": call_id,
-                "result": [{"type": "text", "text": json.dumps(msg.tool_result)}],
-            })
-
-    return steps
+MODEL = "google/gemini-2.5-flash"
+MAX_TOOL_ITERATIONS = 4
 
 
-def run_agent(db: Session, user_id: UUID, user_message: str) -> dict:
-    # 1. Save the incoming user message
+def _build_tools() -> list[dict]:
+    return [
+        {
+            "type": "function",
+            "function": {
+                "name": tool["name"],
+                "description": tool["description"],
+                "parameters": tool["parameters"],
+            }
+        }
+        for tool in ai_tools.TOOL_DEFINITIONS
+    ]
+
+
+def _history_contents(db: Session, user_id: UUID) -> list[dict]:
+    """Return conversational turns only; health data is always requested fresh."""
+    contents = []
+    for message in chat_service.get_recent_history(db, user_id):
+        if message.content and message.role in (MessageRole.USER, MessageRole.ASSISTANT):
+            role = "user" if message.role == MessageRole.USER else "assistant"
+            contents.append({"role": role, "content": message.content})
+    return contents
+
+
+def run_agent(
+    db: Session, user_id: UUID, user_message: str, image_base64: str | None = None
+) -> dict:
     chat_service.save_message(db, user_id, MessageRole.USER, content=user_message)
+    user_settings = user_settings_service.get_or_create_settings(db, user_id)
+    contents = _history_contents(db, user_id)
+    
+    sys_prompt = build_system_prompt(db, user_id, user_settings)
+    messages = [{"role": "system", "content": sys_prompt}] + contents
 
-    # 2. Build system prompt (with profile/allergies/care circle injected) + capped history
-    settings_obj = user_settings_service.get_or_create_settings(db, user_id)
-    system_prompt = build_system_prompt(db, user_id, settings_obj)
-    history = build_history_input(db, user_id)
-    tools = build_tool_declarations()
-
-    blocks = []
-    tools_used = set()
-    hospital_result_cache = None
-    final_text = None
-    iterations = 0
-
-    while final_text is None and iterations < MAX_TOOL_ITERATIONS:
-        iterations += 1
-
-        interaction = client.interactions.create(
-    model=MODEL,
-    store=False,
-    input=history,
-    system_instruction=system_prompt,   # was: instructions=system_prompt
-    tools=tools,
-)
-
-        function_calls = [s for s in interaction.steps if s.type == "function_call"]
-
-        if not function_calls:
-            final_text = interaction.output_text
-            chat_service.save_message(db, user_id, MessageRole.ASSISTANT, content=final_text)
-            blocks.append(TextBlock(content=final_text))
-            break
-
-        # Replay the model's own steps back into history (required by stateless mode)
-        for step in interaction.steps:
-            history.append(step.model_dump())
-
-        # Execute each requested tool call, save + append result
-        for call in function_calls:
-            tools_used.add(call.name)
-
-            chat_service.save_message(
-                db, user_id, MessageRole.ASSISTANT,
-                tool_calls=[{"id": call.id, "name": call.name, "arguments": call.arguments}],
-            )
-
-            result = ai_tools.execute_tool(call.name, call.arguments, db, user_id)
-
-            chat_service.save_message(
-                db, user_id, MessageRole.TOOL,
-                tool_name=call.name, tool_result=result,
-            )
-
-            history.append({
-                "type": "function_result",
-                "name": call.name,
-                "call_id": call.id,
-                "result": [{"type": "text", "text": json.dumps(result)}],
+    if image_base64:
+        try:
+            # Validate base64
+            base64.b64decode(image_base64, validate=True)
+            messages.append({
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": user_message},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}
+                    }
+                ]
             })
+        except (ValueError, binascii.Error):
+            logger.warning("Ignoring malformed image attached to chat by user %s", user_id)
+            messages.append({"role": "user", "content": user_message})
+    else:
+        messages.append({"role": "user", "content": user_message})
 
-            if call.name == "get_health_metrics":
-                blocks.extend(ai_blocks.blocks_for_health_metrics(result))
-            elif call.name == "get_nearby_hospitals":
-                hospital_result_cache = result
-                blocks.extend(ai_blocks.blocks_for_hospitals(result))
+    blocks: list = []
+    tools_used: set[str] = set()
+    hospital_result_cache = None
+
+    try:
+        for _ in range(MAX_TOOL_ITERATIONS):
+            response = client.chat.completions.create(
+                model=MODEL,
+                messages=messages,
+                tools=_build_tools(),
+                temperature=0.2,
+                max_tokens=700,
+            )
+            
+            choice = response.choices[0]
+            msg = choice.message
+
+            if not msg.tool_calls:
+                reply = msg.content or "I'm sorry, I couldn't generate a response just now. Please try again."
+                chat_service.save_message(db, user_id, MessageRole.ASSISTANT, content=reply)
+                blocks.append(TextBlock(content=reply))
+                break
+
+            # msg.model_dump() doesn't include content if None for some old pydantic versions, 
+            # but usually it's fine. We'll build the assistant message dictionary manually to be safe.
+            assistant_msg = {"role": "assistant"}
+            if msg.content:
+                assistant_msg["content"] = msg.content
+            
+            tool_calls = []
+            for call in msg.tool_calls:
+                tool_calls.append({
+                    "id": call.id,
+                    "type": call.type,
+                    "function": {
+                        "name": call.function.name,
+                        "arguments": call.function.arguments
+                    }
+                })
+            assistant_msg["tool_calls"] = tool_calls
+            messages.append(assistant_msg)
+
+            for call in msg.tool_calls:
+                name = call.function.name
+                try:
+                    args = json.loads(call.function.arguments)
+                except json.JSONDecodeError:
+                    args = {}
+                
+                tools_used.add(name)
+                chat_service.save_message(
+                    db, user_id, MessageRole.ASSISTANT,
+                    tool_calls=[{"id": call.id, "name": name, "arguments": args}],
+                )
+                try:
+                    result = ai_tools.execute_tool(name, args, db, user_id)
+                except Exception:
+                    logger.exception("AI tool %s failed for user %s", name, user_id)
+                    result = {"error": "The requested health data is unavailable right now."}
+                
+                chat_service.save_message(db, user_id, MessageRole.TOOL, tool_name=name, tool_result=result)
+                
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": call.id,
+                    "name": name,
+                    "content": json.dumps({"result": result})
+                })
+
+                if name == "get_health_metrics" and "error" not in result:
+                    blocks.extend(ai_blocks.blocks_for_health_metrics(result))
+                elif name == "get_nearby_hospitals":
+                    hospital_result_cache = result
+                    blocks.extend(ai_blocks.blocks_for_hospitals(result))
+        else:
+            reply = "I'm sorry, I couldn't complete that request right now. Please try again."
+            chat_service.save_message(db, user_id, MessageRole.ASSISTANT, content=reply)
+            blocks.append(TextBlock(content=reply))
+    except Exception:
+        logger.exception("AI chat request failed for user %s", user_id)
+        reply = "I'm having trouble connecting right now. Please try again shortly."
+        chat_service.save_message(db, user_id, MessageRole.ASSISTANT, content=reply)
+        blocks.append(TextBlock(content=reply))
 
     action_block = ai_blocks.build_action_buttons(tools_used, hospital_result_cache)
     if action_block:
         blocks.append(action_block)
-
-    return {
-        "reply": final_text or "Sorry, I couldn't complete that request right now.",
-        "blocks": [b.model_dump() for b in blocks],
-    }
+    return {"reply": reply, "blocks": [block.model_dump() for block in blocks]}

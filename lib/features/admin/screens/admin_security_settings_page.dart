@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:firebase_auth/firebase_auth.dart';
+
 class AdminSecuritySettingsPage extends StatefulWidget {
   const AdminSecuritySettingsPage({super.key});
 
@@ -10,6 +12,70 @@ class AdminSecuritySettingsPage extends StatefulWidget {
 class _SecurityAdminSettingsPageState extends State<AdminSecuritySettingsPage> {
   bool _biometricAuth = true;
   bool _twoFactorAuth = false;
+  
+  final _currentPasswordController = TextEditingController();
+  final _newPasswordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  bool _isUpdatingPassword = false;
+
+  @override
+  void dispose() {
+    _currentPasswordController.dispose();
+    _newPasswordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _updatePassword(BuildContext context) async {
+    if (_newPasswordController.text != _confirmPasswordController.text) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('New passwords do not match.'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+    
+    setState(() => _isUpdatingPassword = true);
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null && user.email != null) {
+        // Re-authenticate user
+        final cred = EmailAuthProvider.credential(
+          email: user.email!, 
+          password: _currentPasswordController.text
+        );
+        await user.reauthenticateWithCredential(cred);
+        
+        // Update password
+        await user.updatePassword(_newPasswordController.text);
+        
+        if (mounted) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Access Key updated successfully!'), backgroundColor: Colors.green),
+          );
+        }
+      }
+    } on FirebaseAuthException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message ?? 'Authentication failed.'), backgroundColor: Colors.red),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isUpdatingPassword = false);
+        _currentPasswordController.clear();
+        _newPasswordController.clear();
+        _confirmPasswordController.clear();
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -123,29 +189,62 @@ class _SecurityAdminSettingsPageState extends State<AdminSecuritySettingsPage> {
   void _showChangePasswordDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: const Text('Update Access Key'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: const [
-            TextField(obscureText: true, decoration: InputDecoration(labelText: 'Current Key')),
-            SizedBox(height: 12),
-            TextField(obscureText: true, decoration: InputDecoration(labelText: 'New Key')),
-            SizedBox(height: 12),
-            TextField(obscureText: true, decoration: InputDecoration(labelText: 'Confirm New Key')),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Dismiss')),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context),
-            style: ElevatedButton.styleFrom(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      barrierDismissible: !_isUpdatingPassword,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setStateDialog) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            title: const Text('Update Access Key'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: _currentPasswordController,
+                  obscureText: true, 
+                  decoration: const InputDecoration(labelText: 'Current Key', prefixIcon: Icon(Icons.lock_outline))
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _newPasswordController,
+                  obscureText: true, 
+                  decoration: const InputDecoration(labelText: 'New Key', prefixIcon: Icon(Icons.key))
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _confirmPasswordController,
+                  obscureText: true, 
+                  decoration: const InputDecoration(labelText: 'Confirm New Key', prefixIcon: Icon(Icons.key))
+                ),
+              ],
             ),
-            child: const Text('Confirm Update'),
-          ),
-        ],
+            actions: [
+              TextButton(
+                onPressed: _isUpdatingPassword ? null : () {
+                  _currentPasswordController.clear();
+                  _newPasswordController.clear();
+                  _confirmPasswordController.clear();
+                  Navigator.pop(context);
+                }, 
+                child: const Text('Cancel')
+              ),
+              ElevatedButton(
+                onPressed: _isUpdatingPassword ? null : () async {
+                  setStateDialog(() => _isUpdatingPassword = true);
+                  await _updatePassword(context);
+                  if (mounted) setStateDialog(() => _isUpdatingPassword = false);
+                },
+                style: ElevatedButton.styleFrom(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: Colors.white,
+                ),
+                child: _isUpdatingPassword 
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Text('Confirm Update'),
+              ),
+            ],
+          );
+        }
       ),
     );
   }

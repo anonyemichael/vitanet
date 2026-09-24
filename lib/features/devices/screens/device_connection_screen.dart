@@ -1,81 +1,101 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vitanet/core/constants/app_spacing.dart';
 import 'package:vitanet/core/extensions/context_ext.dart';
+import 'package:vitanet/data/providers/providers.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-class DeviceConnectionScreen extends StatefulWidget {
+class DeviceConnectionScreen extends ConsumerStatefulWidget {
   final String metricId;
 
-  const DeviceConnectionScreen({
-    super.key,
-    required this.metricId,
-  });
+  const DeviceConnectionScreen({super.key, required this.metricId});
 
   @override
-  State<DeviceConnectionScreen> createState() => _DeviceConnectionScreenState();
+  ConsumerState<DeviceConnectionScreen> createState() =>
+      _DeviceConnectionScreenState();
 }
 
-class _DeviceConnectionScreenState extends State<DeviceConnectionScreen> with SingleTickerProviderStateMixin {
-  late AnimationController _pulseController;
+class _DeviceConnectionScreenState extends ConsumerState<DeviceConnectionScreen> {
   bool _isConnecting = false;
-  bool _isConnected = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 2),
-    )..repeat(reverse: true);
-  }
-
-  @override
-  void dispose() {
-    _pulseController.dispose();
-    super.dispose();
-  }
-
-  void _simulateConnection() async {
+  void _syncDevice() async {
     setState(() => _isConnecting = true);
-    await Future.delayed(const Duration(seconds: 2));
+    
+    final service = ref.read(healthServiceProvider);
+    bool hasPermissions = await service.requestPermissions();
+    
+    if (hasPermissions) {
+      try {
+        final biometrics = await service.fetchBiometrics();
+        if (biometrics.isNotEmpty && mounted) {
+          biometrics.forEach((key, value) {
+            final doubleVal = double.tryParse(value.toString());
+            if (doubleVal != null) {
+              ref.read(liveVitalsProvider.notifier).setVital(key, doubleVal);
+            }
+          });
+        }
+      } catch (e) {
+        debugPrint('Error fetching immediate biometrics: $e');
+      }
+    }
+
     if (mounted) {
-      setState(() {
-        _isConnecting = false;
-        _isConnected = true;
-      });
-      Future.delayed(const Duration(seconds: 1), () {
-        if (mounted) context.pop();
-      });
+      setState(() => _isConnecting = false);
+      if (hasPermissions) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Successfully synced with Health Connect!'),
+            backgroundColor: Color(0xFF10B981),
+          ),
+        );
+        Future.delayed(const Duration(seconds: 1), () {
+          if (mounted) {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/home');
+            }
+          }
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not obtain Health Connect permissions. Please install it or check settings.'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _openHealthConnectSettings() async {
+    final Uri url = Uri.parse('market://details?id=com.google.android.apps.healthdata');
+    try {
+      if (await canLaunchUrl(url)) {
+        await launchUrl(url, mode: LaunchMode.externalApplication);
+      } else {
+        final Uri webUrl = Uri.parse('https://play.google.com/store/apps/details?id=com.google.android.apps.healthdata');
+        await launchUrl(webUrl, mode: LaunchMode.externalApplication);
+      }
+    } catch (e) {
+      debugPrint('Could not launch Health Connect: $e');
     }
   }
 
   String _getDeviceName() {
     switch (widget.metricId) {
       case 'heart_rate':
-        return 'Heart Rate Monitor';
+        return 'Heart Rate';
       case 'blood_oxygen':
-        return 'Pulse Oximeter';
+        return 'Blood Oxygen';
       case 'temperature':
-        return 'Smart Thermometer';
+        return 'Body Temperature';
       case 'respiratory_rate':
-        return 'Respiratory Sensor';
+        return 'Respiratory Rate';
       default:
-        return 'Health Device';
-    }
-  }
-
-  IconData _getDeviceIcon() {
-    switch (widget.metricId) {
-      case 'heart_rate':
-        return Icons.favorite_rounded;
-      case 'blood_oxygen':
-        return Icons.air_rounded;
-      case 'temperature':
-        return Icons.thermostat_rounded;
-      case 'respiratory_rate':
-        return Icons.water_drop_rounded;
-      default:
-        return Icons.devices_rounded;
+        return 'Health Data';
     }
   }
 
@@ -97,7 +117,9 @@ class _DeviceConnectionScreenState extends State<DeviceConnectionScreen> with Si
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: context.isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+      backgroundColor: context.isDark
+          ? const Color(0xFF0F172A)
+          : const Color(0xFFF8FAFC),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -109,246 +131,170 @@ class _DeviceConnectionScreenState extends State<DeviceConnectionScreen> with Si
           onPressed: () => context.pop(),
         ),
         title: Text(
-          'Connect Device',
+          'Device Setup',
           style: TextStyle(
             color: context.isDark ? Colors.white : Colors.black87,
             fontWeight: FontWeight.bold,
           ),
         ),
       ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          if (constraints.maxWidth < 800) {
-            return _buildMobileLayout(context);
-          } else {
-            return _buildDesktopLayout(context);
-          }
-        },
-      ),
-    );
-  }
-
-  Widget _buildMobileLayout(BuildContext context) {
-    return SafeArea(
-      child: Column(
-        children: [
-          Expanded(
-            child: _buildRadarAnimation(),
-          ),
-          if (!_isConnected)
-            _buildDeviceListSheet(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDesktopLayout(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          flex: 1,
-          child: _buildRadarAnimation(),
-        ),
-        if (!_isConnected)
-          Container(
-            width: 400,
-            margin: const EdgeInsets.all(AppSpacing.xxl),
-            decoration: BoxDecoration(
-              color: context.isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
-              borderRadius: BorderRadius.circular(32),
-              border: Border.all(
-                color: context.isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.05),
-              ),
-              boxShadow: [
-                if (!context.isDark)
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 30,
-                    offset: const Offset(0, 10),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(AppSpacing.xxl),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Icon(
+                  Icons.health_and_safety_rounded,
+                  size: 80,
+                  color: _getDeviceColor(),
+                ),
+                const SizedBox(height: AppSpacing.xl),
+                Text(
+                  'Sync your ${_getDeviceName()} Data',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: context.isDark ? Colors.white : Colors.black87,
                   ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  'VitaNet reads your real-time vitals through Health Connect. Follow these quick steps to link your smartwatch or fitness tracker:',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: context.isDark ? Colors.white70 : Colors.black54,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xxxl),
+                _buildStep(
+                  context,
+                  number: '1',
+                  title: 'Install Health Connect (if missing)',
+                  description:
+                      'Tap the button below to ensure Google Health Connect is installed on your phone.',
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                _buildStep(
+                  context,
+                  number: '2',
+                  title: 'Link Your Watch App',
+                  description:
+                      "Open your watch's official app (e.g., Fitbit, Garmin, Samsung Health) and turn on \"Share with Health Connect\" in its settings.",
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                _buildStep(
+                  context,
+                  number: '3',
+                  title: 'Start Syncing!',
+                  description:
+                      'Tap "Sync Data Now" to grant VitaNet permission to read your vitals securely.',
+                ),
+                const SizedBox(height: 32),
+                ElevatedButton(
+                  onPressed: _isConnecting ? null : _syncDevice,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _getDeviceColor(),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: _isConnecting
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Text(
+                          'Sync Data Now',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                OutlinedButton.icon(
+                  onPressed: _openHealthConnectSettings,
+                  icon: const Icon(Icons.settings_applications_rounded),
+                  label: const Text('Open Health Connect / Play Store'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: context.isDark ? Colors.white70 : Colors.black87,
+                    side: BorderSide(
+                      color: context.isDark ? Colors.white24 : Colors.black12,
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xxl),
               ],
             ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(32),
-              child: _buildDeviceListSheet(isDesktop: true),
-            ),
           ),
-      ],
-    );
-  }
-
-  Widget _buildRadarAnimation() {
-    final deviceColor = _getDeviceColor();
-    
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          AnimatedBuilder(
-            animation: _pulseController,
-            builder: (context, child) {
-              return Container(
-                width: 160 + (_pulseController.value * 40),
-                height: 160 + (_pulseController.value * 40),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: deviceColor.withValues(alpha: 0.1 - (_pulseController.value * 0.05)),
-                ),
-                child: Center(
-                  child: Container(
-                    width: 120,
-                    height: 120,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: deviceColor.withValues(alpha: 0.2),
-                    ),
-                    child: Center(
-                      child: Icon(
-                        _isConnected ? Icons.check_circle_rounded : _getDeviceIcon(),
-                        size: 64,
-                        color: deviceColor,
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: AppSpacing.xxl),
-          Text(
-            _isConnected ? 'Connected!' : 'Searching for nearby devices...',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: context.isDark ? Colors.white : Colors.black87,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            _isConnected
-                ? 'Your ${_getDeviceName()} is now paired.'
-                : 'Make sure your ${_getDeviceName()} is turned on and in pairing mode.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 14,
-              color: context.isDark ? Colors.white54 : Colors.black54,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDeviceListSheet({bool isDesktop = false}) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.xl),
-      decoration: BoxDecoration(
-        color: isDesktop ? Colors.transparent : (context.isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white),
-        borderRadius: isDesktop ? BorderRadius.zero : const BorderRadius.vertical(top: Radius.circular(32)),
-        boxShadow: isDesktop ? [] : [
-          if (!context.isDark)
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 20,
-              offset: const Offset(0, -10),
-            ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: isDesktop ? MainAxisSize.max : MainAxisSize.min,
-        children: [
-          Text(
-            'Available Devices',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: context.isDark ? Colors.white : Colors.black87,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          _buildDeviceTile(
-            name: 'VitaBand Pro',
-            subtitle: 'Signal: Strong',
-            icon: Icons.watch_rounded,
-            onTap: _isConnecting ? null : _simulateConnection,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          _buildDeviceTile(
-            name: 'Unknown Device',
-            subtitle: 'Signal: Weak',
-            icon: Icons.bluetooth_rounded,
-            onTap: null,
-          ),
-          if (isDesktop) const Spacer(),
-          if (!isDesktop) const SizedBox(height: AppSpacing.xl),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDeviceTile({
-    required String name,
-    required String subtitle,
-    required IconData icon,
-    required VoidCallback? onTap,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: context.isDark ? Colors.white.withValues(alpha: 0.03) : Colors.black.withValues(alpha: 0.02),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: context.isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.05),
         ),
       ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: Container(
-          padding: const EdgeInsets.all(10),
+    );
+  }
+
+  Widget _buildStep(BuildContext context, {required String number, required String title, required String description}) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 32,
+          height: 32,
           decoration: BoxDecoration(
-            color: context.isDark ? Colors.white12 : Colors.white,
+            color: _getDeviceColor().withValues(alpha: 0.15),
             shape: BoxShape.circle,
           ),
-          child: Icon(icon, color: context.isDark ? Colors.white70 : Colors.black87),
-        ),
-        title: Text(
-          name,
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            color: context.isDark ? Colors.white : Colors.black87,
+          child: Center(
+            child: Text(
+              number,
+              style: TextStyle(
+                color: _getDeviceColor(),
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
           ),
         ),
-        subtitle: Text(
-          subtitle,
-          style: TextStyle(
-            color: context.isDark ? Colors.white54 : Colors.black54,
-            fontSize: 13,
-          ),
-        ),
-        trailing: onTap != null
-            ? _isConnecting
-                ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : TextButton(
-                    onPressed: onTap,
-                    style: TextButton.styleFrom(
-                      backgroundColor: const Color(0xFF6366F1).withValues(alpha: 0.1),
-                      foregroundColor: const Color(0xFF6366F1),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    child: const Text('Connect'),
-                  )
-            : Text(
-                'Unsupported',
+        const SizedBox(width: AppSpacing.md),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
                 style: TextStyle(
-                  color: context.isDark ? Colors.white38 : Colors.black38,
-                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: context.isDark ? Colors.white : Colors.black87,
                 ),
               ),
-      ),
+              const SizedBox(height: 4),
+              Text(
+                description,
+                style: TextStyle(
+                  color: context.isDark ? Colors.white60 : Colors.black54,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

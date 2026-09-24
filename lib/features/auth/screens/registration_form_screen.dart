@@ -146,6 +146,7 @@ class _RegistrationFormScreenState extends ConsumerState<RegistrationFormScreen>
                       child: Image.asset(
                         'assets/images/staff_login.jpg',
                         fit: BoxFit.cover,
+                        cacheWidth: 600,
                         height: double.infinity,
                         alignment: Alignment.centerLeft,
                         errorBuilder: (c, e, s) => Container(color: context.colorScheme.primaryContainer),
@@ -268,6 +269,7 @@ class _RegistrationFormScreenState extends ConsumerState<RegistrationFormScreen>
               child: Image.asset(
                 'assets/images/staff_login.jpg',
                 fit: BoxFit.cover,
+                cacheWidth: 600,
                 alignment: Alignment.topCenter,
                 errorBuilder: (c, e, s) => Container(color: context.colorScheme.primaryContainer),
               ),
@@ -385,15 +387,22 @@ class _SignInTabState extends ConsumerState<_SignInTab> {
         throw Exception(authState.errorMessage);
       }
 
-      if (authState.user != null) {
-        final backendUser = await ref.read(apiServiceProvider).getUserByFirebaseUid(authState.user!.uid);
+      if (authState.status == AuthStatus.authenticated && authState.user != null) {
+        final backendUser = await ref.read(firestoreServiceProvider).getUserProfile(authState.user!.uid);
         if (backendUser != null) {
-          // The backend returns user details under 'full_name' and 'account_type'.
-          final accountType = backendUser['account_type'];
+          final accountType = backendUser.role;
+          
+          if (accountType == 'personal_user' || accountType == 'patient' || accountType == 'user') {
+            await ref.read(authProvider.notifier).signOut();
+            if (mounted) {
+              context.showSnack('This account belongs to a Personal User. Please use the Patient login.');
+              setState(() => _isLoading = false);
+            }
+            return;
+          }
+
           final role = (accountType == 'healthcare_professional' || accountType == 'admin') ? 'admin' : 'user';
-          ref.read(userProfileProvider.notifier).updateProfile(
-            UserProfile(name: backendUser['full_name'] ?? 'Provider', role: role),
-          );
+          ref.read(userProfileProvider.notifier).updateProfile(backendUser);
         } else {
           // Fallback if backend fetch fails or no user found
           ref.read(userProfileProvider.notifier).updateProfile(
@@ -531,7 +540,7 @@ class _SignUpTabState extends ConsumerState<_SignUpTab> {
         "care_circle": [],
       };
 
-      await ref.read(apiServiceProvider).registerUser(payload);
+      // Removed Render API registerUser payload
 
       if (mounted) context.go('/admin');
     } catch (e) {

@@ -26,9 +26,14 @@ class HealthMetricRequest {
 
 final healthDataProvider = FutureProvider.family<List<HealthDataPoint>, HealthMetricRequest>((ref, request) async {
   final service = ref.watch(healthServiceProvider);
-  final hasPerms = await service.requestPermissions();
-  if (!hasPerms) {
-    return [];
-  }
-  return service.fetchMetric(request.metricId, request.daysBack);
+  List<HealthDataPoint> data = [];
+  
+  try {
+    final hasPerms = await service.requestPermissions();
+    if (hasPerms) {
+      data = await service.fetchMetric(request.metricId, request.daysBack);
+    }
+  } catch (_) {}
+
+  return data;
 });

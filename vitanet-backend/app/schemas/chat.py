@@ -2,7 +2,7 @@
 from uuid import UUID
 from datetime import datetime
 from typing import Optional, Any
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from app.models.chat import MessageRole
 
 
@@ -19,7 +19,8 @@ class ChatMessageOut(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    message: str
+    message: str = Field(min_length=1, max_length=4_000)
+    image_base64: Optional[str] = Field(default=None, max_length=8_000_000)
 
 
 class ChatResponse(BaseModel):

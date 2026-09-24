@@ -41,10 +41,7 @@ class _AnimatedChatBackgroundState extends State<AnimatedChatBackground>
             progress: _controller.value,
             isDark: isDark,
           ),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
-            child: Container(color: Colors.transparent),
-          ),
+          child: Container(),
         );
       },
     );

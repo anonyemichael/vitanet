@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:firebase_auth/firebase_auth.dart';
+
 class AdminProfileSettingsPage extends StatefulWidget {
   const AdminProfileSettingsPage({super.key});
 
@@ -8,9 +10,21 @@ class AdminProfileSettingsPage extends StatefulWidget {
 }
 
 class _ProfileAdminSettingsPageState extends State<AdminProfileSettingsPage> {
-  final _nameController = TextEditingController(text: 'Medical Service Provider');
+  final _nameController = TextEditingController();
   final _bioController = TextEditingController(
       text: 'Dedicated to providing high-quality clinical care and operational excellence.');
+  bool _isUpdating = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null && user.displayName != null && user.displayName!.isNotEmpty) {
+      _nameController.text = user.displayName!;
+    } else {
+      _nameController.text = 'Medical Service Provider';
+    }
+  }
 
   @override
   void dispose() {
@@ -19,10 +33,43 @@ class _ProfileAdminSettingsPageState extends State<AdminProfileSettingsPage> {
     super.dispose();
   }
 
+  Future<void> _updateProfile() async {
+    setState(() => _isUpdating = true);
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        await user.updateDisplayName(_nameController.text);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Identity records updated successfully.'),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: Colors.green,
+            ),
+          );
+          Navigator.pop(context);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update: $e'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isUpdating = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final user = FirebaseAuth.instance.currentUser;
 
     return Scaffold(
       backgroundColor: isDark ? colorScheme.surface : const Color(0xFFF1F8FE),
@@ -31,18 +78,15 @@ class _ProfileAdminSettingsPageState extends State<AdminProfileSettingsPage> {
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 12),
-            child: TextButton(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Identity records updated'),
-                    behavior: SnackBarBehavior.floating,
+            child: _isUpdating 
+                ? const SizedBox(
+                    width: 20, height: 20, 
+                    child: CircularProgressIndicator(strokeWidth: 2)
+                  )
+                : TextButton(
+                    onPressed: _updateProfile,
+                    child: const Text('Save', style: TextStyle(fontWeight: FontWeight.bold)),
                   ),
-                );
-                Navigator.pop(context);
-              },
-              child: const Text('Update'),
-            ),
           ),
         ],
       ),
@@ -64,8 +108,15 @@ class _ProfileAdminSettingsPageState extends State<AdminProfileSettingsPage> {
                       ),
                       child: CircleAvatar(
                         radius: 65,
-                        backgroundColor: colorScheme.primaryContainer.withAlpha(50),
-                        child: Icon(Icons.person_outline, size: 70, color: colorScheme.primary),
+                        backgroundColor: colorScheme.primaryContainer,
+                        child: Text(
+                          _nameController.text.isNotEmpty ? _nameController.text[0].toUpperCase() : 'M',
+                          style: TextStyle(
+                            fontSize: 50,
+                            fontWeight: FontWeight.bold,
+                            color: colorScheme.primary,
+                          ),
+                        ),
                       ),
                     ),
                     CircleAvatar(
@@ -118,8 +169,9 @@ class _ProfileAdminSettingsPageState extends State<AdminProfileSettingsPage> {
                   ),
                 ),
                 const SizedBox(height: 32),
+                _buildInfoTile(context, 'Primary Email', user?.email ?? 'Unknown', Icons.email_outlined),
                 _buildInfoTile(context, 'Clinical Department', 'General Administration', Icons.business_outlined),
-                _buildInfoTile(context, 'Credential ID', 'MSC-2024-001', Icons.verified_user_outlined),
+                _buildInfoTile(context, 'Credential ID', user?.uid.substring(0, 8).toUpperCase() ?? 'MSC-2024', Icons.verified_user_outlined),
               ],
             ),
           ),

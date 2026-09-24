@@ -9,6 +9,8 @@ class HealthService {
   }
 
   Future<bool> requestPermissions() async {
+    if (kIsWeb) return false;
+    
     final types = [
       HealthDataType.HEART_RATE,
       HealthDataType.BLOOD_PRESSURE_SYSTOLIC,
@@ -49,6 +51,9 @@ class HealthService {
         HealthDataType.HEART_RATE,
         HealthDataType.BLOOD_PRESSURE_SYSTOLIC,
         HealthDataType.BLOOD_PRESSURE_DIASTOLIC,
+        HealthDataType.BLOOD_OXYGEN,
+        HealthDataType.BODY_TEMPERATURE,
+        HealthDataType.RESPIRATORY_RATE,
       ];
       
       List<HealthDataPoint> healthData = await _health.getHealthDataFromTypes(
@@ -68,6 +73,12 @@ class HealthService {
             biometrics['systolic_bp'] = val.toString();
           } else if (point.type == HealthDataType.BLOOD_PRESSURE_DIASTOLIC && !biometrics.containsKey('diastolic_bp')) {
             biometrics['diastolic_bp'] = val.toString();
+          } else if (point.type == HealthDataType.BLOOD_OXYGEN && !biometrics.containsKey('blood_oxygen')) {
+            biometrics['blood_oxygen'] = val.toString();
+          } else if (point.type == HealthDataType.BODY_TEMPERATURE && !biometrics.containsKey('temperature')) {
+            biometrics['temperature'] = val.toString();
+          } else if (point.type == HealthDataType.RESPIRATORY_RATE && !biometrics.containsKey('respiratory_rate')) {
+            biometrics['respiratory_rate'] = val.toString();
           }
         }
       }
@@ -79,6 +90,8 @@ class HealthService {
   }
 
   Future<List<HealthDataPoint>> fetchMetric(String metricId, int daysBack) async {
+    if (kIsWeb) return [];
+
     final now = DateTime.now();
     final start = now.subtract(Duration(days: daysBack));
 

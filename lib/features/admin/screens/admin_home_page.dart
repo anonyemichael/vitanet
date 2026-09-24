@@ -179,7 +179,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
                             crossAxisCount: crossAxisCount,
                             mainAxisSpacing: 16,
                             crossAxisSpacing: 16,
-                            childAspectRatio: 1.4,
+                            childAspectRatio: 1.1,
                             children: [
                               _buildMetricCard(
                                 context,
@@ -235,7 +235,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
                             crossAxisCount: crossAxisCount,
                             mainAxisSpacing: 16,
                             crossAxisSpacing: 16,
-                            childAspectRatio: 1.6,
+                            childAspectRatio: 1.3,
                             children: [
                               _buildWorkflowItem(context, Icons.assignment_outlined, 'Consultation', const Color(0xFF0288D1)),
                               _buildWorkflowItem(context, Icons.history_edu_outlined, 'Case History', const Color(0xFF26C6DA)),

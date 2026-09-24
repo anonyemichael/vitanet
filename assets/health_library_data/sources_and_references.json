@@ -1,0 +1,47 @@
+{
+  "system_title": "VitaNet Health Library Medical Content & Resource Repository",
+  "verified_sources": [
+    {
+      "institution": "National Institutes of Health (NIH) & MedlinePlus",
+      "authority_type": "US Federal Government Medical Database",
+      "url": "https://medlineplus.gov/",
+      "content_usage": "Public Domain / Educational Use",
+      "topics_covered": ["Cardiovascular Disease", "Type 2 Diabetes", "Nutrition", "Neurology", "Pharmacology"]
+    },
+    {
+      "institution": "Centers for Disease Control and Prevention (CDC)",
+      "authority_type": "US National Public Health Agency",
+      "url": "https://www.cdc.gov/",
+      "content_usage": "Public Domain",
+      "topics_covered": ["Vaccines", "Infectious Diseases", "Hypertension", "Physical Activity Guidelines"]
+    },
+    {
+      "institution": "World Health Organization (WHO)",
+      "authority_type": "International Public Health Agency",
+      "url": "https://www.who.int/",
+      "content_usage": "Open Access Educational Guidance",
+      "topics_covered": ["Global Health Guidelines", "Mental Health", "Emergency Protocols"]
+    },
+    {
+      "institution": "openFDA API",
+      "authority_type": "US Food and Drug Administration",
+      "url": "https://open.fda.gov/",
+      "content_usage": "Public Domain API",
+      "topics_covered": ["Drug Labeling", "Dosage Instructions", "Adverse Event Reports", "Recall Notices"]
+    },
+    {
+      "institution": "St. John Ambulance & American Red Cross",
+      "authority_type": "Certified Emergency First Aid & Life Support Authorities",
+      "url": "https://www.sja.org.uk/",
+      "content_usage": "Educational Video Embeds & First Aid Protocols",
+      "topics_covered": ["CPR Procedures", "Heimlich Maneuver", "Burn Triage", "Anaphylaxis Epipen Administration"]
+    },
+    {
+      "institution": "Mayo Clinic & Harvard Health Publishing",
+      "authority_type": "Leading Academic Medical Centers",
+      "url": "https://www.mayoclinic.org/",
+      "content_usage": "Educational Video Embeds & Clinical Summaries",
+      "topics_covered": ["Sleep Hygiene", "Preventive Cardiology", "Stress & Cortisol Regulation"]
+    }
+  ]
+}

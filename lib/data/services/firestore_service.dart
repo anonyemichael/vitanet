@@ -1,11 +1,38 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:vitanet/data/models/chat_message.dart';
+import 'package:vitanet/data/models/user_profile.dart';
 
 class FirestoreService {
   final FirebaseFirestore _firestore;
 
   FirestoreService({FirebaseFirestore? firestore})
       : _firestore = firestore ?? FirebaseFirestore.instance;
+
+  Future<void> saveUserProfile(String userId, UserProfile profile) async {
+    try {
+      if (userId.isEmpty) return;
+      await _firestore.collection('users').doc(userId).set(
+        profile.toMap(),
+        SetOptions(merge: true),
+      );
+    } catch (e) {
+      print('Error saving user profile: $e');
+    }
+  }
+
+  Future<UserProfile?> getUserProfile(String userId) async {
+    try {
+      if (userId.isEmpty) return null;
+      final doc = await _firestore.collection('users').doc(userId).get();
+      if (doc.exists && doc.data() != null) {
+        return UserProfile.fromMap(doc.data()!);
+      }
+      return null;
+    } catch (e) {
+      print('Error getting user profile: $e');
+      return null;
+    }
+  }
 
   Future<void> saveChatHistory(String userId, String conversationId, List<ChatMessage> messages) async {
     try {

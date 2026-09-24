@@ -16,21 +16,19 @@ class ProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profile = ref.watch(userProfileProvider);
-    final isHealthWorker = profile?.role == 'health_worker' || profile?.role == 'admin';
+    final isHealthWorker =
+        profile?.role == 'health_worker' || profile?.role == 'admin';
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = isDark ? const Color(0xFF121212) : Colors.grey.shade50;
-    final textColor = isDark ? Colors.white : Colors.black87;
+    final bgColor = context.theme.scaffoldBackgroundColor;
+    final textColor = context.colorScheme.onSurface;
 
     return Scaffold(
       backgroundColor: bgColor,
       appBar: AppBar(
         title: Text(
           'Profile',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: textColor,
-          ),
+          style: TextStyle(fontWeight: FontWeight.bold, color: textColor),
         ),
         elevation: 0,
         backgroundColor: bgColor,
@@ -40,9 +38,21 @@ class ProfileScreen extends ConsumerWidget {
         child: LayoutBuilder(
           builder: (context, constraints) {
             if (constraints.maxWidth < 800) {
-              return _buildMobileLayout(context, ref, profile, isHealthWorker, isDark);
+              return _buildMobileLayout(
+                context,
+                ref,
+                profile,
+                isHealthWorker,
+                isDark,
+              );
             } else {
-              return _buildDesktopLayout(context, ref, profile, isHealthWorker, isDark);
+              return _buildDesktopLayout(
+                context,
+                ref,
+                profile,
+                isHealthWorker,
+                isDark,
+              );
             }
           },
         ),
@@ -50,44 +60,151 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildMobileLayout(BuildContext context, WidgetRef ref, UserProfile? profile, bool isHealthWorker, bool isDark) {
+  Widget _buildMobileLayout(
+    BuildContext context,
+    WidgetRef ref,
+    UserProfile? profile,
+    bool isHealthWorker,
+    bool isDark,
+  ) {
     return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.md,
+      ),
       children: [
-        _buildCenteredHeader(context, ref, profile, isDark).animate().fadeIn(duration: 400.ms).slideY(begin: 0.05),
+        _buildCenteredHeader(
+          context,
+          ref,
+          profile,
+          isDark,
+        ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.05),
         const SizedBox(height: AppSpacing.xxl),
-        
-        if (profile != null) ...[
-          _buildSectionTitle(context, 'Health Overview', isDark).animate().fadeIn(delay: 100.ms),
-          _buildHealthMetricsGrid(context, profile, isDark).animate().fadeIn(delay: 100.ms).slideY(begin: 0.05),
+
+        if (_needsProfileCompletion(profile)) ...[
+          _buildCompletionPrompt(context, isDark),
           const SizedBox(height: AppSpacing.xl),
         ],
 
-        _buildSectionTitle(context, 'Account', isDark).animate().fadeIn(delay: 200.ms),
-        _buildAccountGroup(context, isHealthWorker, isDark).animate().fadeIn(delay: 200.ms).slideY(begin: 0.05),
+        if (profile != null) ...[
+          _buildSectionTitle(
+            context,
+            'Health Overview',
+            isDark,
+          ).animate().fadeIn(delay: 100.ms),
+          _buildHealthMetricsGrid(
+            context,
+            profile,
+            isDark,
+          ).animate().fadeIn(delay: 100.ms).slideY(begin: 0.05),
+          const SizedBox(height: AppSpacing.xl),
+        ],
+
+        _buildSectionTitle(
+          context,
+          'Account',
+          isDark,
+        ).animate().fadeIn(delay: 200.ms),
+        _buildAccountGroup(
+          context,
+          isHealthWorker,
+          isDark,
+        ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.05),
         const SizedBox(height: AppSpacing.xl),
 
-        _buildSectionTitle(context, 'Support', isDark).animate().fadeIn(delay: 300.ms),
-        _buildSupportGroup(context, isDark).animate().fadeIn(delay: 300.ms).slideY(begin: 0.05),
+        _buildSectionTitle(
+          context,
+          'Support',
+          isDark,
+        ).animate().fadeIn(delay: 300.ms),
+        _buildSupportGroup(
+          context,
+          isDark,
+        ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.05),
         const SizedBox(height: AppSpacing.xxxl),
 
-        _buildLogoutButton(context, isDark).animate().fadeIn(delay: 400.ms),
-        const SizedBox(height: AppSpacing.xxl),
+        _buildLogoutButton(context, ref, isDark).animate().fadeIn(delay: 400.ms),
+        const SizedBox(height: 120),
       ],
     );
   }
 
-  Widget _buildDesktopLayout(BuildContext context, WidgetRef ref, UserProfile? profile, bool isHealthWorker, bool isDark) {
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 800),
-        child: _buildMobileLayout(context, ref, profile, isHealthWorker, isDark),
+  String _getInitials(String? name) {
+    if (name == null || name.isEmpty) return '?';
+    final parts = name.trim().split(RegExp(r'\s+'));
+    if (parts.length > 1) {
+      return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+    }
+    return parts.first[0].toUpperCase();
+  }
+
+  bool _needsProfileCompletion(UserProfile? profile) {
+    if (profile == null) return true;
+    return profile.phone == null ||
+        profile.phone!.trim().isEmpty ||
+        profile.dob == null ||
+        profile.dob!.trim().isEmpty ||
+        profile.sex == null ||
+        profile.sex!.trim().isEmpty;
+  }
+
+  Widget _buildCompletionPrompt(BuildContext context, bool isDark) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: context.colorScheme.primaryContainer.withValues(alpha: 0.65),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.person_add_alt_1_rounded,
+            color: context.colorScheme.primary,
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Text(
+              'Complete your profile so VitaNet can personalize your health guidance.',
+              style: context.textTheme.bodyMedium,
+            ),
+          ),
+          TextButton(
+            onPressed: () => context.push('/edit-profile'),
+            child: const Text('Complete'),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildCenteredHeader(BuildContext context, WidgetRef ref, UserProfile? profile, bool isDark) {
-    final textColor = isDark ? Colors.white : Colors.black87;
+  Widget _buildDesktopLayout(
+    BuildContext context,
+    WidgetRef ref,
+    UserProfile? profile,
+    bool isHealthWorker,
+    bool isDark,
+  ) {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 800),
+        child: _buildMobileLayout(
+          context,
+          ref,
+          profile,
+          isHealthWorker,
+          isDark,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCenteredHeader(
+    BuildContext context,
+    WidgetRef ref,
+    UserProfile? profile,
+    bool isDark,
+  ) {
+    final textColor = context.colorScheme.onSurface;
 
     return Column(
       children: [
@@ -111,24 +228,35 @@ class ProfileScreen extends ConsumerWidget {
               letterSpacing: 1.0,
             ),
           ),
-        ]
+        ],
       ],
     );
   }
 
-  Widget _buildAvatarPicker(BuildContext context, WidgetRef ref, UserProfile? profile, bool isDark) {
-    final hasImage = profile?.profileImagePath != null && profile!.profileImagePath!.isNotEmpty;
-    final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final avatarBgColor = isDark ? Colors.grey.shade800 : Colors.blueGrey.shade50;
-    
+  Widget _buildAvatarPicker(
+    BuildContext context,
+    WidgetRef ref,
+    UserProfile? profile,
+    bool isDark,
+  ) {
+    final hasImage =
+        profile?.profileImagePath != null &&
+        profile!.profileImagePath!.isNotEmpty;
+    final cardColor = context.colorScheme.surface;
+    final avatarBgColor = context.colorScheme.surfaceContainerHighest;
+
     return GestureDetector(
       onTap: () async {
         final ImagePicker picker = ImagePicker();
-        final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-        
+        final XFile? image = await picker.pickImage(
+          source: ImageSource.gallery,
+        );
+
         if (image != null && profile != null) {
           final updatedProfile = profile.copyWith(profileImagePath: image.path);
-          await ref.read(userProfileProvider.notifier).updateProfile(updatedProfile);
+          await ref
+              .read(userProfileProvider.notifier)
+              .updateProfile(updatedProfile);
         }
       },
       child: Stack(
@@ -149,14 +277,16 @@ class ProfileScreen extends ConsumerWidget {
             child: CircleAvatar(
               radius: 54,
               backgroundColor: avatarBgColor,
-              backgroundImage: hasImage ? FileImage(File(profile!.profileImagePath!)) : null,
-              child: !hasImage 
+              backgroundImage: hasImage
+                  ? FileImage(File(profile!.profileImagePath!))
+                  : null,
+              child: !hasImage
                   ? Text(
-                      profile?.name?.isNotEmpty == true
-                          ? profile!.name![0].toUpperCase()
-                          : '?',
+                      _getInitials(profile?.name),
                       style: context.textTheme.headlineMedium?.copyWith(
-                        color: isDark ? Colors.grey.shade400 : Colors.blueGrey.shade300,
+                        color: isDark
+                            ? Colors.grey.shade400
+                            : Colors.blueGrey.shade300,
                         fontWeight: FontWeight.bold,
                       ),
                     )
@@ -195,9 +325,13 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildHealthMetricsGrid(BuildContext context, UserProfile profile, bool isDark) {
-    final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final dividerColor = isDark ? Colors.grey.shade800 : Colors.grey.shade100;
+  Widget _buildHealthMetricsGrid(
+    BuildContext context,
+    UserProfile profile,
+    bool isDark,
+  ) {
+    final cardColor = context.colorScheme.surface;
+    final dividerColor = context.colorScheme.outlineVariant.withValues(alpha: 0.5);
 
     return Container(
       decoration: BoxDecoration(
@@ -216,9 +350,25 @@ class ProfileScreen extends ConsumerWidget {
           IntrinsicHeight(
             child: Row(
               children: [
-                Expanded(child: _buildMetricItem(context, Icons.water_drop_rounded, 'Blood', profile.bloodType ?? '--', isDark)),
+                Expanded(
+                  child: _buildMetricItem(
+                    context,
+                    Icons.water_drop_rounded,
+                    'Blood',
+                    profile.bloodType ?? '--',
+                    isDark,
+                  ),
+                ),
                 VerticalDivider(width: 1, color: dividerColor),
-                Expanded(child: _buildMetricItem(context, Icons.cake_rounded, 'Age', profile.age?.toString() ?? '--', isDark)),
+                Expanded(
+                  child: _buildMetricItem(
+                    context,
+                    Icons.cake_rounded,
+                    'Age',
+                    profile.age?.toString() ?? '--',
+                    isDark,
+                  ),
+                ),
               ],
             ),
           ),
@@ -226,9 +376,25 @@ class ProfileScreen extends ConsumerWidget {
           IntrinsicHeight(
             child: Row(
               children: [
-                Expanded(child: _buildMetricItem(context, Icons.monitor_weight_rounded, 'Weight', profile.weight != null ? '${profile.weight}kg' : '--', isDark)),
+                Expanded(
+                  child: _buildMetricItem(
+                    context,
+                    Icons.monitor_weight_rounded,
+                    'Weight',
+                    profile.weight != null ? '${profile.weight}kg' : '--',
+                    isDark,
+                  ),
+                ),
                 VerticalDivider(width: 1, color: dividerColor),
-                Expanded(child: _buildMetricItem(context, Icons.height_rounded, 'Height', profile.height != null ? '${profile.height}cm' : '--', isDark)),
+                Expanded(
+                  child: _buildMetricItem(
+                    context,
+                    Icons.height_rounded,
+                    'Height',
+                    profile.height != null ? '${profile.height}cm' : '--',
+                    isDark,
+                  ),
+                ),
               ],
             ),
           ),
@@ -237,19 +403,29 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildMetricItem(BuildContext context, IconData icon, String label, String value, bool isDark) {
+  Widget _buildMetricItem(
+    BuildContext context,
+    IconData icon,
+    String label,
+    String value,
+    bool isDark,
+  ) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 16),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: isDark ? Colors.blueGrey.shade300 : Colors.blueGrey.shade400, size: 20),
+          Icon(
+            icon,
+            color: isDark ? Colors.blueGrey.shade300 : Colors.blueGrey.shade400,
+            size: 20,
+          ),
           const SizedBox(height: 8),
           Text(
             value,
             style: context.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.bold,
-              color: isDark ? Colors.white : Colors.black87,
+              color: context.colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 2),
@@ -264,9 +440,13 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildAccountGroup(BuildContext context, bool isHealthWorker, bool isDark) {
-    final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final dividerColor = isDark ? Colors.grey.shade800 : Colors.grey.shade100;
+  Widget _buildAccountGroup(
+    BuildContext context,
+    bool isHealthWorker,
+    bool isDark,
+  ) {
+    final cardColor = context.colorScheme.surface;
+    final dividerColor = context.colorScheme.outlineVariant.withValues(alpha: 0.5);
 
     return Container(
       decoration: BoxDecoration(
@@ -305,8 +485,8 @@ class ProfileScreen extends ConsumerWidget {
   }
 
   Widget _buildSupportGroup(BuildContext context, bool isDark) {
-    final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final dividerColor = isDark ? Colors.grey.shade800 : Colors.grey.shade100;
+    final cardColor = context.colorScheme.surface;
+    final dividerColor = context.colorScheme.outlineVariant.withValues(alpha: 0.5);
 
     return Container(
       decoration: BoxDecoration(
@@ -357,8 +537,8 @@ class ProfileScreen extends ConsumerWidget {
     required bool isDark,
     required VoidCallback onTap,
   }) {
-    final iconBgColor = isDark ? Colors.grey.shade800 : Colors.blueGrey.shade50;
-    
+    final iconBgColor = context.colorScheme.surfaceContainerHighest;
+
     return ListTile(
       onTap: onTap,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -369,7 +549,11 @@ class ProfileScreen extends ConsumerWidget {
           color: iconBgColor,
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Icon(icon, color: isDark ? Colors.blueGrey.shade200 : Colors.blueGrey.shade700, size: 20),
+        child: Icon(
+          icon,
+          color: isDark ? Colors.blueGrey.shade200 : Colors.blueGrey.shade700,
+          size: 20,
+        ),
       ),
       title: Text(
         title,
@@ -386,8 +570,8 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildLogoutButton(BuildContext context, bool isDark) {
-    final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+  Widget _buildLogoutButton(BuildContext context, WidgetRef ref, bool isDark) {
+    final cardColor = context.colorScheme.surface;
     final borderColor = isDark ? Colors.red.shade900 : Colors.red.shade100;
     final textColor = isDark ? Colors.red.shade300 : Colors.red.shade600;
 
@@ -395,7 +579,8 @@ class ProfileScreen extends ConsumerWidget {
       width: double.infinity,
       child: TextButton.icon(
         onPressed: () async {
-          await FirebaseAuth.instance.signOut();
+          await ref.read(userProfileProvider.notifier).clearProfile();
+          await ref.read(authProvider.notifier).signOut();
           if (context.mounted) {
             context.go('/login');
           }
@@ -408,7 +593,11 @@ class ProfileScreen extends ConsumerWidget {
             side: BorderSide(color: borderColor, width: 1),
           ),
         ),
-        icon: Icon(Icons.power_settings_new_rounded, color: textColor, size: 20),
+        icon: Icon(
+          Icons.power_settings_new_rounded,
+          color: textColor,
+          size: 20,
+        ),
         label: Text(
           'Sign Out',
           style: context.textTheme.titleSmall?.copyWith(

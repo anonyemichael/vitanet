@@ -13,6 +13,7 @@ def create_user(db: Session, data: UserSignupInput) -> User:
         full_name=data.full_name,
         email=data.email,
         phone_number=data.phone_number,
+        biological_sex=data.biological_sex,
         date_of_birth=data.date_of_birth,
         account_type=data.account_type,
     )

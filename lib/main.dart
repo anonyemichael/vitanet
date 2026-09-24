@@ -8,31 +8,37 @@ import 'package:vitanet/app/theme.dart';
 import 'package:vitanet/data/providers/providers.dart';
 import 'firebase_options.dart';
 
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:health/health.dart';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  await dotenv.load(fileName: ".env");
-  
+  try {
+    await dotenv.load(fileName: ".env");
+  } catch (e) {
+    debugPrint('Failed to load .env file: $e');
+  }
+
   // Try to initialize Firebase
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
   } catch (e) {
-    debugPrint('Firebase initialization failed. Did you run `flutterfire configure`? Error: $e');
+    debugPrint(
+      'Firebase initialization failed. Did you run `flutterfire configure`? Error: $e',
+    );
   }
 
   final prefs = await SharedPreferences.getInstance();
 
   runApp(
     ProviderScope(
-      overrides: [
-        sharedPreferencesProvider.overrideWithValue(prefs),
-      ],
+      overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
       child: const VitaNetApp(),
     ),
   );
@@ -49,21 +55,19 @@ class _VitaNetAppState extends ConsumerState<VitaNetApp> {
   @override
   void initState() {
     super.initState();
-    _requestPermissions();
+    // Defer permission requests to after the first frame so the UI
+    // renders immediately instead of blocking on GPS/Health authorization.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _requestPermissions();
+    });
   }
 
   Future<void> _requestPermissions() async {
     try {
       await Geolocator.requestPermission();
-      final health = Health();
-      await health.requestAuthorization([
-        HealthDataType.HEART_RATE,
-        HealthDataType.BLOOD_OXYGEN,
-        HealthDataType.RESPIRATORY_RATE,
-        HealthDataType.BODY_TEMPERATURE,
-        HealthDataType.BLOOD_PRESSURE_SYSTOLIC,
-        HealthDataType.BLOOD_PRESSURE_DIASTOLIC,
-      ]);
+      if (!kIsWeb) {
+        await ref.read(healthServiceProvider).requestPermissions();
+      }
     } catch (_) {}
   }
 

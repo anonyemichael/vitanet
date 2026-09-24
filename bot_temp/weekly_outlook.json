@@ -1,0 +1,446 @@
+{
+  "run_date": "2026-07-18",
+  "analyses": [
+    {
+      "symbol": "EURUSDm",
+      "current_price": 1.14373,
+      "w1_bias": "bearish",
+      "d1_eq": 1.15864,
+      "d1_position": "discount",
+      "h4_bias": "neutral",
+      "ema21_4h": 1.14383,
+      "overall_bias": "neutral",
+      "watch_direction": "WAIT",
+      "aoi_zones": [
+        {
+          "low": 1.141575065,
+          "high": 1.1508536950000001,
+          "mid": 1.1452264285714284,
+          "touches": 14,
+          "has_psych": false
+        },
+        {
+          "low": 1.136602535,
+          "high": 1.14619672,
+          "mid": 1.1418780000000004,
+          "touches": 20,
+          "has_psych": false
+        },
+        {
+          "low": 1.1336469750000002,
+          "high": 1.14299192,
+          "mid": 1.1384130000000003,
+          "touches": 10,
+          "has_psych": false
+        },
+        {
+          "low": 1.147406305,
+          "high": 1.15599139,
+          "mid": 1.1522400000000002,
+          "touches": 18,
+          "has_psych": false
+        },
+        {
+          "low": 1.1510608150000001,
+          "high": 1.16119919,
+          "mid": 1.1558133333333336,
+          "touches": 18,
+          "has_psych": false
+        }
+      ],
+      "nearest_aoi": {
+        "low": 1.141575065,
+        "high": 1.1508536950000001,
+        "mid": 1.1452264285714284,
+        "touches": 14,
+        "has_psych": false
+      },
+      "nearest_aoi_pct": 0.13,
+      "key_levels": {
+        "PDH": 1.1476,
+        "PDL": 1.14307,
+        "PWH": 1.14603,
+        "PWL": 1.13908
+      },
+      "notes": "Conflicting signals \u2014 no clear directional bias"
+    },
+    {
+      "symbol": "GBPUSDm",
+      "current_price": 1.34523,
+      "w1_bias": "neutral",
+      "d1_eq": 1.33984,
+      "d1_position": "premium",
+      "h4_bias": "neutral",
+      "ema21_4h": 1.34536,
+      "overall_bias": "bearish",
+      "watch_direction": "SHORT",
+      "aoi_zones": [
+        {
+          "low": 1.3408556950000001,
+          "high": 1.352776125,
+          "mid": 1.34676,
+          "touches": 45,
+          "has_psych": false
+        },
+        {
+          "low": 1.34531899,
+          "high": 1.35585073,
+          "mid": 1.35,
+          "touches": 38,
+          "has_psych": true
+        },
+        {
+          "low": 1.33291762,
+          "high": 1.3446139000000001,
+          "mid": 1.3392301785714287,
+          "touches": 56,
+          "has_psych": false
+        },
+        {
+          "low": 1.3289236199999999,
+          "high": 1.3406179150000002,
+          "mid": 1.3352197368421053,
+          "touches": 38,
+          "has_psych": false
+        },
+        {
+          "low": 1.35033146,
+          "high": 1.3622202700000001,
+          "mid": 1.355329090909091,
+          "touches": 22,
+          "has_psych": false
+        }
+      ],
+      "nearest_aoi": {
+        "low": 1.3408556950000001,
+        "high": 1.352776125,
+        "mid": 1.34676,
+        "touches": 45,
+        "has_psych": false
+      },
+      "nearest_aoi_pct": 0.11,
+      "key_levels": {
+        "PDH": 1.35438,
+        "PDL": 1.34592,
+        "PWH": 1.34514,
+        "PWL": 1.33218
+      },
+      "notes": "SHORT setup near \u2014 approaching 1.34676 AOI (0.11% away)"
+    },
+    {
+      "symbol": "XAUUSDm",
+      "current_price": 4017.752,
+      "w1_bias": "bearish",
+      "d1_eq": 4415.8925,
+      "d1_position": "discount",
+      "h4_bias": "bearish",
+      "ema21_4h": 4022.32655,
+      "overall_bias": "bearish",
+      "watch_direction": "WAIT",
+      "aoi_zones": [
+        {
+          "low": 3994.9116305000002,
+          "high": 4023.778628,
+          "mid": 4011.0436666666665,
+          "touches": 6,
+          "has_psych": false
+        },
+        {
+          "low": 4029.1162465,
+          "high": 4063.9868500000002,
+          "mid": 4048.36325,
+          "touches": 4,
+          "has_psych": false
+        },
+        {
+          "low": 4047.0433155,
+          "high": 4068.9252465000004,
+          "mid": 4057.951333333333,
+          "touches": 3,
+          "has_psych": false
+        },
+        {
+          "low": 4070.161586,
+          "high": 4094.3773675,
+          "mid": 4082.944,
+          "touches": 3,
+          "has_psych": false
+        },
+        {
+          "low": 4082.1126325,
+          "high": 4105.196572,
+          "mid": 4100.0,
+          "touches": 3,
+          "has_psych": true
+        }
+      ],
+      "nearest_aoi": {
+        "low": 3994.9116305000002,
+        "high": 4023.778628,
+        "mid": 4011.0436666666665,
+        "touches": 6,
+        "has_psych": false
+      },
+      "nearest_aoi_pct": 0.17,
+      "key_levels": {
+        "PDH": 4061.388,
+        "PDL": 3969.111,
+        "PWH": 4203.185,
+        "PWL": 4021.769
+      },
+      "notes": "Conflicting signals \u2014 no clear directional bias"
+    },
+    {
+      "symbol": "USDJPYm",
+      "current_price": 162.394,
+      "w1_bias": "bullish",
+      "d1_eq": 158.9315,
+      "d1_position": "premium",
+      "h4_bias": "bullish",
+      "ema21_4h": 162.2842,
+      "overall_bias": "bullish",
+      "watch_direction": "WAIT",
+      "aoi_zones": [
+        {
+          "low": 161.9457165,
+          "high": 162.873945,
+          "mid": 162.4226666666667,
+          "touches": 9,
+          "has_psych": false
+        },
+        {
+          "low": 161.11696150000003,
+          "high": 162.4322835,
+          "mid": 161.7384375,
+          "touches": 16,
+          "has_psych": false
+        },
+        {
+          "low": 161.0510605,
+          "high": 162.0076475,
+          "mid": 161.51536363636362,
+          "touches": 11,
+          "has_psych": false
+        },
+        {
+          "low": 159.57128350000002,
+          "high": 160.8439045,
+          "mid": 160.18763157894736,
+          "touches": 19,
+          "has_psych": false
+        },
+        {
+          "low": 159.00812950000002,
+          "high": 160.438297,
+          "mid": 159.64765625,
+          "touches": 32,
+          "has_psych": false
+        }
+      ],
+      "nearest_aoi": {
+        "low": 161.9457165,
+        "high": 162.873945,
+        "mid": 162.4226666666667,
+        "touches": 9,
+        "has_psych": false
+      },
+      "nearest_aoi_pct": 0.02,
+      "key_levels": {
+        "PDH": 162.542,
+        "PDL": 161.976,
+        "PWH": 162.704,
+        "PWL": 161.215
+      },
+      "notes": "Conflicting signals \u2014 no clear directional bias"
+    },
+    {
+      "symbol": "GBPJPYm",
+      "current_price": 218.45,
+      "w1_bias": "bullish",
+      "d1_eq": 214.597,
+      "d1_position": "premium",
+      "h4_bias": "bullish",
+      "ema21_4h": 218.32765,
+      "overall_bias": "bullish",
+      "watch_direction": "WAIT",
+      "aoi_zones": [
+        {
+          "low": 218.122325,
+          "high": 219.745124,
+          "mid": 218.90499999999997,
+          "touches": 3,
+          "has_psych": false
+        },
+        {
+          "low": 216.94209800000002,
+          "high": 218.0976565,
+          "mid": 217.57533333333333,
+          "touches": 3,
+          "has_psych": false
+        },
+        {
+          "low": 216.35198450000001,
+          "high": 218.01353050000003,
+          "mid": 216.98842857142856,
+          "touches": 7,
+          "has_psych": false
+        },
+        {
+          "low": 215.15378450000003,
+          "high": 217.015035,
+          "mid": 215.9146153846154,
+          "touches": 13,
+          "has_psych": false
+        },
+        {
+          "low": 214.24514950000003,
+          "high": 216.1487375,
+          "mid": 215.2287857142857,
+          "touches": 28,
+          "has_psych": false
+        }
+      ],
+      "nearest_aoi": {
+        "low": 218.122325,
+        "high": 219.745124,
+        "mid": 218.90499999999997,
+        "touches": 3,
+        "has_psych": false
+      },
+      "nearest_aoi_pct": 0.21,
+      "key_levels": {
+        "PDH": 219.53,
+        "PDL": 218.667,
+        "PWH": 217.996,
+        "PWL": 215.181
+      },
+      "notes": "Conflicting signals \u2014 no clear directional bias"
+    },
+    {
+      "symbol": "BTCUSDm",
+      "current_price": 63965.11,
+      "w1_bias": "bearish",
+      "d1_eq": 70268.735,
+      "d1_position": "discount",
+      "h4_bias": "neutral",
+      "ema21_4h": 63903.63447,
+      "overall_bias": "neutral",
+      "watch_direction": "WAIT",
+      "aoi_zones": [
+        {
+          "low": 63799.606825,
+          "high": 64321.107155,
+          "mid": 64033.411250000005,
+          "touches": 8,
+          "has_psych": false
+        },
+        {
+          "low": 63652.188285000004,
+          "high": 64061.05766500001,
+          "mid": 63844.06428571429,
+          "touches": 7,
+          "has_psych": false
+        },
+        {
+          "low": 63384.48045,
+          "high": 63843.431715,
+          "mid": 63582.828,
+          "touches": 5,
+          "has_psych": false
+        },
+        {
+          "low": 64331.427895,
+          "high": 64812.55322000001,
+          "mid": 64552.675,
+          "touches": 4,
+          "has_psych": false
+        },
+        {
+          "low": 63077.092225,
+          "high": 63574.91955,
+          "mid": 63300.876000000004,
+          "touches": 5,
+          "has_psych": false
+        }
+      ],
+      "nearest_aoi": {
+        "low": 63799.606825,
+        "high": 64321.107155,
+        "mid": 64033.411250000005,
+        "touches": 8,
+        "has_psych": false
+      },
+      "nearest_aoi_pct": 0.11,
+      "key_levels": {
+        "PDH": 64351.89,
+        "PDL": 62466.31,
+        "PWH": 64669.63,
+        "PWL": 61251.88
+      },
+      "notes": "Conflicting signals \u2014 no clear directional bias"
+    },
+    {
+      "symbol": "ETHUSDm",
+      "current_price": 1842.58,
+      "w1_bias": "bullish",
+      "d1_eq": 1985.245,
+      "d1_position": "discount",
+      "h4_bias": "bearish",
+      "ema21_4h": 1850.61122,
+      "overall_bias": "bullish",
+      "watch_direction": "LONG",
+      "aoi_zones": [
+        {
+          "low": 1848.8026300000001,
+          "high": 1859.8155450000002,
+          "mid": 1854.6366666666665,
+          "touches": 3,
+          "has_psych": false
+        },
+        {
+          "low": 1788.43332,
+          "high": 1800.65694,
+          "mid": 1794.695,
+          "touches": 4,
+          "has_psych": false
+        },
+        {
+          "low": 1781.30403,
+          "high": 1793.80668,
+          "mid": 1787.1433333333334,
+          "touches": 3,
+          "has_psych": false
+        },
+        {
+          "low": 1771.35897,
+          "high": 1786.65597,
+          "mid": 1778.9566666666667,
+          "touches": 3,
+          "has_psych": false
+        },
+        {
+          "low": 1765.5277300000002,
+          "high": 1776.6810300000002,
+          "mid": 1770.68,
+          "touches": 3,
+          "has_psych": false
+        }
+      ],
+      "nearest_aoi": {
+        "low": 1848.8026300000001,
+        "high": 1859.8155450000002,
+        "mid": 1854.6366666666665,
+        "touches": 3,
+        "has_psych": false
+      },
+      "nearest_aoi_pct": 0.65,
+      "key_levels": {
+        "PDH": 1869.21,
+        "PDL": 1801.09,
+        "PWH": 1831.97,
+        "PWL": 1711.12
+      },
+      "notes": "LONG setup near \u2014 approaching 1,854.64 AOI (0.65% away)"
+    }
+  ]
+}

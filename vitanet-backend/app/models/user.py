@@ -21,6 +21,8 @@ class User(Base):
 
     phone_number = Column(String(20), unique=True, index=True, nullable=True)
 
+    biological_sex = Column(String(32), nullable=True)
+
     date_of_birth = Column(Date, nullable=True)
 
     account_type = Column(

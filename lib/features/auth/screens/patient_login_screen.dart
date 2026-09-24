@@ -30,13 +30,11 @@ class _PatientLoginScreenState extends ConsumerState<PatientLoginScreen> {
 
         // It is an authenticated user. Check backend.
         try {
-          final backendUser = await ref.read(apiServiceProvider).getUserByFirebaseUid(next.user!.uid);
+          final userProfile = await ref.read(firestoreServiceProvider).getUserProfile(next.user!.uid);
           
-          if (backendUser != null) {
-            final role = (backendUser['account_type'] == 'healthcare_professional' || backendUser['account_type'] == 'admin') ? 'admin' : 'user';
-            ref.read(userProfileProvider.notifier).updateProfile(
-              UserProfile(name: backendUser['full_name'] ?? 'Patient', role: role),
-            );
+          if (userProfile != null) {
+            final role = userProfile.role;
+            ref.read(userProfileProvider.notifier).updateProfile(userProfile);
             
             if (mounted) {
               if (role == 'admin') {
@@ -278,8 +276,8 @@ Widget _googleIcon() {
       color: Colors.white,
       shape: BoxShape.circle,
     ),
-    child: Image.network(
-      'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/120px-Google_%22G%22_logo.svg.png',
+    child: Image.asset(
+      'assets/images/google_logo.png',
       width: 20,
       height: 20,
       errorBuilder: (c, e, s) => const Icon(Icons.g_mobiledata_rounded, color: Colors.blue, size: 24),

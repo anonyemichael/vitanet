@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:vitanet/core/constants/app_spacing.dart';
 import 'package:vitanet/core/extensions/context_ext.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../resources/screens/video_player_screen.dart';
+import '../../resources/models/health_video.dart';
 
 class FirstAidTip {
   final String title;
@@ -31,6 +33,23 @@ class FirstAidScreen extends StatelessWidget {
 
   static const tips = <FirstAidTip>[
     FirstAidTip(
+      title: 'CPR (adult, hands-only)',
+      summary:
+          'Call emergency services, then push hard and fast in the centre of the chest.',
+      icon: Icons.favorite_rounded,
+      accent: Color(0xFFDC2626),
+      steps: [
+        'Check that the scene is safe and the person is unresponsive and not breathing normally.',
+        'Call local emergency services and ask someone to get an AED if one is available.',
+        'Place both hands in the centre of the chest and keep your arms straight.',
+        'Give continuous, hard and fast chest compressions until help takes over or the person shows signs of life.',
+        'Use an AED as soon as it is available and follow its voice prompts.',
+      ],
+      whenToSeekHelp:
+          'This is an emergency. Call local emergency services immediately. CPR training is strongly recommended.',
+      videoUrl: 'M4ZcSlKROXg',
+    ),
+    FirstAidTip(
       title: 'Cuts & scrapes',
       summary: 'Clean the wound and protect it while it heals.',
       icon: Icons.healing_rounded,
@@ -43,8 +62,7 @@ class FirstAidScreen extends StatelessWidget {
       ],
       whenToSeekHelp:
           'Seek care for deep wounds, heavy bleeding, animal bites, or signs of infection.',
-      imageUrl: 'https://images.unsplash.com/photo-1584362917165-526a968579e8?auto=format&fit=crop&q=80&w=800',
-      videoUrl: 'https://www.youtube.com/watch?v=4eMQvdDYXqk',
+      videoUrl: '4eBzmDkIAiw',
     ),
     FirstAidTip(
       title: 'Burns (minor)',
@@ -59,6 +77,7 @@ class FirstAidScreen extends StatelessWidget {
       ],
       whenToSeekHelp:
           'Get urgent help for large burns, chemical/electrical burns, or burns on face, hands, or genitals.',
+      videoUrl: 'EaJmzB8gE_o',
     ),
     FirstAidTip(
       title: 'Sprains & strains',
@@ -73,6 +92,7 @@ class FirstAidScreen extends StatelessWidget {
       ],
       whenToSeekHelp:
           'Seek care if you cannot bear weight, see severe swelling/deformity, or pain worsens.',
+      videoUrl: 'W3Z1Yy2U5kY',
     ),
     FirstAidTip(
       title: 'Choking (adult)',
@@ -88,6 +108,7 @@ class FirstAidScreen extends StatelessWidget {
       ],
       whenToSeekHelp:
           'Call emergency services right away if the person cannot breathe, cough, or speak.',
+      videoUrl: 'PA9hpOnvtTg',
     ),
     FirstAidTip(
       title: 'Fever at home',
@@ -102,6 +123,7 @@ class FirstAidScreen extends StatelessWidget {
       ],
       whenToSeekHelp:
           'Seek urgent care for very high fever, stiff neck, confusion, rash, or breathing trouble.',
+      videoUrl: 'sOa35n9ZwtY',
     ),
     FirstAidTip(
       title: 'Nosebleeds',
@@ -116,13 +138,50 @@ class FirstAidScreen extends StatelessWidget {
       ],
       whenToSeekHelp:
           'Get help if bleeding lasts over 20 minutes, follows an injury, or you feel faint.',
+      videoUrl: 'Z6bF4F4Y1oM',
+    ),
+    FirstAidTip(
+      title: 'Heart Attack Signs',
+      summary: 'Recognize chest pain, shortness of breath, and seek urgent care.',
+      icon: Icons.monitor_heart_rounded,
+      accent: Color(0xFFE11D48),
+      steps: [
+        'Call emergency services immediately if you suspect a heart attack.',
+        'Have the person sit down, rest, and try to keep calm.',
+        'Loosen any tight clothing.',
+        'Ask if they take chest pain medication (like nitroglycerin) and help them take it.',
+        'If they are unresponsive and not breathing, begin CPR.',
+      ],
+      whenToSeekHelp:
+          'Call 911 immediately for chest pain, pain spreading to arms/neck, or severe shortness of breath.',
+    ),
+    FirstAidTip(
+      title: 'Allergic Reactions (Anaphylaxis)',
+      summary: 'Use an epinephrine auto-injector if available and call for help.',
+      icon: Icons.sick_rounded,
+      accent: Color(0xFF8B5CF6),
+      steps: [
+        'Call emergency services immediately.',
+        'Ask if they carry an epinephrine auto-injector (EpiPen) and help them use it.',
+        'Have the person lie down face up, and elevate their legs if possible.',
+        'Do not give them anything by mouth.',
+        'If they stop breathing, begin CPR.',
+      ],
+      whenToSeekHelp:
+          'Call 911 immediately if they have trouble breathing, swelling of the throat/tongue, or faintness.',
     ),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('First Aid Tips')),
+      appBar: AppBar(
+        title: const Text('First Aid Tips'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(
           AppSpacing.xl,
@@ -134,10 +193,9 @@ class FirstAidScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(AppSpacing.xl),
             decoration: BoxDecoration(
-              color: context.colorScheme.primaryContainer.withValues(
-                alpha: 0.7,
-              ),
+              color: context.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
               borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: context.colorScheme.primary.withValues(alpha: 0.2)),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -151,7 +209,7 @@ class FirstAidScreen extends StatelessWidget {
                   child: Text(
                     'These tips are general first-aid guidance only — not a diagnosis or substitute for emergency care.',
                     style: context.textTheme.bodyMedium?.copyWith(
-                      color: context.colorScheme.onPrimaryContainer,
+                      color: context.colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ),
@@ -254,29 +312,44 @@ class FirstAidDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(tip.title)),
+      appBar: AppBar(
+        title: Text(tip.title),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
       body: ListView(
-        padding: const EdgeInsets.all(AppSpacing.xl),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.xl,
+          AppSpacing.xl,
+          AppSpacing.xl,
+          120, // Add bottom padding to prevent nav bar from covering content
+        ),
         children: [
           Container(
             padding: const EdgeInsets.all(AppSpacing.xl),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [tip.accent, tip.accent.withValues(alpha: 0.75)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
+              color: context.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              border: Border.all(color: tip.accent.withValues(alpha: 0.3)),
               borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(tip.icon, color: Colors.white, size: 36),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: tip.accent.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(tip.icon, color: tip.accent, size: 32),
+                ),
                 const SizedBox(height: AppSpacing.md),
                 Text(
                   tip.title,
                   style: context.textTheme.headlineMedium?.copyWith(
-                    color: Colors.white,
+                    color: context.colorScheme.onSurface,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -284,7 +357,7 @@ class FirstAidDetailScreen extends StatelessWidget {
                 Text(
                   tip.summary,
                   style: context.textTheme.bodyLarge?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.92),
+                    color: context.colorScheme.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -302,25 +375,47 @@ class FirstAidDetailScreen extends StatelessWidget {
                 errorBuilder: (context, error, stackTrace) => Container(
                   height: 200,
                   color: context.colorScheme.surfaceContainerHighest,
-                  child: Icon(Icons.broken_image_rounded, size: 48, color: context.colorScheme.onSurfaceVariant),
+                  child: Icon(
+                    Icons.broken_image_rounded,
+                    size: 48,
+                    color: context.colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ),
             ),
           ],
           if (tip.videoUrl != null) ...[
             const SizedBox(height: AppSpacing.md),
-            FilledButton.icon(
-              onPressed: () => launchUrl(Uri.parse(tip.videoUrl!)),
-              icon: const Icon(Icons.play_circle_fill_rounded),
-              label: const Text('Watch Video Tutorial'),
-              style: FilledButton.styleFrom(
-                backgroundColor: context.colorScheme.primaryContainer,
-                foregroundColor: context.colorScheme.onPrimaryContainer,
+            OutlinedButton.icon(
+              onPressed: () {
+                Navigator.of(context, rootNavigator: true).push(
+                  MaterialPageRoute(
+                    builder: (_) => VideoPlayerScreen(
+                      video: HealthVideo(
+                        videoId: tip.videoUrl!,
+                        title: '${tip.title} Tutorial',
+                        thumbnailUrl: 'https://img.youtube.com/vi/${tip.videoUrl!}/hqdefault.jpg',
+                        duration: '',
+                        category: 'First Aid',
+                        organization: 'Emergency Guidance',
+                        summary: tip.summary,
+                        keySteps: tip.steps.map((step) => VideoKeyStep(time: '•', action: step)).toList(),
+                        verificationStatus: 'Verified Medical Guideline',
+                      ),
+                    ),
+                  ),
+                );
+              },
+              icon: Icon(Icons.play_circle_outline_rounded, color: context.colorScheme.primary),
+              label: Text('Play First-Aid Tutorial', style: TextStyle(color: context.colorScheme.primary)),
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: context.colorScheme.primary.withValues(alpha: 0.5)),
                 padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusMd)),
               ),
             ),
           ],
-          const SizedBox(height: AppSpacing.xxl),
+          const SizedBox(height: AppSpacing.xxxl),
           Text('Steps', style: context.textTheme.titleLarge),
           const SizedBox(height: AppSpacing.md),
           ...List.generate(tip.steps.length, (i) {
@@ -362,10 +457,10 @@ class FirstAidDetailScreen extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(AppSpacing.lg),
             decoration: BoxDecoration(
-              color: context.colorScheme.errorContainer.withValues(alpha: 0.45),
+              color: context.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
               borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
               border: Border.all(
-                color: context.colorScheme.error.withValues(alpha: 0.25),
+                color: context.colorScheme.error.withValues(alpha: 0.3),
               ),
             ),
             child: Column(
@@ -382,7 +477,7 @@ class FirstAidDetailScreen extends StatelessWidget {
                 Text(
                   tip.whenToSeekHelp,
                   style: context.textTheme.bodyMedium?.copyWith(
-                    color: context.colorScheme.onErrorContainer,
+                    color: context.isDark ? Colors.white : Colors.black87,
                   ),
                 ),
               ],

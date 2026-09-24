@@ -35,17 +35,52 @@ final healthServiceProvider = Provider<HealthService>((ref) {
 });
 
 final aiServiceProvider = Provider<AiService>((ref) {
-  final profile = ref.watch(userProfileProvider);
-  final apiService = ref.watch(apiServiceProvider);
-  final history = ref.watch(triageHistoryProvider);
-  final service = AiService(apiService: apiService);
-  service.updateContext(profile, pastTriages: history);
+  final service = AiService();
+
+  ref.listen(userProfileProvider, (prev, next) {
+    service.updateContext(next, pastTriages: ref.read(triageHistoryProvider), vitals: ref.read(liveVitalsProvider));
+  });
+  ref.listen(triageHistoryProvider, (prev, next) {
+    service.updateContext(ref.read(userProfileProvider), pastTriages: next, vitals: ref.read(liveVitalsProvider));
+  });
+  ref.listen(liveVitalsProvider, (prev, next) {
+    service.updateContext(ref.read(userProfileProvider), pastTriages: ref.read(triageHistoryProvider), vitals: next);
+  });
+
+  service.updateContext(
+    ref.read(userProfileProvider),
+    pastTriages: ref.read(triageHistoryProvider),
+    vitals: ref.read(liveVitalsProvider),
+  );
   return service;
 });
 
 final firestoreServiceProvider = Provider<FirestoreService>(
   (ref) => FirestoreService(),
 );
+
+// ─── Live Vitals ───
+/// Holds live device readings keyed by metric ID.
+/// e.g. {'heart_rate': 74.0, 'blood_oxygen': 98.0}
+final liveVitalsProvider =
+    StateNotifierProvider<LiveVitalsNotifier, Map<String, double>>((ref) {
+  return LiveVitalsNotifier();
+});
+
+class LiveVitalsNotifier extends StateNotifier<Map<String, double>> {
+  LiveVitalsNotifier() : super(const {});
+
+  void setVital(String metricId, double value) {
+    state = {...state, metricId: value};
+  }
+
+  void connectDevice(String metricId) {
+    // Real data will be fetched/streamed instead of simulating.
+  }
+
+  /// Updates heart rate continuously from the live card.
+  void updateHeartRate(int bpm) => setVital('heart_rate', bpm.toDouble());
+}
 
 // ─── Theme ───
 
@@ -92,22 +127,53 @@ final onboardingCompleteProvider = StateProvider<bool>((ref) {
 final userProfileProvider =
     StateNotifierProvider<UserProfileNotifier, UserProfile?>((ref) {
       final storage = ref.watch(localStorageProvider);
-      return UserProfileNotifier(storage);
+      final firestore = ref.watch(firestoreServiceProvider);
+      final authState = ref.watch(authProvider);
+      return UserProfileNotifier(storage, firestore, authState.user?.uid);
     });
 
 class UserProfileNotifier extends StateNotifier<UserProfile?> {
   final LocalStorageService _storage;
+  final FirestoreService _firestore;
+  final String? _userId;
 
-  UserProfileNotifier(this._storage) : super(_storage.getProfile());
+  UserProfileNotifier(this._storage, this._firestore, this._userId) 
+      : super(_storage.getProfile()) {
+    _init();
+  }
+
+  Future<void> _init() async {
+    if (_userId != null) {
+      final remoteProfile = await _firestore.getUserProfile(_userId!);
+      if (remoteProfile != null) {
+        await _storage.saveProfile(remoteProfile);
+        if (mounted) {
+          state = remoteProfile;
+        }
+      }
+    }
+  }
 
   Future<void> updateProfile(UserProfile profile) async {
     await _storage.saveProfile(profile);
-    state = profile;
+    if (mounted) {
+      state = profile;
+    }
+    
+    if (_userId != null) {
+      // Do not await the firestore save so it doesn't hang indefinitely 
+      // if the client is offline, as Firebase queues writes locally.
+      _firestore.saveUserProfile(_userId!, profile).catchError((e) {
+        debugPrint('Failed to sync profile to firestore: $e');
+      });
+    }
   }
 
   Future<void> clearProfile() async {
-    await _storage.saveProfile(UserProfile(name: ''));
-    state = null;
+    await _storage.saveProfile(const UserProfile(name: ''));
+    if (mounted) {
+      state = null;
+    }
   }
 }
 
@@ -136,6 +202,26 @@ class ChatMessagesNotifier extends StateNotifier<List<ChatMessage>> {
 
   void addMessage(ChatMessage message) {
     state = [...state, message];
+  }
+
+  void updateMessageText(String id, String newText) {
+    state = [
+      for (final msg in state)
+        if (msg.id == id)
+          ChatMessage(
+            id: msg.id,
+            role: msg.role,
+            text: newText,
+            timestamp: msg.timestamp,
+            imagePath: msg.imagePath,
+            actions: msg.actions,
+            widgetType: msg.widgetType,
+            widgetPayload: msg.widgetPayload,
+            quickReplies: msg.quickReplies,
+          )
+        else
+          msg
+    ];
   }
 
   void clear() => state = [];

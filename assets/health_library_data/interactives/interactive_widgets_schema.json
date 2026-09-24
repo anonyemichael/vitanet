@@ -1,0 +1,54 @@
+{
+  "system": "VitaNet Interactive Health Experience Engine",
+  "widget_types": [
+    {
+      "type": "myth_fact_flip_card",
+      "description": "Interactive card that flips 180 degrees upon tap to reveal the evidence-based medical fact behind common health misconceptions.",
+      "schema": {
+        "myth_title": "String",
+        "fact_title": "String",
+        "scientific_consensus": "String",
+        "citation": "String"
+      },
+      "user_experience_goal": "Eliminates boring static reading by turning common myths into interactive discovery moments."
+    },
+    {
+      "type": "in_article_micro_quiz",
+      "description": "Short 1-question check-in embedded midway through an article to test comprehension and retain critical health facts.",
+      "schema": {
+        "question": "String",
+        "options": ["Array of Strings"],
+        "correct_index": "Integer",
+        "explanation": "String",
+        "reward_badge": "String"
+      },
+      "user_experience_goal": "Gamifies learning and increases reading retention by 40%."
+    },
+    {
+      "type": "emergency_step_timer",
+      "description": "Visual step-by-step progress stepper with built-in interactive stopwatch/timer (e.g. 20-min burn cool down, 3-sec EpiPen hold).",
+      "schema": {
+        "step_number": "Integer",
+        "instruction": "String",
+        "has_timer": "Boolean",
+        "timer_duration_seconds": "Integer",
+        "warning_alert": "String"
+      },
+      "user_experience_goal": "Provides real-time utility in high-stress emergency situations."
+    },
+    {
+      "type": "interactive_health_calculator",
+      "description": "Sliding input controls allowing users to calculate personal metrics like daily water intake based on body weight or sleep debt score.",
+      "schema": {
+        "calculator_id": "String",
+        "inputs": [
+          {"name": "weight_kg", "type": "slider", "min": 30, "max": 150},
+          {"name": "activity_level", "type": "segmented_button", "options": ["Low", "Moderate", "High"]}
+        ],
+        "formula": "water_ml = (weight_kg * 35) + (activity_level == 'High' ? 500 : 0)",
+        "output_label": "Recommended Daily Water Intake"
+      },
+      "user_experience_goal": "Makes health advice personalized and actionable."
+    }
+  ]
+}

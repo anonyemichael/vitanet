@@ -27,6 +27,7 @@ class UserSignupInput(BaseModel):
     full_name: str
     email: Optional[EmailStr] = None
     phone_number: Optional[str] = None
+    biological_sex: Optional[str] = None
     date_of_birth: Optional[date] = None
     account_type: AccountType
 
@@ -47,6 +48,7 @@ class UserOut(BaseModel):
     full_name: str
     email: Optional[EmailStr] = None
     phone_number: Optional[str] = None
+    biological_sex: Optional[str] = None
     date_of_birth: Optional[date] = None
     account_type: AccountType
     created_at: datetime
@@ -64,4 +66,5 @@ class UserUpdate(BaseModel):
     full_name: Optional[str] = None
     email: Optional[EmailStr] = None
     phone_number: Optional[str] = None
+    biological_sex: Optional[str] = None
     date_of_birth: Optional[date] = None

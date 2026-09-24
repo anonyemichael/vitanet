@@ -6,6 +6,8 @@ import 'package:health/health.dart';
 import 'package:vitanet/core/constants/app_spacing.dart';
 import 'package:vitanet/core/extensions/context_ext.dart';
 import 'package:vitanet/data/providers/health_providers.dart';
+import 'package:vitanet/data/services/ai_service.dart';
+import 'package:vitanet/data/providers/providers.dart';
 
 class HealthTrendsScreen extends ConsumerStatefulWidget {
   final String metricId;
@@ -189,7 +191,7 @@ class _HealthTrendsScreenState extends ConsumerState<HealthTrendsScreen> {
             ],
           ),
           const SizedBox(height: AppSpacing.xl),
-          _buildAiInsights(isDark),
+          _buildAiInsights(isDark, data),
           const SizedBox(height: AppSpacing.xxl),
         ],
       ),
@@ -280,7 +282,7 @@ class _HealthTrendsScreenState extends ConsumerState<HealthTrendsScreen> {
                   ],
                 ),
                 const SizedBox(height: AppSpacing.xl),
-                Expanded(child: _buildAiInsights(isDark)),
+                Expanded(child: _buildAiInsights(isDark, data)),
               ],
             ),
           ),
@@ -290,9 +292,10 @@ class _HealthTrendsScreenState extends ConsumerState<HealthTrendsScreen> {
   }
 
   Widget _buildCurrentValueHeader(bool isDark, List<HealthDataPoint> data) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
+    return Wrap(
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 8,
+      runSpacing: 8,
       children: [
         Wrap(
           crossAxisAlignment: WrapCrossAlignment.end,
@@ -300,9 +303,9 @@ class _HealthTrendsScreenState extends ConsumerState<HealthTrendsScreen> {
             Text(
               _getCurrentValue(data),
               style: TextStyle(
-                fontSize: 48,
+                fontSize: 32,
                 fontWeight: FontWeight.bold,
-                letterSpacing: -2,
+                letterSpacing: -1,
                 color: isDark ? Colors.white : Colors.black87,
               ),
             ),
@@ -541,7 +544,7 @@ class _HealthTrendsScreenState extends ConsumerState<HealthTrendsScreen> {
     );
   }
 
-  Widget _buildAiInsights(bool isDark) {
+  Widget _buildAiInsights(bool isDark, List<HealthDataPoint> data) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.xl),
       decoration: BoxDecoration(
@@ -595,7 +598,9 @@ class _HealthTrendsScreenState extends ConsumerState<HealthTrendsScreen> {
           SizedBox(
             width: double.infinity,
             child: OutlinedButton(
-              onPressed: () {},
+              onPressed: () {
+                _showDetailedReportDialog(context, isDark, data);
+              },
               style: OutlinedButton.styleFrom(
                 foregroundColor: const Color(0xFF6366F1),
                 side: const BorderSide(color: Color(0xFF6366F1)),
@@ -610,6 +615,101 @@ class _HealthTrendsScreenState extends ConsumerState<HealthTrendsScreen> {
     );
   }
 
+  void _showDetailedReportDialog(BuildContext context, bool isDark, List<HealthDataPoint> data) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.all(AppSpacing.xxl),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF6366F1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 24),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Text(
+                    'AI Detailed Report',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.xl),
+              FutureBuilder<String>(
+                future: ref.read(aiServiceProvider).generateHealthReport(
+                  metricName: _getMetricTitle(),
+                  currentValue: _getCurrentValue(data),
+                  unit: _getMetricUnit(),
+                  avg: _getStats(data)['avg'] ?? '--',
+                  high: _getStats(data)['high'] ?? '--',
+                  low: _getStats(data)['low'] ?? '--',
+                ),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(AppSpacing.xxl),
+                        child: CircularProgressIndicator(),
+                      ),
+                    );
+                  }
+                  
+                  if (snapshot.hasError || !snapshot.hasData) {
+                    return Text(
+                      'Failed to generate report. Please try again.',
+                      style: TextStyle(
+                        color: Colors.red.shade400,
+                        fontSize: 16,
+                      ),
+                    );
+                  }
+
+                  return Text(
+                    snapshot.data!,
+                    style: TextStyle(
+                      color: isDark ? Colors.white70 : Colors.black87,
+                      fontSize: 16,
+                      height: 1.6,
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: AppSpacing.xxl),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                  child: const Text('Close'),
+                ),
+              )
+            ],
+          ),
+        ),
+      );
+    },
+    );
+  }
   String _getBottomTitle(int value) {
     switch (_selectedTabIndex) {
       case 0: // Day

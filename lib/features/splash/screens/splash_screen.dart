@@ -88,7 +88,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     Future.delayed(const Duration(milliseconds: 1500), _checkAuthAndNavigate);
   }
 
-  void _checkAuthAndNavigate() {
+  void _checkAuthAndNavigate() async {
     if (!mounted || _hasNavigated) return;
 
     final authState = ref.read(authProvider);
@@ -111,14 +111,40 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     if (authState.status == AuthStatus.authenticated ||
         authState.status == AuthStatus.anonymous) {
       var profile = ref.read(userProfileProvider);
-      if (profile == null) {
+      
+      // If profile is missing locally, try to fetch it before assuming new user
+      if (profile == null || profile.name == null || profile.name!.isEmpty) {
         if (authState.status == AuthStatus.anonymous) {
-          profile = UserProfile(name: 'Guest User', role: 'user');
+          profile = const UserProfile(name: 'Guest User', role: 'user');
           ref.read(userProfileProvider.notifier).updateProfile(profile);
           context.go('/home');
         } else {
-          // New user, push to the completion form!
-          context.go('/login/patient_completion');
+          try {
+            final firestore = ref.read(firestoreServiceProvider);
+            final user = authState.user;
+            if (user != null) {
+              final backendUser = await firestore.getUserProfile(user.uid);
+              if (backendUser != null) {
+                final role = backendUser.role;
+                if (role == 'admin') {
+                  await ref.read(authProvider.notifier).signOut();
+                  if (mounted) {
+                    context.showSnack('Please use Hospital Personnel login.');
+                    context.go('/login');
+                  }
+                  return;
+                }
+                profile = backendUser;
+                ref.read(userProfileProvider.notifier).updateProfile(profile);
+                if (mounted) context.go('/home');
+                return;
+              }
+            }
+          } catch (e) {
+            debugPrint('Splash profile fetch error: $e');
+          }
+          // Only push to completion if backend really doesn't know them
+          if (mounted) context.go('/login/patient_completion');
         }
       } else {
         context.go('/home');
@@ -151,6 +177,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                 child: Image.asset(
                   'assets/images/splash_bg.png',
                   fit: BoxFit.cover,
+                  cacheWidth: 800,
                 ),
               );
             },
@@ -168,59 +195,61 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
               return Stack(
                 children: [
                   Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Logo
-                        Transform.translate(
-                          offset: Offset(0, _logoTranslateY.value),
-                          child: Opacity(
-                            opacity: _logoOpacity.value,
-                            child: Container(
-                              padding: const EdgeInsets.all(24),
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Colors.white.withOpacity(0.1),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: context.colorScheme.primary.withOpacity(0.2),
-                                    blurRadius: 40,
-                                    spreadRadius: 10,
-                                  ),
-                                ],
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Logo
+                          Transform.translate(
+                            offset: Offset(0, _logoTranslateY.value),
+                            child: Opacity(
+                              opacity: _logoOpacity.value,
+                              child: Container(
+                                padding: const EdgeInsets.all(24),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.white.withOpacity(0.1),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: context.colorScheme.primary.withOpacity(0.2),
+                                      blurRadius: 40,
+                                      spreadRadius: 10,
+                                    ),
+                                  ],
+                                ),
+                                child: const AnimatedLogo(size: 110),
                               ),
-                              child: const AnimatedLogo(size: 110),
                             ),
                           ),
-                        ),
-                        const SizedBox(height: AppSpacing.xxl),
-                        
-                        // Title
-                        Opacity(
-                          opacity: _titleOpacity.value,
-                          child: Text(
-                            'VitaNet',
-                            style: context.textTheme.displaySmall?.copyWith(
-                              fontWeight: FontWeight.w900,
-                              color: Colors.white,
-                              letterSpacing: 1.5,
+                          const SizedBox(height: AppSpacing.xxl),
+                          
+                          // Title
+                          Opacity(
+                            opacity: _titleOpacity.value,
+                            child: Text(
+                              'VitaNet',
+                              style: context.textTheme.displaySmall?.copyWith(
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                                letterSpacing: 1.5,
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        
-                        // Subtitle
-                        Opacity(
-                          opacity: _subtitleOpacity.value,
-                          child: Text(
-                            'Your health, instantly.',
-                            style: context.textTheme.bodyLarge?.copyWith(
-                              color: Colors.white70,
-                              letterSpacing: 0.5,
+                          const SizedBox(height: AppSpacing.sm),
+                          
+                          // Subtitle
+                          Opacity(
+                            opacity: _subtitleOpacity.value,
+                            child: Text(
+                              'Your health, instantly.',
+                              style: context.textTheme.bodyLarge?.copyWith(
+                                color: Colors.white70,
+                                letterSpacing: 0.5,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                   

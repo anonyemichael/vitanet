@@ -1,0 +1,139 @@
+[
+  {
+    "id": "med_001",
+    "name": "Paracetamol",
+    "type": "Pain Reliever",
+    "description": "A common painkiller used to treat aches and pain. It can also be used to reduce a high temperature (fever).",
+    "accent_color": "#3B82F6",
+    "icon": "medication_liquid_rounded",
+    "hero_image_url": "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?q=80&w=1000&auto=format&fit=crop",
+    "is_fda_approved": true,
+    "related_video_id": "vid_first_aid_001",
+    "details": [
+      {
+        "title": "Typical Dosage",
+        "icon": "medication_rounded",
+        "content": "Adults: Take 1-2 tablets (500mg each) every 4 to 6 hours as needed.\nDo not exceed 8 tablets (4,000mg) in 24 hours.\nTake with a full glass of water. Can be taken with or without food."
+      },
+      {
+        "title": "Common Side Effects",
+        "icon": "warning_amber_rounded",
+        "content": "Paracetamol rarely causes side effects if taken at the right dosage. Rarely, it may cause an allergic reaction (rash, swelling) or liver damage if taken in overdose."
+      },
+      {
+        "title": "Interactions & Warnings",
+        "icon": "gpp_maybe_rounded",
+        "content": "Avoid drinking excessive amounts of alcohol while taking this medicine. Do not combine with other cold or cough medicines that already contain paracetamol to avoid overdose."
+      }
+    ]
+  },
+  {
+    "id": "med_002",
+    "name": "Ibuprofen",
+    "type": "NSAID",
+    "description": "An everyday painkiller for a range of aches and pains, including back pain, period pain, toothache, and it reduces inflammation.",
+    "accent_color": "#F97316",
+    "icon": "medication_rounded",
+    "hero_image_url": "https://images.unsplash.com/photo-1550572017-edb7994c4897?q=80&w=1000&auto=format&fit=crop",
+    "is_fda_approved": true,
+    "related_video_id": "vid_diet_001",
+    "details": [
+      {
+        "title": "Typical Dosage",
+        "icon": "medication_rounded",
+        "content": "Adults: Take 1-2 tablets (200mg each) every 4 to 6 hours as needed.\nDo not exceed 1,200mg in 24 hours without consulting a doctor.\nBest taken with food or a glass of milk to reduce stomach upset."
+      },
+      {
+        "title": "Common Side Effects",
+        "icon": "warning_amber_rounded",
+        "content": "• Nausea or vomiting\n• Mild stomach pain\n• Heartburn\n• Dizziness"
+      },
+      {
+        "title": "Interactions & Warnings",
+        "icon": "gpp_maybe_rounded",
+        "content": "Do not take if you have a history of stomach ulcers, severe heart failure, or are highly allergic to aspirin. May interact with blood thinners."
+      }
+    ]
+  },
+  {
+    "id": "med_003",
+    "name": "Amoxicillin",
+    "type": "Antibiotic",
+    "description": "A penicillin antibiotic used to treat a wide variety of bacterial infections, such as middle ear infections, strep throat, and pneumonia.",
+    "accent_color": "#10B981",
+    "icon": "healing_rounded",
+    "hero_image_url": "https://images.unsplash.com/photo-1628771065518-0d82f1938462?q=80&w=1000&auto=format&fit=crop",
+    "is_fda_approved": true,
+    "details": [
+      {
+        "title": "Typical Dosage",
+        "icon": "medication_rounded",
+        "content": "Dosage is prescribed by a doctor based on the infection. Typically 250mg to 500mg every 8 hours, or 500mg to 875mg every 12 hours.\nYou must complete the entire course of medication even if you feel better."
+      },
+      {
+        "title": "Common Side Effects",
+        "icon": "warning_amber_rounded",
+        "content": "• Nausea or vomiting\n• Diarrhea\n• Mild skin rash"
+      },
+      {
+        "title": "Interactions & Warnings",
+        "icon": "gpp_maybe_rounded",
+        "content": "Do not use if you are allergic to penicillin. Seek immediate emergency medical help if you have signs of an allergic reaction: hives, difficult breathing, swelling of your face."
+      }
+    ]
+  },
+  {
+    "id": "med_004",
+    "name": "Loratadine",
+    "type": "Antihistamine",
+    "description": "Used to treat symptoms of allergies, such as sneezing, watery eyes, and runny nose. It is non-drowsy for most people.",
+    "accent_color": "#8B5CF6",
+    "icon": "air_rounded",
+    "hero_image_url": "https://images.unsplash.com/photo-1584017911766-d451b3d0e843?q=80&w=1000&auto=format&fit=crop",
+    "is_fda_approved": true,
+    "details": [
+      {
+        "title": "Typical Dosage",
+        "icon": "medication_rounded",
+        "content": "Adults: Take 1 tablet (10mg) once daily.\nDo not take more than 1 tablet in 24 hours."
+      },
+      {
+        "title": "Common Side Effects",
+        "icon": "warning_amber_rounded",
+        "content": "• Headache\n• Dry mouth\n• Feeling tired or drowsy (rare, but possible)"
+      },
+      {
+        "title": "Interactions & Warnings",
+        "icon": "gpp_maybe_rounded",
+        "content": "Check with your doctor before taking if you have liver or kidney disease. Safe for use during pregnancy only if clearly needed."
+      }
+    ]
+  },
+  {
+    "id": "med_005",
+    "name": "Omeprazole",
+    "type": "Antacid",
+    "description": "A proton pump inhibitor (PPI) that decreases the amount of acid produced in the stomach. Treats acid reflux and ulcers.",
+    "accent_color": "#14B8A6",
+    "icon": "local_pharmacy_rounded",
+    "hero_image_url": "https://images.unsplash.com/photo-1631549916768-4119b2e5f926?q=80&w=1000&auto=format&fit=crop",
+    "is_fda_approved": true,
+    "details": [
+      {
+        "title": "Typical Dosage",
+        "icon": "medication_rounded",
+        "content": "Adults: Take 1 capsule (20mg) once daily before a meal, usually in the morning.\nSwallow whole; do not crush or chew."
+      },
+      {
+        "title": "Common Side Effects",
+        "icon": "warning_amber_rounded",
+        "content": "• Headache\n• Stomach pain, nausea, vomiting, or diarrhea\n• Gas"
+      },
+      {
+        "title": "Interactions & Warnings",
+        "icon": "gpp_maybe_rounded",
+        "content": "Long-term use may increase the risk of bone fractures and vitamin B12 deficiency. May interact with blood thinners or methotrexate."
+      }
+    ]
+  }
+]

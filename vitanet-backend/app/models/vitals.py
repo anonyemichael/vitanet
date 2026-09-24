@@ -17,6 +17,7 @@ class VitalType(str, enum.Enum):
     BP_DIASTOLIC = "bp_diastolic"
     TEMPERATURE = "temperature"
     BLOOD_OXYGEN = "blood_oxygen"
+    RESPIRATORY_RATE = "respiratory_rate"
 
 # python -m app.scripts.seed_vitals <your-test-user-uuid>
 

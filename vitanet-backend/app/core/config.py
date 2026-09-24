@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     RESEND_API_KEY: str
     
     GEMINI_API_KEY: str
+    GEMINI_MODEL: str = "gemini-2.5-flash"
+    OPENROUTER_API_KEYS: str = ""
 
     class Config:
         env_file = ".env"

@@ -1,6 +1,10 @@
+import 'dart:convert';
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:vitanet/core/constants/app_spacing.dart';
 import 'package:vitanet/core/extensions/context_ext.dart';
+import 'medicine_detail_screen.dart';
+import '../models/medicine.dart';
 
 class MedicineSearchScreen extends StatefulWidget {
   const MedicineSearchScreen({super.key});
@@ -12,16 +16,32 @@ class MedicineSearchScreen extends StatefulWidget {
 class _MedicineSearchScreenState extends State<MedicineSearchScreen> {
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
+  List<Medicine> _allMeds = [];
+  bool _isLoading = true;
 
-  final _allMeds = [
-    _Medicine(name: 'Paracetamol', type: 'Pain Reliever', desc: 'Used to treat mild to moderate pain and reduce fever.', color: const Color(0xFF3B82F6), icon: Icons.medication_liquid_rounded),
-    _Medicine(name: 'Ibuprofen', type: 'NSAID', desc: 'Reduces fever, pain and inflammation.', color: const Color(0xFFF97316), icon: Icons.medication_rounded),
-    _Medicine(name: 'Amoxicillin', type: 'Antibiotic', desc: 'Used to treat bacterial infections.', color: const Color(0xFF10B981), icon: Icons.healing_rounded),
-    _Medicine(name: 'Loratadine', type: 'Antihistamine', desc: 'Relieves allergy symptoms.', color: const Color(0xFF8B5CF6), icon: Icons.air_rounded),
-    _Medicine(name: 'Omeprazole', type: 'Antacid', desc: 'Treats acid reflux and stomach ulcers.', color: const Color(0xFF14B8A6), icon: Icons.local_pharmacy_rounded),
-  ];
+  final _popularSearches = ['Paracetamol', 'Ibuprofen', 'Amoxicillin', 'Loratadine', 'Omeprazole'];
 
-  final _popularSearches = ['Paracetamol', 'Ibuprofen', 'Amoxicillin'];
+  @override
+  void initState() {
+    super.initState();
+    _loadMedicines();
+  }
+
+  Future<void> _loadMedicines() async {
+    try {
+      final jsonString = await rootBundle.loadString('assets/health_library_data/medicines/medicines_catalog.json');
+      final List<dynamic> jsonList = json.decode(jsonString);
+      setState(() {
+        _allMeds = jsonList.map((json) => Medicine.fromJson(json)).toList();
+        _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('Error loading medicines: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -38,14 +58,38 @@ class _MedicineSearchScreenState extends State<MedicineSearchScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        if (constraints.maxWidth < 800) {
-          return _buildMobileLayout(context);
-        } else {
-          return _buildDesktopLayout(context);
-        }
-      },
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: context.colorScheme.surface,
+        appBar: AppBar(
+          title: const Text('Medicine Directory'),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+        ),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: context.colorScheme.surface,
+      appBar: AppBar(
+        title: const Text('Medicine Directory'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth < 800) {
+            return _buildMobileLayout(context);
+          } else {
+            return _buildDesktopLayout(context);
+          }
+        },
+      ),
     );
   }
 
@@ -57,7 +101,12 @@ class _MedicineSearchScreenState extends State<MedicineSearchScreen> {
         _buildHeaderArea(context),
         Expanded(
           child: ListView.separated(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl, vertical: AppSpacing.md),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.xl,
+              AppSpacing.md,
+              AppSpacing.xl,
+              120, // Add bottom padding to prevent nav bar from covering content
+            ),
             itemCount: filteredMeds.length,
             separatorBuilder: (context, index) => const SizedBox(height: AppSpacing.md),
             itemBuilder: (context, index) {
@@ -77,7 +126,12 @@ class _MedicineSearchScreenState extends State<MedicineSearchScreen> {
         _buildHeaderArea(context, isDesktop: true),
         Expanded(
           child: GridView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxxl, vertical: AppSpacing.lg),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.xxxl,
+              AppSpacing.lg,
+              AppSpacing.xxxl,
+              120, // Add bottom padding to prevent nav bar from covering content
+            ),
             gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
               maxCrossAxisExtent: 450,
               mainAxisSpacing: AppSpacing.lg,
@@ -172,7 +226,7 @@ class _MedicineSearchScreenState extends State<MedicineSearchScreen> {
     );
   }
 
-  Widget _buildMedicineCard(BuildContext context, _Medicine med) {
+  Widget _buildMedicineCard(BuildContext context, Medicine med) {
     return Container(
       decoration: BoxDecoration(
         color: context.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
@@ -183,21 +237,48 @@ class _MedicineSearchScreenState extends State<MedicineSearchScreen> {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(20),
-          onTap: () {},
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => MedicineDetailScreen(medicine: med),
+              ),
+            );
+          },
           child: Padding(
             padding: const EdgeInsets.all(AppSpacing.lg),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: med.color.withValues(alpha: 0.15),
+                if (med.heroImageUrl != null)
+                  ClipRRect(
                     borderRadius: BorderRadius.circular(16),
+                    child: Image.network(
+                      med.heroImageUrl!,
+                      width: 56,
+                      height: 56,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          color: med.color.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Icon(med.icon, color: med.color, size: 28),
+                      ),
+                    ),
+                  )
+                else
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: med.color.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Icon(med.icon, color: med.color, size: 28),
                   ),
-                  child: Icon(med.icon, color: med.color, size: 28),
-                ),
                 const SizedBox(width: AppSpacing.lg),
                 Expanded(
                   child: Column(
@@ -221,7 +302,7 @@ class _MedicineSearchScreenState extends State<MedicineSearchScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        med.desc, 
+                        med.description, 
                         style: context.textTheme.bodySmall?.copyWith(color: context.colorScheme.onSurfaceVariant),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
@@ -239,18 +320,3 @@ class _MedicineSearchScreenState extends State<MedicineSearchScreen> {
   }
 }
 
-class _Medicine {
-  final String name;
-  final String type;
-  final String desc;
-  final Color color;
-  final IconData icon;
-
-  _Medicine({
-    required this.name, 
-    required this.type, 
-    required this.desc,
-    required this.color,
-    required this.icon,
-  });
-}

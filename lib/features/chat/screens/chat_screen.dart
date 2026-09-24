@@ -4,14 +4,17 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
+import 'package:go_router/go_router.dart';
 import 'package:vitanet/core/constants/app_spacing.dart';
 import 'package:vitanet/core/extensions/context_ext.dart';
 import 'package:vitanet/core/providers/shared_state.dart';
 import 'package:vitanet/data/models/chat_message.dart';
 import 'package:vitanet/data/providers/providers.dart';
+import 'package:vitanet/data/services/firestore_service.dart';
+import 'package:vitanet/data/services/voice_service.dart';
 
 import 'package:vitanet/features/chat/widgets/ai_message_card.dart';
-import 'package:vitanet/features/chat/widgets/animated_background.dart';
+import 'package:vitanet/shared/widgets/premium_background.dart';
 import 'package:vitanet/features/chat/widgets/chat_header.dart';
 import 'package:vitanet/features/chat/widgets/chat_history_drawer.dart';
 import 'package:vitanet/features/chat/widgets/health_input_bar.dart';
@@ -96,7 +99,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _textController.addListener(_handleTextChange);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (ref.read(chatMessagesProvider).isEmpty) {
-        ref.read(chatMessagesProvider.notifier).addGreeting();
         ref.read(aiServiceProvider).reset();
       }
     });
@@ -133,10 +135,54 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   void _runCommand(_SlashCommand command) {
     _textController.clear();
     setState(() => _showSlashMenu = false);
-    _sendMessage(command.prompt);
+    _checkProfileCompletionAndProceed(command.prompt);
   }
 
-  Future<void> _sendMessage(String text, {String? imagePath}) async {
+  void _checkProfileCompletionAndProceed(String text, {String? imagePath, bool isVoice = false}) {
+    if (text.trim().isEmpty && imagePath == null) return;
+
+    final profile = ref.read(userProfileProvider);
+    final needsCompletion = profile == null || 
+        profile.bloodType == null || profile.bloodType!.trim().isEmpty ||
+        profile.weight == null || profile.height == null ||
+        profile.dob == null || profile.dob!.trim().isEmpty;
+
+    final isSymptomRelated = text.toLowerCase().contains('symptom') || 
+        text.toLowerCase().contains('headache') || 
+        text.toLowerCase().contains('pain') ||
+        text.toLowerCase().contains('sick') ||
+        ref.read(chatMessagesProvider).length <= 1; // Greeting is 1
+
+    if (needsCompletion && isSymptomRelated) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Complete Your Profile'),
+          content: const Text('For an accurate AI health assessment, please update your profile with your age, weight, height, and blood type.'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _sendMessage(text, imagePath: imagePath, isVoice: isVoice);
+              },
+              child: const Text('Skip'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(context);
+                context.push('/edit-profile');
+              },
+              child: const Text('Update Profile'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      _sendMessage(text, imagePath: imagePath, isVoice: isVoice);
+    }
+  }
+
+  Future<void> _sendMessage(String text, {String? imagePath, bool isVoice = false}) async {
     if (text.trim().isEmpty && imagePath == null) return;
 
     _textController.clear();
@@ -165,25 +211,43 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
 
     final aiService = ref.read(aiServiceProvider);
-    final responses = await aiService.getResponse(text.trim(), base64Image: base64Image);
+    final stream = aiService.getResponseStream(text.trim(), base64Image: base64Image);
+    
+    final responseId = _uuid.v4();
+    bool isFirst = true;
+    String fullResponse = '';
 
-    ref.read(isAiTypingProvider.notifier).state = false;
-
-    for (int i = 0; i < responses.length; i++) {
-      ref.read(chatMessagesProvider.notifier).addMessage(responses[i]);
-      _scrollToBottom();
-
-      if (i < responses.length - 1) {
-        ref.read(isAiTypingProvider.notifier).state = true;
-        await Future.delayed(const Duration(milliseconds: 1500));
+    await for (final chunk in stream) {
+      fullResponse = chunk;
+      if (isFirst) {
+        ref.read(chatMessagesProvider.notifier).addMessage(ChatMessage(
+          id: responseId,
+          role: MessageRole.assistant,
+          text: chunk,
+          timestamp: DateTime.now(),
+        ));
+        isFirst = false;
         ref.read(isAiTypingProvider.notifier).state = false;
+      } else {
+        ref.read(chatMessagesProvider.notifier).updateMessageText(responseId, chunk);
       }
+      _scrollToBottom();
     }
 
-    if (responses.last.quickReplies != null) {
-      ref.read(quickRepliesProvider.notifier).state =
-          responses.last.quickReplies!;
+    if (isFirst) {
+      // In case the stream was empty or failed immediately
+      ref.read(isAiTypingProvider.notifier).state = false;
     }
+
+    if (isVoice && fullResponse.isNotEmpty) {
+      final voiceService = ref.read(voiceServiceProvider);
+      final cleanText = fullResponse
+          .replaceAll(RegExp(r'[*_#]+'), '')
+          .replaceAll(RegExp(r'\[.*?\]\(.*?\)'), 'a link');
+      voiceService.speak(cleanText);
+    }
+
+    // TODO: Quick replies can be injected here if needed
 
     _scrollToBottom();
 
@@ -221,21 +285,63 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     ref.listen<String?>(searchActionProvider, (previous, next) {
       if (next != null && next.isNotEmpty) {
         Future.microtask(() {
-          _sendMessage(next);
+          _checkProfileCompletionAndProceed(next);
           ref.read(searchActionProvider.notifier).state = null;
         });
       }
     });
 
+    final composer = Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 720),
+        child: _Composer(
+          showSlashMenu: _showSlashMenu,
+          commands: _filteredCommands,
+          onCommandSelected: _runCommand,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              HealthInputBar(
+                controller: _textController,
+                onSend: _checkProfileCompletionAndProceed,
+              ),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6.0, top: 6.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.info_outline_rounded,
+                      size: 12,
+                      color: context.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'AI can make mistakes. Please verify medical information.',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        color: context.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
     return Scaffold(
       key: _scaffoldKey,
-      backgroundColor: colorScheme.surface,
+      backgroundColor: Colors.transparent, // Required to see PremiumBackground
       extendBodyBehindAppBar: true,
       appBar: ChatHeader(
         onMenuPressed: () => _scaffoldKey.currentState?.openDrawer(),
         onNewChatPressed: () {
           ref.read(chatMessagesProvider.notifier).clear();
-          ref.read(chatMessagesProvider.notifier).addGreeting();
           ref.read(aiServiceProvider).reset();
           ref.read(currentConversationIdProvider.notifier).state =
               const Uuid().v4();
@@ -245,97 +351,82 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         },
       ),
       drawer: const ChatHistoryDrawer(),
-      body: Stack(
-        children: [
-          const Positioned.fill(child: AnimatedChatBackground()),
-          Column(
-            children: [
-          Expanded(
-            child: Align(
-              alignment: Alignment.topCenter,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 720),
-                child: ListView.builder(
-                  controller: _scrollController,
-                  padding: EdgeInsets.only(
-                    top: kToolbarHeight +
-                        MediaQuery.of(context).padding.top +
-                        AppSpacing.lg,
-                    left: AppSpacing.md,
-                    right: AppSpacing.md,
-                    bottom: AppSpacing.md,
+      body: PremiumBackground(
+        child: messages.isEmpty && !isTyping
+            ? Center(
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const _EmptyState(),
+                      const SizedBox(height: 32),
+                      composer,
+                    ],
                   ),
-                  itemCount: messages.isEmpty && !isTyping ? 1 : messages.length + (isTyping ? 1 : 0),
-                  itemBuilder: (context, index) {
-                    if (messages.isEmpty && !isTyping) {
-                      return const Padding(
-                        padding: EdgeInsets.only(top: 40.0),
-                        child: _EmptyState(),
-                      );
-                    }
-
-                    if (index == messages.length && isTyping) {
-                      return const Padding(
-                        padding: EdgeInsets.only(bottom: AppSpacing.md),
-                        child: _MessageEntrance(
-                          key: ValueKey('typing-indicator'),
-                          child: TypingIndicator(),
+                ),
+              )
+            : Column(
+              children: [
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 720),
+                      child: ListView.builder(
+                        controller: _scrollController,
+                        padding: EdgeInsets.only(
+                          top: kToolbarHeight +
+                              MediaQuery.of(context).padding.top +
+                              AppSpacing.lg,
+                          left: AppSpacing.md,
+                          right: AppSpacing.md,
+                          bottom: 120,
                         ),
-                      );
-                    }
+                        itemCount: messages.length + (isTyping ? 1 : 0),
+                        itemBuilder: (context, index) {
+                          if (index == messages.length && isTyping) {
+                            return const Padding(
+                              padding: EdgeInsets.only(bottom: AppSpacing.md),
+                              child: _MessageEntrance(
+                                key: ValueKey('typing-indicator'),
+                                child: TypingIndicator(),
+                              ),
+                            );
+                          }
 
-                    final message = messages[index];
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                      child: _MessageEntrance(
-                        key: ValueKey(message.id),
-                        child: message.role == MessageRole.user
-                            ? UserMessageBubble(message: message)
-                            : AiMessageCard(message: message),
+                          final message = messages[index];
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                            child: _MessageEntrance(
+                              key: ValueKey(message.id),
+                              child: message.role == MessageRole.user
+                                  ? UserMessageBubble(message: message)
+                                  : AiMessageCard(message: message),
+                            ),
+                          );
+                        },
                       ),
-                    );
-                  },
+                    ),
+                  ),
                 ),
-              ),
+                if (quickReplies.isNotEmpty)
+                  Align(
+                    alignment: Alignment.topCenter,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 720),
+                      child: _QuickReplyRow(
+                        replies: quickReplies,
+                        onSelected: _checkProfileCompletionAndProceed,
+                      ),
+                    ),
+                  ),
+                composer,
+              ],
             ),
-          ),
-
-          if (quickReplies.isNotEmpty)
-            Align(
-              alignment: Alignment.topCenter,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 720),
-                child: _QuickReplyRow(
-                  replies: quickReplies,
-                  onSelected: _sendMessage,
-                ),
-              ),
-            ),
-
-          // Clean, flat composer with inline slash commands
-          Align(
-            alignment: Alignment.topCenter,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 720),
-              child: _Composer(
-                showSlashMenu: _showSlashMenu,
-                commands: _filteredCommands,
-                onCommandSelected: _runCommand,
-                child: HealthInputBar(
-                  controller: _textController,
-                  onSend: _sendMessage,
-                ),
-              ),
-            ),
-          ),
-        ],
       ),
-    ],
-  ),
-);
+    );
   }
 }
-
 /// One-shot fade + rise entrance animation for chat bubbles.
 ///
 /// Keyed by message id so existing items in the list are never
@@ -462,23 +553,14 @@ class _Composer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = context.colorScheme;
+    final isKeyboardOpen = MediaQueryData.fromView(View.of(context)).viewInsets.bottom > 0;
 
-    return ClipRect(
-      child: BackdropFilter(
-        filter: dart_ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-        child: Container(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).padding.bottom,
-          ),
-          decoration: BoxDecoration(
-            color: colorScheme.surface.withValues(alpha: 0.75),
-            border: Border(
-              top: BorderSide(
-                color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-                width: 1,
-              ),
-            ),
-          ),
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: isKeyboardOpen 
+            ? 10 
+            : MediaQuery.of(context).padding.bottom + 24, // Padding for bottom nav bar when keyboard is closed
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -487,81 +569,80 @@ class _Composer extends StatelessWidget {
             curve: Curves.easeOut,
             alignment: Alignment.bottomCenter,
             child: showSlashMenu && commands.isNotEmpty
-                ? _SlashCommandList(
-                    commands: commands,
-                    onSelected: onCommandSelected,
+                ? Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surface,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.1),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
+                        )
+                      ],
+                      border: Border.all(
+                        color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: _SlashCommandList(
+                      commands: commands,
+                      onSelected: onCommandSelected,
+                    ),
                   )
                 : const SizedBox(width: double.infinity),
           ),
-          if (showSlashMenu && commands.isNotEmpty)
-            Divider(
-              height: 1,
-              thickness: 1,
-              color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-            ),
           child,
-          ],
-        ),
+        ],
       ),
-    ),
-  );
+    );
   }
 }
 
-class _EmptyState extends StatelessWidget {
+class _EmptyState extends ConsumerStatefulWidget {
   const _EmptyState();
 
   @override
+  ConsumerState<_EmptyState> createState() => _EmptyStateState();
+}
+
+class _EmptyStateState extends ConsumerState<_EmptyState> {
+  late String _greetingPrefix;
+
+  @override
+  void initState() {
+    super.initState();
+    final greetings = [
+      'How are you feeling today',
+      'What\'s on your mind',
+      'How can I support your health',
+      'Ready to check in on your health',
+      'What would you like to discuss',
+    ];
+    greetings.shuffle();
+    _greetingPrefix = greetings.first;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        const SizedBox(height: 60),
-        Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: const LinearGradient(
-              colors: [Color(0xFF3B82F6), Color(0xFF10B981)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF3B82F6).withValues(alpha: 0.3),
-                blurRadius: 30,
-                spreadRadius: 5,
-              ),
-            ],
-          ),
-          child: const Icon(
-            Icons.auto_awesome_rounded,
-            size: 48,
-            color: Colors.white,
-          ),
+    final profile = ref.watch(userProfileProvider);
+    final userName = profile?.name?.split(' ').first ?? 'Anony';
+    
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 32).copyWith(
+        top: MediaQuery.of(context).size.height * 0.20,
+      ),
+      child: Text(
+        '$_greetingPrefix, $userName?',
+        style: TextStyle(
+          fontSize: 26,
+          fontWeight: FontWeight.w500,
+          color: context.isDark ? Colors.white.withValues(alpha: 0.9) : Colors.black87,
+          letterSpacing: -0.3,
+          height: 1.3,
         ),
-        const SizedBox(height: 32),
-        Text(
-          'How can I help you today?',
-          style: context.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w800,
-            letterSpacing: -0.5,
-          ),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 12),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32),
-          child: Text(
-            'Type a symptom, ask about medication, or find a doctor nearby. You can also type / to see quick commands.',
-            style: context.textTheme.bodyMedium?.copyWith(
-              color: context.colorScheme.onSurfaceVariant,
-              height: 1.5,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ),
-      ],
+        textAlign: TextAlign.center,
+      ),
     );
   }
 }
