@@ -12,4 +12,4 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 # app/routers/chat.py
 @router.post("/{user_id}")
 def chat(user_id: UUID, payload: ChatRequest, db: Session = Depends(get_db)):
-    return run_agent(db, user_id, payload.message)
+    return run_agent(db, user_id, payload.message, payload.image_base64)

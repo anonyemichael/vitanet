@@ -10,3 +10,6 @@ __pycache__/
 
 # IDE
 .vscode/"vitanet_frontend/" 
+
+# Secrets
+firebase-service-account.json

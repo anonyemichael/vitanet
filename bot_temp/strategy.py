@@ -1,0 +1,692 @@
+"""
+Institutional ICT / FXAlexG Strategy Engine — v3.1 (Strategy Overhaul)
+Implements:
+  1. Dynamic Swing Dealing Range (Equilibrium & TRUE OTE discount/premium)
+  2. Multi-Timeframe Trend Confluence (Weekly, Daily 200 EMA, 4H 21 EMA)
+  3. Key Support/Resistance & Areas of Interest (AOI)
+  4. Primary Triggers: 4H Structural Rejection / Engulfing at Key AOI
+  5. Secondary Triggers: 15M / 1H CHoCH + FVG Mitigation in Kill Zones
+  6. Structure-based Stop Loss & Asymmetric Take Profit (TP1 1:1.2, TP2 1:2.5)
+  7. [v3.1] ADX Market Regime Filter — skip ranging/choppy markets
+  8. [v3.1] True OTE Zone Enforcement — only buy in discount, sell in premium
+  9. [v3.1] Adaptive SL Lookback — deeper structure for crypto vs forex
+  10.[v3.1] Strict HTF Confluence — require 3TF sync for primary entries
+"""
+
+import pandas as pd
+import numpy as np
+from config import (
+    AOI_TOLERANCE, AOI_MIN_TOUCHES, SWING_WINDOW,
+    EMA_FAST, EMA_SLOW, EMA_TREND,
+    RSI_LONG_MIN, RSI_LONG_MAX, RSI_SHORT_MIN, RSI_SHORT_MAX,
+    PSYCH_PIP_TOL, MIN_RR, TP1_RR, TP2_RR,
+    ADX_PERIOD, ADX_MIN,
+    CRYPTO_SL_LOOKBACK, FOREX_SL_LOOKBACK,
+    CRYPTO_ATR_BUFFER, FOREX_ATR_BUFFER,
+    MIN_GRADE, MIN_TF_SYNC, MIN_TF_SYNC_KZ,
+)
+
+# ── Indicators ──────────────────────────────────────────────────────────────
+
+def _ema(series, length):
+    return series.ewm(span=length, adjust=False).mean()
+
+
+def _rsi(series, length=14):
+    delta = series.diff()
+    gain = delta.where(delta > 0, 0.0)
+    loss = -delta.where(delta < 0, 0.0)
+    avg_gain = gain.ewm(com=length - 1, min_periods=length).mean()
+    avg_loss = loss.ewm(com=length - 1, min_periods=length).mean()
+    rs = avg_gain / avg_loss.replace(0, np.nan)
+    return 100 - (100 / (1 + rs))
+
+
+def _atr(high, low, close, length=14):
+    tr = pd.concat([
+        high - low,
+        (high - close.shift(1)).abs(),
+        (low  - close.shift(1)).abs(),
+    ], axis=1).max(axis=1)
+    return tr.ewm(com=length - 1, min_periods=length).mean()
+
+
+def _adx(high, low, close, length=14):
+    """
+    Wilder's Average Directional Index.
+    Returns a Series of ADX values (0-100).
+    ADX > 25 = trending, ADX < 20 = ranging/choppy.
+    """
+    prev_high = high.shift(1)
+    prev_low = low.shift(1)
+    prev_close = close.shift(1)
+
+    # True Range
+    tr = pd.concat([
+        high - low,
+        (high - prev_close).abs(),
+        (low - prev_close).abs(),
+    ], axis=1).max(axis=1)
+
+    # Directional Movement
+    plus_dm = high - prev_high
+    minus_dm = prev_low - low
+    plus_dm = plus_dm.where((plus_dm > minus_dm) & (plus_dm > 0), 0.0)
+    minus_dm = minus_dm.where((minus_dm > plus_dm) & (minus_dm > 0), 0.0)
+
+    # Wilder's smoothing (EMA with alpha = 1/length)
+    atr_smooth = tr.ewm(alpha=1.0 / length, min_periods=length).mean()
+    plus_di = 100.0 * (plus_dm.ewm(alpha=1.0 / length, min_periods=length).mean() / atr_smooth.replace(0, np.nan))
+    minus_di = 100.0 * (minus_dm.ewm(alpha=1.0 / length, min_periods=length).mean() / atr_smooth.replace(0, np.nan))
+
+    # DX and ADX
+    di_sum = plus_di + minus_di
+    dx = 100.0 * ((plus_di - minus_di).abs() / di_sum.replace(0, np.nan))
+    adx = dx.ewm(alpha=1.0 / length, min_periods=length).mean()
+
+    return adx
+
+
+def add_indicators(df):
+    df = df.copy()
+    df["ema9"]   = _ema(df["close"], EMA_FAST)
+    df["ema21"]  = _ema(df["close"], EMA_SLOW)
+    df["ema200"] = _ema(df["close"], EMA_TREND)
+    df["rsi"]    = _rsi(df["close"], 14)
+    df["atr"]    = _atr(df["high"], df["low"], df["close"], 14)
+    df["adx"]    = _adx(df["high"], df["low"], df["close"], ADX_PERIOD)
+    return df
+
+
+# ── Asset Classification Helper ────────────────────────────────────────────
+
+def _is_volatile(symbol):
+    """Returns True if symbol is a cryptocurrency pair or Gold."""
+    return any(tag in symbol.upper() for tag in ("BTC", "ETH", "LTC", "XRP", "SOL", "XAU"))
+
+
+# ── Dynamic Swing Dealing Range (Equilibrium & OTE) ─────────────────────────
+
+def get_swing_range(df, lookback=30):
+    """
+    Calculates active dealing range from recent swing highs and lows.
+    Returns (swing_high, swing_low, equilibrium, discount_boundary, premium_boundary).
+    """
+    recent = df.iloc[-lookback:]
+    high = float(recent["high"].max())
+    low  = float(recent["low"].min())
+    eq   = (high + low) / 2.0
+    rng  = high - low
+    
+    # 61.8% OTE retracement boundaries
+    discount_ote = low + 0.618 * rng  # Below this is deep/valid discount for buying
+    premium_ote  = high - 0.618 * rng # Above this is deep/valid premium for selling
+    
+    return {
+        "high": high,
+        "low": low,
+        "equilibrium": eq,
+        "discount_ote": discount_ote,
+        "premium_ote": premium_ote,
+        "range": rng,
+    }
+
+
+def is_price_in_favorable_zone(price, direction, swing_info):
+    """
+    [v3.1 FIX] Validates price is in TRUE OTE discount/premium zone.
+    - Longs: price must be BELOW the 61.8% discount OTE boundary (buying in discount)
+    - Shorts: price must be ABOVE the 61.8% premium OTE boundary (selling in premium)
+    
+    Previously this only blocked the top/bottom 15%, allowing entries at 85% of range.
+    Now enforces proper ICT OTE zones.
+    """
+    rng = swing_info["range"]
+    if rng <= 0:
+        return True
+
+    if direction == "bullish":
+        # Must be in the discount zone (below 61.8% retracement from the low)
+        return price <= swing_info["discount_ote"]
+    else:
+        # Must be in the premium zone (above 61.8% retracement from the high)
+        return price >= swing_info["premium_ote"]
+
+
+# ── AOI Zones & Key Levels ──────────────────────────────────────────────────
+
+def _psych_level(price, symbol):
+    if "XAU" in symbol or "GLD" in symbol:
+        step = 100.0
+    elif "BTC" in symbol:
+        step = 1000.0
+    elif "ETH" in symbol:
+        step = 50.0
+    elif "JPY" in symbol:
+        step = 5.0
+    else:
+        step = 0.05
+    return round(price / step) * step
+
+
+def find_aoi_zones(df, symbol):
+    """Identifies multi-touch support/resistance zones weighted by recent volume & closes."""
+    closes = df["close"].dropna().values
+    highs  = df["high"].dropna().values
+    lows   = df["low"].dropna().values
+    n = len(closes)
+    
+    zones = []
+    # Identify swing pivot points
+    pivots = []
+    for i in range(2, n - 2):
+        if highs[i] >= highs[i-1] and highs[i] >= highs[i-2] and highs[i] >= highs[i+1] and highs[i] >= highs[i+2]:
+            pivots.append(highs[i])
+        if lows[i] <= lows[i-1] and lows[i] <= lows[i-2] and lows[i] <= lows[i+1] and lows[i] <= lows[i+2]:
+            pivots.append(lows[i])
+            
+    all_levels = list(closes[-60:]) + pivots[-30:]
+    if not all_levels:
+        return []
+
+    all_levels = np.array(all_levels)
+    used = np.zeros(len(all_levels), dtype=bool)
+
+    for i, price in enumerate(all_levels):
+        if used[i]:
+            continue
+        mask = np.abs(all_levels - price) / max(price, 1e-6) <= AOI_TOLERANCE
+        if mask.sum() < AOI_MIN_TOUCHES:
+            continue
+        cluster = all_levels[mask]
+        used[mask] = True
+        
+        zone_low  = float(cluster.min()) * (1 - AOI_TOLERANCE / 2)
+        zone_high = float(cluster.max()) * (1 + AOI_TOLERANCE / 2)
+        zone_mid  = float(cluster.mean())
+        
+        psych = _psych_level(zone_mid, symbol)
+        pip_size = 0.01 if "JPY" in symbol else (1.0 if "XAU" in symbol else (10.0 if "BTC" in symbol else 0.0001))
+        has_psych = abs(psych - zone_mid) <= PSYCH_PIP_TOL * pip_size
+        
+        zones.append({
+            "low": zone_low,
+            "high": zone_high,
+            "mid": zone_mid,
+            "touches": int(mask.sum()),
+            "has_psych": has_psych,
+        })
+    return zones
+
+
+def price_in_aoi(price, zones, buffer_pct=0.0015):
+    for z in zones:
+        if (z["low"] * (1 - buffer_pct)) <= price <= (z["high"] * (1 + buffer_pct)):
+            return z
+    return None
+
+
+def get_key_levels(df_d, df_w):
+    levels = {}
+    if len(df_d) >= 2:
+        prev_d = df_d.iloc[-2]
+        levels["PDH"] = float(prev_d["high"])
+        levels["PDL"] = float(prev_d["low"])
+    if len(df_w) >= 2:
+        prev_w = df_w.iloc[-2]
+        levels["PWH"] = float(prev_w["high"])
+        levels["PWL"] = float(prev_w["low"])
+    return levels
+
+
+def near_key_level(price, levels, tolerance=0.0025):
+    for name, level in levels.items():
+        if abs(price - level) / max(level, 1e-6) <= tolerance:
+            return True, name
+    return False, None
+
+
+def get_equilibrium(df, n=100):
+    """Returns equilibrium (midpoint) of the last n bars' high-low range."""
+    recent = df.iloc[-n:]
+    return (float(recent["high"].max()) + float(recent["low"].min())) / 2.0
+
+
+# ── Trend Biases ─────────────────────────────────────────────────────────────
+
+def get_weekly_bias(df_w):
+    if len(df_w) < 2:
+        return "neutral"
+    row = df_w.iloc[-1]
+    if row["close"] > row["ema21"]:
+        return "bullish"
+    elif row["close"] < row["ema21"]:
+        return "bearish"
+    return "neutral"
+
+
+def get_daily_trend(df_d):
+    if len(df_d) < 2:
+        return "neutral"
+    row = df_d.iloc[-1]
+    if row["close"] > row["ema200"]:
+        return "bullish"
+    elif row["close"] < row["ema200"]:
+        return "bearish"
+    return "neutral"
+
+
+def get_4h_bias(df_4h):
+    if len(df_4h) < 2:
+        return "neutral"
+    row = df_4h.iloc[-2]
+    if row["close"] > row["ema21"]:
+        return "bullish"
+    elif row["close"] < row["ema21"]:
+        return "bearish"
+    return "neutral"
+
+
+def count_synced_timeframes(w_bias, d_trend, h4_bias, direction):
+    count = 0
+    if w_bias  == direction: count += 1
+    if d_trend == direction: count += 1
+    if h4_bias == direction: count += 1
+    return count
+
+
+def rsi_ok(df_4h, direction):
+    rsi_val = float(df_4h["rsi"].iloc[-2])
+    if direction == "bullish":
+        return RSI_LONG_MIN <= rsi_val <= RSI_LONG_MAX
+    return RSI_SHORT_MIN <= rsi_val <= RSI_SHORT_MAX
+
+
+# ── Candlestick Reversal & Structural Triggers ──────────────────────────────
+
+def check_engulfing(df, direction):
+    if len(df) < 3:
+        return False
+    prev = df.iloc[-3]
+    curr = df.iloc[-2]
+    prev_high = max(prev["open"], prev["close"])
+    prev_low  = min(prev["open"], prev["close"])
+    curr_high = max(curr["open"], curr["close"])
+    curr_low  = min(curr["open"], curr["close"])
+    if direction == "bullish":
+        return (curr["close"] > curr["open"] and curr["close"] >= prev_high)
+    else:
+        return (curr["close"] < curr["open"] and curr["close"] <= prev_low)
+
+
+def check_rejection_candle(df, direction):
+    """Pinbar, hammer, or strong wick rejection at key level."""
+    if len(df) < 2:
+        return False
+    curr = df.iloc[-2]
+    body = abs(curr["close"] - curr["open"])
+    rng = curr["high"] - curr["low"]
+    if rng == 0:
+        return False
+    
+    if direction == "bullish":
+        lower_wick = min(curr["open"], curr["close"]) - curr["low"]
+        # Lower wick >= 45% of total candle range and bullish close or small body
+        return (lower_wick / rng >= 0.45)
+    else:
+        upper_wick = curr["high"] - max(curr["open"], curr["close"])
+        # Upper wick >= 45% of total candle range
+        return (upper_wick / rng >= 0.45)
+
+
+def check_shift_of_structure(df, direction, window=3):
+    n = len(df)
+    highs  = df["high"].values
+    lows   = df["low"].values
+
+    swing_highs = []
+    swing_lows  = []
+    for i in range(window, n - window):
+        if all(highs[i] >= highs[i - j] for j in range(1, window + 1)) and \
+           all(highs[i] >= highs[i + j] for j in range(1, window + 1)):
+            swing_highs.append(highs[i])
+        if all(lows[i] <= lows[i - j] for j in range(1, window + 1)) and \
+           all(lows[i] <= lows[i + j] for j in range(1, window + 1)):
+            swing_lows.append(lows[i])
+
+    if direction == "bullish" and len(swing_highs) >= 2:
+        if swing_highs[-1] > swing_highs[-2]:
+            return True, "HH"
+    if direction == "bearish" and len(swing_lows) >= 2:
+        if swing_lows[-1] < swing_lows[-2]:
+            return True, "LL"
+    return False, None
+
+
+# ── 15M CHoCH & Order Blocks ────────────────────────────────────────────────
+
+def detect_15m_sweep_and_choch(df_15m, direction, lookback=40):
+    if len(df_15m) < lookback + 5:
+        return None
+    recent = df_15m.iloc[-lookback:]
+    curr = df_15m.iloc[-2]
+    atr = float(df_15m["atr"].iloc[-2]) if "atr" in df_15m.columns else (float(curr["high"]) - float(curr["low"]))
+    
+    if direction == "bullish":
+        swing_low = float(recent["low"].iloc[:-3].min())
+        # Swept recent low then closed higher
+        if float(curr["low"]) <= swing_low and float(curr["close"]) > swing_low:
+            sl = float(curr["low"]) - 0.2 * atr
+            entry = float(curr["close"])
+            sl_dist = entry - sl
+            if sl_dist <= 0: return None
+            tp1 = entry + sl_dist * TP1_RR
+            tp2 = entry + sl_dist * TP2_RR
+            return {"entry": entry, "sl": sl, "tp1": tp1, "tp2": tp2, "sl_dist": sl_dist, "rr": TP2_RR}
+    else:
+        swing_high = float(recent["high"].iloc[:-3].max())
+        if float(curr["high"]) >= swing_high and float(curr["close"]) < swing_high:
+            sl = float(curr["high"]) + 0.2 * atr
+            entry = float(curr["close"])
+            sl_dist = sl - entry
+            if sl_dist <= 0: return None
+            tp1 = entry - sl_dist * TP1_RR
+            tp2 = entry - sl_dist * TP2_RR
+            return {"entry": entry, "sl": sl, "tp1": tp1, "tp2": tp2, "sl_dist": sl_dist, "rr": TP2_RR}
+    return None
+
+
+def find_fvg_near_price(df_15m, direction, price, lookback=15):
+    n = len(df_15m)
+    highs = df_15m["high"].values
+    lows  = df_15m["low"].values
+    for i in range(max(0, n - lookback - 2), n - 2):
+        if direction == "bullish":
+            fvg_low, fvg_high = highs[i], lows[i + 2]
+        else:
+            fvg_low, fvg_high = highs[i + 2], lows[i]
+        if fvg_low < fvg_high and fvg_low <= price <= fvg_high:
+            return True
+    return False
+
+
+# ── Stop Loss & Take Profit Calculation ─────────────────────────────────────
+
+def _find_structural_target(df_4h, direction, entry_price, lookback=60):
+    """Find the next structural swing high/low as a take profit target."""
+    recent = df_4h.iloc[-lookback:]
+    highs = recent["high"].values
+    lows = recent["low"].values
+    n = len(highs)
+    
+    swing_levels = []
+    for i in range(2, n - 2):
+        if direction == "bullish":
+            # Find swing highs above entry as resistance targets
+            if highs[i] >= highs[i-1] and highs[i] >= highs[i-2] and highs[i] >= highs[i+1] and highs[i] >= highs[i+2]:
+                if float(highs[i]) > entry_price:
+                    swing_levels.append(float(highs[i]))
+        else:
+            # Find swing lows below entry as support targets
+            if lows[i] <= lows[i-1] and lows[i] <= lows[i-2] and lows[i] <= lows[i+1] and lows[i] <= lows[i+2]:
+                if float(lows[i]) < entry_price:
+                    swing_levels.append(float(lows[i]))
+    
+    if not swing_levels:
+        return None
+    
+    # Sort by distance from entry — nearest structural target
+    swing_levels.sort(key=lambda x: abs(x - entry_price))
+    return swing_levels[0]
+
+
+def calculate_sl_tp_4h(df_4h, direction, entry_price, symbol=""):
+    """
+    [v3.2 FIX] Structural SL/TP:
+    - SL: Adaptive lookback with wider buffers for crypto/gold
+    - TP: Based on actual structural swing targets, not mechanical multipliers
+    - Falls back to RR-based if no structural target found
+    """
+    atr = float(df_4h["atr"].iloc[-2]) if "atr" in df_4h.columns else 0.001
+
+    # FIX 6: Wider lookback and buffer for volatile assets
+    if _is_volatile(symbol):
+        lookback = 20   # 80h — much deeper structure for BTC/XAU
+        atr_buffer = 0.8  # Wider buffer to survive crypto noise
+    else:
+        lookback = 8    # 32h — slightly wider than v3.1
+        atr_buffer = 0.3
+
+    recent = df_4h.iloc[-(lookback + 1):-1]
+    
+    if direction == "bullish":
+        swing_low = float(recent["low"].min())
+        sl = min(swing_low - atr_buffer * atr, entry_price - 0.7 * atr)
+        sl_dist = entry_price - sl
+        if sl_dist <= 0:
+            sl_dist = atr
+            sl = entry_price - sl_dist
+        
+        # FIX 2: Structural TP — find next swing high above entry
+        structural_tp = _find_structural_target(df_4h, direction, entry_price, lookback=60)
+        if structural_tp:
+            struct_dist = structural_tp - entry_price
+            rr = struct_dist / sl_dist if sl_dist > 0 else 0
+            if rr >= MIN_RR:
+                tp2 = structural_tp - 0.1 * atr  # Slightly inside the level
+                tp1 = entry_price + sl_dist * TP1_RR
+                return round(sl, 5), round(tp1, 5), round(tp2, 5), sl_dist, round(rr, 2)
+        
+        # Fallback to mechanical if no good structural target
+        tp1 = entry_price + sl_dist * TP1_RR
+        tp2 = entry_price + sl_dist * TP2_RR
+        rr = TP2_RR
+    else:
+        swing_high = float(recent["high"].max())
+        sl = max(swing_high + atr_buffer * atr, entry_price + 0.7 * atr)
+        sl_dist = sl - entry_price
+        if sl_dist <= 0:
+            sl_dist = atr
+            sl = entry_price + sl_dist
+        
+        # FIX 2: Structural TP — find next swing low below entry
+        structural_tp = _find_structural_target(df_4h, direction, entry_price, lookback=60)
+        if structural_tp:
+            struct_dist = entry_price - structural_tp
+            rr = struct_dist / sl_dist if sl_dist > 0 else 0
+            if rr >= MIN_RR:
+                tp2 = structural_tp + 0.1 * atr
+                tp1 = entry_price - sl_dist * TP1_RR
+                return round(sl, 5), round(tp1, 5), round(tp2, 5), sl_dist, round(rr, 2)
+        
+        # Fallback
+        tp1 = entry_price - sl_dist * TP1_RR
+        tp2 = entry_price - sl_dist * TP2_RR
+        rr = TP2_RR
+        
+    return round(sl, 5), round(tp1, 5), round(tp2, 5), sl_dist, rr
+
+
+# ── Grading System ──────────────────────────────────────────────────────────
+
+def grade_setup(at_aoi, synced_tfs, ema21_ok, ema200_ok,
+                sos, trigger_type, has_psych, rsi_good, near_key_lvl, in_zone):
+    """
+    [v3.1 FIX] Raised A+ threshold from 75 → 80 for stricter quality gate.
+    B+ = 65+, A+ = 80+. Only A+ is tradeable by default (config.MIN_GRADE).
+    """
+    score = 0
+    met = []
+    
+    if at_aoi:
+        score += 15; met.append("Key AOI")
+    if in_zone:
+        score += 15; met.append("Swing Discount/Premium")
+    if synced_tfs >= 3:
+        score += 18; met.append("3TF Sync (W1+D1+4H)")
+    elif synced_tfs == 2:
+        score += 12; met.append("2TF Sync")
+    if ema21_ok:
+        score += 10; met.append("4H EMA21 ok")
+    if ema200_ok:
+        score += 10; met.append("D1 EMA200 ok")
+    if sos:
+        score += 12; met.append("Shift of Structure")
+    if trigger_type == "engulfing":
+        score += 15; met.append("4H Engulfing")
+    elif trigger_type == "rejection":
+        score += 12; met.append("4H Rejection Wick")
+    elif trigger_type == "15m_choch":
+        score += 15; met.append("15M CHoCH Mitigation")
+    if has_psych:
+        score += 5;  met.append("Psych Level")
+    if rsi_good:
+        score += 5;  met.append("RSI Filter ok")
+    if near_key_lvl:
+        score += 6;  met.append("PDH/PDL Key Level")
+
+    # v3.2: Raised A+ threshold to 95, B+ to 78 for real selectivity
+    if score >= 95:
+        grade = "A+"
+    elif score >= 78:
+        grade = "B+"
+    elif score >= 45:
+        grade = "C+"
+    else:
+        grade = "F"
+    return grade, score, met
+
+
+# ── Main Pair Analysis ──────────────────────────────────────────────────────
+
+def analyze_pair(symbol, df_w, df_d, df_4h, df_15m=None, in_kill_zone=False):
+    """
+    Analyzes one symbol across multi-timeframes.
+    Returns valid setup dict or None.
+    
+    [v3.1 CHANGES]:
+    - ADX regime filter: skips when 4H ADX < ADX_MIN (ranging market)
+    - True OTE zone enforcement via fixed is_price_in_favorable_zone()
+    - Requires MIN_TF_SYNC (3) for primary triggers
+    - Allows MIN_TF_SYNC_KZ (2) for Kill Zone secondary triggers
+    - Only returns setups meeting MIN_GRADE threshold
+    """
+    df_w  = add_indicators(df_w)
+    df_d  = add_indicators(df_d)
+    df_4h = add_indicators(df_4h)
+    if df_15m is not None:
+        df_15m = add_indicators(df_15m)
+
+    current_price = float(df_4h["close"].iloc[-2])
+
+    # [v3.1] ADX Market Regime Filter — skip if market is not trending
+    adx_value = float(df_4h["adx"].iloc[-2]) if "adx" in df_4h.columns and not pd.isna(df_4h["adx"].iloc[-2]) else 50.0
+    if adx_value < ADX_MIN:
+        return None  # Market is ranging/choppy — no setups
+
+    # Dynamic swing range
+    swing_info = get_swing_range(df_4h, lookback=30)
+    key_levels = get_key_levels(df_d, df_w)
+
+    w_bias  = get_weekly_bias(df_w)
+    d_trend = get_daily_trend(df_d)
+    h4_bias = get_4h_bias(df_4h)
+
+    for direction in ["bullish", "bearish"]:
+        # Hard Rule 1: 4H trend alignment (never trade directly against 4H EMA21)
+        if h4_bias not in (direction, "neutral"):
+            continue
+
+        # Hard Rule 2: Swing dealing range zone — TRUE OTE enforcement
+        in_zone = is_price_in_favorable_zone(current_price, direction, swing_info)
+        if not in_zone:
+            continue
+
+        # Confluences
+        synced = count_synced_timeframes(w_bias, d_trend, h4_bias, direction)
+        daily_zones  = find_aoi_zones(df_d, symbol)
+        weekly_zones = find_aoi_zones(df_w, symbol)
+        h4_zones     = find_aoi_zones(df_4h, symbol)
+
+        daily_aoi  = price_in_aoi(current_price, daily_zones)
+        weekly_aoi = price_in_aoi(current_price, weekly_zones)
+        h4_aoi     = price_in_aoi(current_price, h4_zones)
+        aoi_found  = daily_aoi or weekly_aoi or h4_aoi
+
+        row_4h    = df_4h.iloc[-2]
+        ema21_ok  = (direction == "bullish" and row_4h["close"] > row_4h["ema21"]) or \
+                    (direction == "bearish" and row_4h["close"] < row_4h["ema21"])
+        ema200_ok = (d_trend == direction)
+        sos, _    = check_shift_of_structure(df_4h, direction)
+        has_psych = aoi_found["has_psych"] if aoi_found else False
+        rsi_good  = rsi_ok(df_4h, direction)
+        at_key, _ = near_key_level(current_price, key_levels)
+
+        # Trigger checks
+        engulfing = check_engulfing(df_4h, direction)
+        rejection = check_rejection_candle(df_4h, direction)
+
+        trigger_type = None
+        if engulfing:
+            trigger_type = "engulfing"
+        elif rejection:
+            trigger_type = "rejection"
+
+        # PRIMARY: 15M CHoCH in Kill Zone (Sniper Entry)
+        if in_kill_zone and df_15m is not None and (sos or ema21_ok):
+            # [v3.1] Allow MIN_TF_SYNC_KZ (2) for Kill Zone secondary entries
+            if synced < MIN_TF_SYNC_KZ:
+                continue
+
+            choch = detect_15m_sweep_and_choch(df_15m, direction)
+            if choch and choch["rr"] >= MIN_RR:
+                at_fvg = find_fvg_near_price(df_15m, direction, choch["entry"])
+                if at_fvg or aoi_found:
+                    grade, score, met = grade_setup(
+                        at_aoi=aoi_found is not None, synced_tfs=synced, ema21_ok=ema21_ok,
+                        ema200_ok=ema200_ok, sos=True, trigger_type="15m_choch",
+                        has_psych=has_psych, rsi_good=rsi_good, near_key_lvl=at_key, in_zone=in_zone,
+                    )
+                    allow_eval = (grade == MIN_GRADE) or (getattr(config, "AI_UPGRADE_B_PLUS", False) and score >= 80)
+                    if allow_eval:
+                        return {
+                            "symbol": symbol, "direction": direction,
+                            "entry": choch["entry"], "sl": choch["sl"],
+                            "tp": choch["tp2"], "tp1": choch["tp1"], "tp2": choch["tp2"],
+                            "sl_dist": choch["sl_dist"], "rr": choch["rr"],
+                            "grade": grade, "score": score,
+                            "met": met + ["15M CHoCH"],
+                            "trigger": "15m_choch",
+                            "w_bias": w_bias, "d_trend": d_trend, "h4_bias": h4_bias,
+                            "synced": synced, "swing_eq": round(swing_info["equilibrium"], 5),
+                            "adx": round(adx_value, 1),
+                        }
+
+        # SECONDARY: 4H Structural Trigger (Rejection Wick)
+        if trigger_type and aoi_found:
+            # [v3.1] Require MIN_TF_SYNC (3) for primary entries
+            if synced < MIN_TF_SYNC:
+                continue
+
+            grade, score, met = grade_setup(
+                at_aoi=aoi_found is not None, synced_tfs=synced, ema21_ok=ema21_ok, ema200_ok=ema200_ok,
+                sos=sos, trigger_type=trigger_type, has_psych=has_psych, rsi_good=rsi_good,
+                near_key_lvl=at_key, in_zone=in_zone,
+            )
+            allow_eval = (grade == MIN_GRADE) or (getattr(config, "AI_UPGRADE_B_PLUS", False) and score >= 80)
+            if allow_eval:
+                sl, tp1, tp2, sl_dist, rr = calculate_sl_tp_4h(df_4h, direction, current_price, symbol)
+                if rr >= MIN_RR:
+                    return {
+                        "symbol": symbol, "direction": direction,
+                        "entry": current_price, "sl": sl,
+                        "tp": tp2, "tp1": tp1, "tp2": tp2,
+                        "sl_dist": sl_dist, "rr": rr,
+                        "grade": grade, "score": score, "met": met,
+                        "trigger": f"4h_{trigger_type}",
+                        "w_bias": w_bias, "d_trend": d_trend, "h4_bias": h4_bias,
+                        "synced": synced, "swing_eq": round(swing_info["equilibrium"], 5),
+                        "adx": round(adx_value, 1),
+                    }
+
+    return None

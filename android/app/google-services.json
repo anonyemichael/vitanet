@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "975976200606",
+    "project_id": "vitanet-62e40",
+    "storage_bucket": "vitanet-62e40.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:975976200606:android:41bd4b3e04251b760dbe8f",
+        "android_client_info": {
+          "package_name": "com.vitanet.vitanet"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "975976200606-t8eoe2nuupo7nf84bi79dtkn4f9t2muc.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.vitanet.vitanet",
+            "certificate_hash": "8cfefaff36a5c710d40dee65b2065cfc2ec86531"
+          }
+        },
+        {
+          "client_id": "975976200606-ieviukvqvou7r08s5bs8d9ghahnob133.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDZ_XjO99ci23xoOy_1zfGZx3QGDH1ctvM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "975976200606-ieviukvqvou7r08s5bs8d9ghahnob133.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "975976200606-mg4og468uguel1ir9v0ndk6m76fp11o9.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.vitanet.vitanet"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

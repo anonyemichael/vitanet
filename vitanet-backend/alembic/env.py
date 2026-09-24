@@ -12,9 +12,11 @@ from app.models.care_circle import CareCircle
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
+db_url = str(settings.DATABASE_URL)
+escaped_db_url = db_url.replace("%", "%%")
+
 config.set_main_option(
-    "sqlalchemy.url",
-    settings.DATABASE_URL
+    "sqlalchemy.url", escaped_db_url
 )
 
 

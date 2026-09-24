@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.database.connection import get_db
 from app.schemas.health_profile import (
-    HealthProfileOut, HealthProfileUpdate, AllergyCreate, AllergyOut
+    AllergyCreate, AllergyOut, AllergyReplace, HealthProfileOut, HealthProfileUpdate
 )
 from app.services import health_profile_service
 
@@ -25,6 +25,11 @@ def update_profile(user_id: UUID, payload: HealthProfileUpdate, db: Session = De
 @router.post("/{user_id}/allergies", response_model=AllergyOut)
 def create_allergy(user_id: UUID, payload: AllergyCreate, db: Session = Depends(get_db)):
     return health_profile_service.add_allergy(db, user_id, payload)
+
+
+@router.put("/{user_id}/allergies", response_model=list[AllergyOut])
+def replace_allergies(user_id: UUID, payload: AllergyReplace, db: Session = Depends(get_db)):
+    return health_profile_service.replace_allergies(db, user_id, payload.allergies)
 
 
 @router.get("/{user_id}/allergies", response_model=list[AllergyOut])

@@ -35,3 +35,15 @@ def add_allergy(db: Session, user_id: UUID, payload: AllergyCreate) -> Allergy:
 
 def get_allergies(db: Session, user_id: UUID) -> list[Allergy]:
     return db.query(Allergy).filter(Allergy.user_id == user_id).all()
+
+
+def replace_allergies(db: Session, user_id: UUID, allergens: list[str]) -> list[Allergy]:
+    """Replace the user's allergy list as one transaction when a profile is saved."""
+    db.query(Allergy).filter(Allergy.user_id == user_id).delete()
+    unique_allergens = list(dict.fromkeys(item.strip() for item in allergens if item.strip()))
+    records = [Allergy(user_id=user_id, allergen=allergen) for allergen in unique_allergens]
+    db.add_all(records)
+    db.commit()
+    for record in records:
+        db.refresh(record)
+    return records

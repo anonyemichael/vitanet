@@ -31,6 +31,10 @@ class AllergyCreate(BaseModel):
     allergen: str
 
 
+class AllergyReplace(BaseModel):
+    allergies: list[str]
+
+
 class AllergyOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID

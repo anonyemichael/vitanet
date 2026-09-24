@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="VitaNet is your AI health triage assistant. Describe symptoms, get a clear next step — self-care, pharmacist, or urgent care — privately on your device." />
+  <meta name="theme-color" content="#0A5C56" />
+  <meta property="og:title" content="VitaNet — AI Health Triage" />
+  <meta property="og:description" content="Know what to do next when symptoms show up. Private, on-device triage guidance." />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="hero.jpg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <title>VitaNet — AI Health Triage Assistant</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230A5C56'/%3E%3Cpath d='M6 16h4l2-5 4 10 2-5h8' fill='none' stroke='%235EEAD4' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <div class="noise" aria-hidden="true"></div>
+
+  <header class="header" id="top">
+    <div class="header__bar">
+      <a class="logo" href="index.html" aria-label="VitaNet home">
+        <svg class="logo__mark" width="28" height="28" viewBox="0 0 32 32" aria-hidden="true">
+          <rect width="32" height="32" rx="7" fill="currentColor" />
+          <path d="M6 16h4l2-5 4 10 2-5h8" fill="none" stroke="#ECF8F5" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        <span class="logo__word">VitaNet</span>
+      </a>
+
+      <button class="menu-btn" type="button" aria-expanded="false" aria-controls="menu" aria-label="Open menu">
+        <span class="menu-btn__lines" aria-hidden="true"></span>
+      </button>
+
+      <nav class="menu" id="menu" aria-label="Primary">
+        <a href="#about">About</a>
+        <a href="features.html">Features</a>
+        <a href="#faq">FAQ</a>
+        <a href="enquiries.html">Enquiries</a>
+        <a class="btn btn--solid" href="#get">Get the app</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero" aria-labelledby="brand">
+      <div class="hero__media">
+        <img
+          src="hero.jpg"
+          alt="Someone checking a health app on their phone in a calm morning room"
+          width="1920"
+          height="1080"
+          fetchpriority="high"
+        />
+      </div>
+      <div class="hero__veil" aria-hidden="true"></div>
+
+      <div class="hero__frame">
+        <p class="brand" id="brand">VitaNet</p>
+        <h1 class="hero__title">Know what to do next when symptoms show up.</h1>
+        <p class="hero__lede">
+          AI triage that guides you to self-care, a pharmacist, or urgent care — privately, on your device.
+        </p>
+        <div class="hero__cta">
+          <a class="btn btn--solid btn--lg" href="#get">Download VitaNet</a>
+          <a class="btn btn--line btn--lg" href="#how">How it works</a>
+        </div>
+      </div>
+
+      <svg class="hero__pulse" viewBox="0 0 1200 48" preserveAspectRatio="none" aria-hidden="true">
+        <path class="hero__pulse-path" d="M0 24 H180 L200 24 L220 8 L240 40 L260 24 H420 L440 24 L460 4 L480 44 L500 24 H700 L720 24 L740 12 L760 36 L780 24 H1200" />
+      </svg>
+    </section>
+
+    <section class="band band--product" aria-label="Product preview">
+      <div class="wrap">
+        <div class="device" aria-hidden="true">
+          <div class="device__chrome">
+            <div class="device__island"></div>
+            <div class="device__app">
+              <header class="appbar">
+                <span class="appbar__mark"></span>
+                <span>VitaNet</span>
+              </header>
+              <div class="thread">
+                <div class="bubble bubble--bot">What symptoms are you experiencing today?</div>
+                <div class="bubble bubble--user">Sore throat and a low fever since last night.</div>
+                <div class="bubble bubble--bot bubble--result">
+                  <span class="result__tone">Manage at home</span>
+                  <span>Rest, fluids, and monitor for 24–48 hours. Seek care if symptoms worsen.</span>
+                </div>
+              </div>
+              <div class="composer"><span>Describe your symptoms…</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="band band--about" id="about" aria-labelledby="about-h">
+      <div class="wrap wrap--split">
+        <div>
+          <header class="band__head">
+            <p class="kicker">About VitaNet</p>
+            <h2 id="about-h">A calm companion for uncertain moments.</h2>
+            <p class="lede">
+              VitaNet helps you assess whether symptoms suggest self-care at home, a pharmacist visit,
+              or urgent medical attention — so you can act with clarity instead of guesswork.
+            </p>
+          </header>
+          <ul class="ticks">
+            <li>Built for everyday symptom decisions</li>
+            <li>Clear triage — never a diagnosis</li>
+            <li>Private by design, on your device</li>
+          </ul>
+        </div>
+        <figure class="media-block">
+          <img src="outdoors.jpg" alt="Checking VitaNet privately outdoors on a calm day" width="1400" height="788" loading="lazy" />
+        </figure>
+      </div>
+    </section>
+
+    <section class="band band--how" id="how" aria-labelledby="how-h">
+      <div class="wrap">
+        <header class="band__head">
+          <p class="kicker">How it works</p>
+          <h2 id="how-h">Three steps from worry to a clear next move.</h2>
+        </header>
+
+        <ol class="flow">
+          <li class="flow__item">
+            <span class="flow__idx" aria-hidden="true">01</span>
+            <div>
+              <h3>Describe what you feel</h3>
+              <p>Chat in everyday language — symptoms, timing, and what has changed.</p>
+            </div>
+          </li>
+          <li class="flow__item">
+            <span class="flow__idx" aria-hidden="true">02</span>
+            <div>
+              <h3>Answer a few questions</h3>
+              <p>VitaNet asks only what it needs to keep guidance careful and relevant.</p>
+            </div>
+          </li>
+          <li class="flow__item">
+            <span class="flow__idx" aria-hidden="true">03</span>
+            <div>
+              <h3>Get a triage path</h3>
+              <p>Leave with a responsible recommendation — not a diagnosis.</p>
+            </div>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="band band--features" id="features" aria-labelledby="features-h">
+      <div class="wrap">
+        <header class="band__head">
+          <p class="kicker">Features</p>
+          <h2 id="features-h">Built for the full triage journey.</h2>
+          <p class="lede">From the first chat to history, profile, and privacy controls.</p>
+        </header>
+
+        <div class="feat-preview">
+          <article class="feat-preview__item">
+            <span class="feat-preview__num" aria-hidden="true">01</span>
+            <div>
+              <h3>AI symptom chat</h3>
+              <p>Guided conversation with quick replies — severity, duration, and related signs.</p>
+            </div>
+            <a class="feat-preview__link" href="features.html#chat">View</a>
+          </article>
+          <article class="feat-preview__item">
+            <span class="feat-preview__num" aria-hidden="true">02</span>
+            <div>
+              <h3>Color-coded triage result</h3>
+              <p>Home, pharmacist, or urgent care — with monitoring tips you can share.</p>
+            </div>
+            <a class="feat-preview__link" href="features.html#result">View</a>
+          </article>
+          <article class="feat-preview__item">
+            <span class="feat-preview__num" aria-hidden="true">03</span>
+            <div>
+              <h3>Home, history &amp; profile</h3>
+              <p>Dashboard, filterable past checks, and a health profile stored on device.</p>
+            </div>
+            <a class="feat-preview__link" href="features.html#home">View</a>
+          </article>
+          <article class="feat-preview__item">
+            <span class="feat-preview__num" aria-hidden="true">04</span>
+            <div>
+              <h3>Privacy &amp; settings</h3>
+              <p>On-device storage, theme control, clear history, and safety disclaimers.</p>
+            </div>
+            <a class="feat-preview__link" href="features.html#privacy-feat">View</a>
+          </article>
+        </div>
+
+        <p class="inline-links" style="margin-top: 1.75rem">
+          <a class="btn btn--solid" href="features.html">Explore all features</a>
+        </p>
+      </div>
+    </section>
+
+    <section class="band band--triage" id="triage" aria-labelledby="triage-h">
+      <div class="wrap">
+        <header class="band__head band__head--narrow">
+          <p class="kicker">Smart triage</p>
+          <h2 id="triage-h">One spectrum. Three responsible outcomes.</h2>
+          <p class="lede">We guide you toward the right level of care — never a medical diagnosis.</p>
+        </header>
+
+        <div class="gallery" role="list">
+          <article class="gallery__item" role="listitem" data-tone="home">
+            <figure class="gallery__media">
+              <img src="home-care.jpg" alt="Resting at home with tea during mild recovery" width="1400" height="1050" loading="lazy" />
+            </figure>
+            <h3>Manage at home</h3>
+            <p>Mild and stable symptoms. Rest, monitor, and use everyday remedies.</p>
+          </article>
+          <article class="gallery__item" role="listitem" data-tone="pharm">
+            <figure class="gallery__media">
+              <img src="pharmacy.jpg" alt="Speaking with a pharmacist for over-the-counter guidance" width="1400" height="1050" loading="lazy" />
+            </figure>
+            <h3>Visit a pharmacist</h3>
+            <p>When over-the-counter support or professional advice can help.</p>
+          </article>
+          <article class="gallery__item" role="listitem" data-tone="urgent">
+            <figure class="gallery__media">
+              <img src="outdoors.jpg" alt="Seeking timely care when warning signs appear" width="1400" height="788" loading="lazy" />
+            </figure>
+            <h3>Seek urgent care</h3>
+            <p>When warning signs mean you should speak with a clinician soon.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="band band--privacy" id="privacy" aria-labelledby="privacy-h">
+      <div class="wrap wrap--privacy">
+        <div class="privacy__copy">
+          <p class="kicker">Private &amp; secure</p>
+          <h2 id="privacy-h">Your health story stays on your device.</h2>
+          <p class="lede">
+            Built for privacy-first triage. Personal health details stay local — we never warehouse them remotely.
+          </p>
+          <ul class="ticks">
+            <li>On-device history you control</li>
+            <li>No remote health data store</li>
+            <li>Clear medical disclaimers, always</li>
+          </ul>
+          <p class="inline-links">
+            <a class="text-link" href="privacy.html">Read the Privacy Policy</a>
+          </p>
+        </div>
+        <aside class="privacy__panel" aria-hidden="true">
+          <div class="readout">
+            <span class="readout__label">Session</span>
+            <span class="readout__value">Local only</span>
+            <span class="readout__label">Storage</span>
+            <span class="readout__value">On device</span>
+            <span class="readout__label">Remote PHI</span>
+            <span class="readout__value readout__value--ok">None</span>
+            <svg class="readout__wave" viewBox="0 0 280 56" preserveAspectRatio="none">
+              <path d="M0 28 H40 L52 28 L64 10 L76 46 L88 28 H140 L152 28 L164 14 L176 42 L188 28 H280" />
+            </svg>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="band band--faq" id="faq" aria-labelledby="faq-h">
+      <div class="wrap wrap--faq">
+        <header class="band__head">
+          <p class="kicker">FAQ</p>
+          <h2 id="faq-h">Answers before you download.</h2>
+        </header>
+
+        <div class="faq">
+          <details class="faq__item">
+            <summary>Is VitaNet a doctor or a diagnosis tool?</summary>
+            <p>
+              No. VitaNet provides triage recommendations only. It does not diagnose conditions, prescribe medicine,
+              or replace professional medical advice.
+            </p>
+          </details>
+          <details class="faq__item">
+            <summary>What happens in a medical emergency?</summary>
+            <p>
+              If you think you may have a medical emergency, call your local emergency services immediately.
+              Do not wait for an app response.
+            </p>
+          </details>
+          <details class="faq__item">
+            <summary>Where is my health data stored?</summary>
+            <p>
+              Symptom history is kept on your device. See our
+              <a class="text-link" href="privacy.html">Privacy Policy</a> for full details.
+            </p>
+          </details>
+          <details class="faq__item">
+            <summary>Who is VitaNet for?</summary>
+            <p>
+              Adults who want a responsible first step when mild-to-moderate symptoms appear and are unsure
+              whether to rest, visit a pharmacist, or seek urgent care.
+            </p>
+          </details>
+          <details class="faq__item">
+            <summary>How can I contact the team?</summary>
+            <p>
+              Use the <a class="text-link" href="enquiries.html">Enquiries</a> page for product questions,
+              press, partnerships, or support.
+            </p>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <section class="band band--disclaimer" id="disclaimer" aria-labelledby="disclaimer-h">
+      <div class="wrap wrap--disclaimer">
+        <p class="kicker">Important</p>
+        <h2 id="disclaimer-h">Medical disclaimer</h2>
+        <p>
+          VitaNet is designed to help you assess whether symptoms suggest self-care at home, a visit to a pharmacist,
+          or urgent medical attention. It does <strong>not</strong> provide medical diagnoses, prescriptions, or treatment plans.
+          Always seek the advice of a qualified healthcare provider with any questions you may have regarding a medical condition.
+          Never disregard professional medical advice or delay in seeking it because of something suggested by this application.
+        </p>
+      </div>
+    </section>
+
+    <section class="band band--get" id="get" aria-labelledby="get-h">
+      <div class="wrap wrap--get">
+        <p class="brand brand--compact">VitaNet</p>
+        <h2 id="get-h">Your health companion, ready when symptoms start.</h2>
+        <p class="lede">Quickly assess from home — then decide with confidence.</p>
+        <div class="hero__cta hero__cta--center">
+          <a class="btn btn--solid btn--lg" href="#" data-store="ios">Download for iOS</a>
+          <a class="btn btn--invert btn--lg" href="#" data-store="android">Download for Android</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap footer__grid">
+      <div class="footer__brand">
+        <p class="logo__word">VitaNet</p>
+        <p class="footer__tag">AI Health Triage Assistant</p>
+        <p class="footer__contact">
+          <a class="text-link" href="mailto:hello@vitanet.app">hello@vitanet.app</a>
+        </p>
+      </div>
+
+      <nav class="footer__nav" aria-label="Footer">
+        <div>
+          <p class="footer__heading">Product</p>
+          <a href="#about">About</a>
+          <a href="features.html">Features</a>
+          <a href="#how">How it works</a>
+          <a href="#triage">Triage</a>
+          <a href="#faq">FAQ</a>
+          <a href="#get">Download</a>
+        </div>
+        <div>
+          <p class="footer__heading">Company</p>
+          <a href="enquiries.html">Enquiries</a>
+          <a href="mailto:hello@vitanet.app">Email us</a>
+        </div>
+        <div>
+          <p class="footer__heading">Legal</p>
+          <a href="privacy.html">Privacy Policy</a>
+          <a href="#disclaimer">Medical disclaimer</a>
+        </div>
+      </nav>
+
+      <div class="footer__meta">
+        <p class="footer__legal">
+          VitaNet provides triage recommendations, not medical diagnoses, prescriptions, or treatment plans.
+          Always consult a qualified healthcare professional. If you think you may have a medical emergency,
+          call emergency services immediately.
+        </p>
+        <p class="footer__copy">&copy; <span data-year></span> VitaNet. All rights reserved.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

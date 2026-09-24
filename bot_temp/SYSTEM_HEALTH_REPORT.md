@@ -1,0 +1,133 @@
+﻿# FXAlexG Trading Bot â€” System Health Report
+**Generated:** 2026-09-10 12:47 UTC  
+**Server:** evilgnx (Oracle Cloud Ubuntu)
+
+---
+
+## âœ… Test Results Summary
+
+| # | Test | Status | Details |
+|---|------|--------|---------|
+| 1 | Systemd Services | âœ… PASS | `mt5-bridge.service` active, `fxalexg-bot.service` active |
+| 2 | MT5 Bridge Health | âœ… PASS | Connected, responding on `localhost:5001` |
+| 3 | Account Info | âœ… PASS | Login: 00000000, Server: Exness-MT5Trial9, Balance: $50.00, Leverage: 1:2000 |
+| 4 | Open Positions | âœ… PASS | 0 open positions (clean state) |
+| 5 | Symbol Accessibility (13 pairs) | âœ… PASS | All 13 symbols accessible (see below) |
+| 6 | OHLCV Data Feed | âœ… PASS | 3 bars returned for EURUSDm H4 |
+| 7 | News Filter (ForexFactory) | âœ… PASS | 5 high-impact events fetched for today |
+| 8 | PNL Reports | âœ… PASS | Today & Week endpoints responding |
+| 9 | AutoTrading Config | âœ… PASS | `Experts Enabled=1` (AutoTrading ON) |
+| 10 | Telegram Bot | âœ… PASS | Chat ID: 6220850396 loaded |
+| 11 | Bot Configuration | âœ… PASS | 13 pairs, 7.5% risk, A+ grade gate |
+| 12 | Bot Scanning Logs | âœ… PASS | Scanning all 13 symbols on schedule |
+
+---
+
+## Symbol Spread Report
+
+| Symbol | Description | Spread | Status |
+|--------|-------------|--------|--------|
+| EURUSDm | Euro vs US Dollar | 8 | âœ… |
+| GBPUSDm | British Pound vs US Dollar | 10 | âœ… |
+| USDJPYm | US Dollar vs Japanese Yen | 10 | âœ… |
+| AUDUSDm | Australian Dollar vs US Dollar | 9 | âœ… |
+| USDCADm | US Dollar vs Canadian Dollar | 14 | âœ… |
+| EURJPYm | Euro vs Japanese Yen | 16 | âœ… |
+| GBPJPYm | British Pound vs Japanese Yen | 22 | âœ… |
+| BTCUSDm | Bitcoin vs US Dollar | 1000 | âœ… |
+| ETHUSDm | Ethereum vs US Dollar | 100 | âœ… |
+| XAUUSDm | Gold vs US Dollar | 260 | âœ… |
+| SOLUSDm | Solana vs US Dollar | 6000 | âœ… |
+| XRPUSDm | Ripple vs US Dollar | 1000 | âœ… |
+| LTCUSDm | Litecoin vs US Dollar | 180 | âœ… |
+
+---
+
+## Today's High-Impact News (2026-09-10)
+
+| Time (UTC) | Currency | Event |
+|------------|----------|-------|
+| 12:15 | EUR | Main Refinancing Rate |
+| 12:15 | EUR | Monetary Policy Statement |
+| 12:30 | USD | Core PPI m/m |
+| 12:30 | USD | PPI m/m |
+| 12:45 | EUR | ECB Press Conference |
+
+---
+
+## Bot Configuration
+
+| Setting | Value |
+|---------|-------|
+| Symbols | 13 pairs (7 Forex + 3 Crypto + 3 Commodity/Cross) |
+| Risk per Trade | 7.5% |
+| Max Trades/Day | 4 |
+| Max Concurrent | 2 |
+| ADX Minimum | 20 |
+| Post-Loss Cooldown | 24h |
+| TP1 (Partial Close) | 1:1.0 RR (50% close) |
+| TP2 (Full Target) | 1:3.0 RR (trailing) |
+| Min Grade | A+ only |
+| Auto News Broadcast | Daily at 06:00 UTC |
+
+---
+
+## Issue Fixed This Session
+
+**Error 10027 â€” AutoTrading Disabled by Client**
+
+- **Problem:** Bot found an A+ setup on XAUUSDm but order was rejected with code 10027.
+- **Root Cause:** MT5 `common.ini` had `Enabled=0` under `[Experts]` section.
+- **Fix Applied:** Changed `Enabled=0` â†’ `Enabled=1` in UTF-16LE encoded config file.
+- **Verified:** Config now reads `Enabled=1`, MT5 bridge restarted and reconnected.
+
+---
+
+## Architecture
+
+```
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚   Telegram Bot      â”‚  â† /news /account /status /report /help
+â”‚   @anonye_trading   â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+         â”‚
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â–¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚   bot.py (Python3)  â”‚  â† Main loop, scanner, position manager
+â”‚   systemd managed   â”‚
+â”‚   fxalexg-bot.svc   â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+         â”‚ HTTP localhost:5001
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â–¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚   mt5_bridge.py     â”‚  â† REST API bridge
+â”‚   Wine + Python39   â”‚
+â”‚   mt5-bridge.svc    â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+         â”‚ MetaTrader5 API
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â–¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚   terminal64.exe    â”‚  â† Exness MT5 Terminal
+â”‚   Wine environment  â”‚
+â”‚   AutoTrading: ON   â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+```
+
+---
+
+## Files Location
+
+| File | Path |
+|------|------|
+| Bot Main | `/home/ubuntu/fxalexg_bot/bot.py` |
+| Config | `/home/ubuntu/fxalexg_bot/config.py` |
+| Strategy | `/home/ubuntu/fxalexg_bot/strategy.py` |
+| Bridge Client | `/home/ubuntu/fxalexg_bot/bridge_client.py` |
+| News Filter | `/home/ubuntu/fxalexg_bot/news_filter.py` |
+| Risk Manager | `/home/ubuntu/fxalexg_bot/risk_manager.py` |
+| Notifier | `/home/ubuntu/fxalexg_bot/notifier.py` |
+| MT5 Bridge | `/home/ubuntu/.wine_exness/drive_c/Python39/mt5_bridge.py` |
+| MT5 Config | `/home/ubuntu/.wine_exness/drive_c/Program Files/MetaTrader 5/Config/common.ini` |
+| Health Check | `/home/ubuntu/fxalexg_bot/health_check.sh` |
+| This Report | `/home/ubuntu/fxalexg_bot/SYSTEM_HEALTH_REPORT.md` |
+
+---
+
+*Report generated by automated health check. Run `bash /home/ubuntu/fxalexg_bot/health_check.sh` anytime to re-test.*
