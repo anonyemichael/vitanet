@@ -12,6 +12,7 @@ import 'package:vitanet/core/providers/shared_state.dart';
 import 'package:vitanet/data/providers/providers.dart';
 import 'package:vitanet/features/first_aid/screens/first_aid_screen.dart';
 import 'package:vitanet/features/resources/widgets/emergency_widgets.dart';
+import 'package:vitanet/features/resources/widgets/resource_media.dart';
 import 'package:vitanet/shared/widgets/vn_kit.dart';
 
 /// Emergency protocols: a "call first" header, life-threatening protocols and
@@ -39,6 +40,9 @@ class _EmergencyProtocolsScreenState extends ConsumerState<EmergencyProtocolsScr
   String _currentAddress = 'Finding your location…';
   bool _isLoadingLocation = true;
   StreamSubscription<Position>? _positionSubscription;
+
+  /// Upper bound for the permission prompt and the first GPS fix.
+  static const _locateTimeout = Duration(seconds: 8);
 
   @override
   void initState() {
@@ -69,7 +73,8 @@ class _EmergencyProtocolsScreenState extends ConsumerState<EmergencyProtocolsScr
 
       var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
+        // A browser prompt left unanswered never resolves: time out instead.
+        permission = await Geolocator.requestPermission().timeout(_locateTimeout);
         if (permission == LocationPermission.denied) {
           if (mounted) {
             setState(() {
@@ -94,9 +99,9 @@ class _EmergencyProtocolsScreenState extends ConsumerState<EmergencyProtocolsScr
       final position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 5),
+          timeLimit: _locateTimeout,
         ),
-      );
+      ).timeout(_locateTimeout);
 
       if (mounted) {
         setState(() {
@@ -120,9 +125,12 @@ class _EmergencyProtocolsScreenState extends ConsumerState<EmergencyProtocolsScr
         if (mounted) setState(() => _isLoadingLocation = false);
       });
     } catch (_) {
+      // Timeout, denial or platform error: fall back to the international
+      // emergency number, which works from any mobile phone in most countries.
       if (mounted) {
         setState(() {
           _currentAddress = 'Location unavailable';
+          _emergencyNumber = '112';
           _isLoadingLocation = false;
         });
       }
@@ -224,7 +232,7 @@ class _EmergencyProtocolsScreenState extends ConsumerState<EmergencyProtocolsScr
     final p = VnPalette.of(context);
     final resourcesService = ref.watch(dynamicResourcesServiceProvider);
 
-    return Scaffold(
+    return vnReadableWidth(Scaffold(
       backgroundColor: p.page,
       body: StreamBuilder<List<FirstAidTip>>(
         stream: resourcesService.streamFirstAidGuides(category: 'All'),
@@ -317,6 +325,6 @@ class _EmergencyProtocolsScreenState extends ConsumerState<EmergencyProtocolsScr
           );
         },
       ),
-    );
+    ), maxWidth: 960, background: p.page);
   }
 }

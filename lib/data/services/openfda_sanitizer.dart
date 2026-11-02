@@ -116,7 +116,7 @@ class OpenFdaSanitizer {
   /// - Limits length smoothly at word boundaries if [maxChars] is specified.
   static String cleanIndication(String? raw, {int maxChars = 220}) {
     if (raw == null || raw.trim().isEmpty) {
-      return 'Prescription medication monograph verified by the FDA.';
+      return 'Medication label information from the FDA.';
     }
 
     var text = raw.trim();
@@ -137,7 +137,7 @@ class OpenFdaSanitizer {
     text = text.replaceAll(RegExp(r'\s+'), ' ').trim();
 
     if (text.isEmpty) {
-      return 'Prescription medication monograph verified by the FDA.';
+      return 'Medication label information from the FDA.';
     }
 
     // 6. Ensure initial capital letter
@@ -427,14 +427,42 @@ class OpenFdaSanitizer {
       return s.startsWith('NDA') || s.startsWith('ANDA') || s.startsWith('BLA');
     });
 
-    final isExplicitOtc = productType.contains('HUMAN OTC DRUG') ||
-        productType.contains('OTC') ||
-        (item['purpose'] as List?)?.join(' ').toUpperCase().contains('OTC') == true;
+    // openfda.product_type is authoritative when present
+    // ("HUMAN OTC DRUG" vs "HUMAN PRESCRIPTION DRUG").
+    final isExplicitOtc = productType.contains('OTC');
+    final isExplicitRx = !isExplicitOtc && productType.contains('PRESCRIPTION');
 
-    final isExplicitRx = productType.contains('HUMAN PRESCRIPTION DRUG') ||
-        productType.contains('PRESCRIPTION');
-
-    final isRx = !isExplicitOtc && (isExplicitRx || hasNda);
+    final bool isRx;
+    if (isExplicitOtc) {
+      isRx = false;
+    } else if (isExplicitRx) {
+      isRx = true;
+    } else {
+      // No product_type: infer from the label itself. An ANDA/NDA number alone
+      // says nothing about Rx vs OTC (most OTC generics are ANDA products).
+      // OTC monograph products use "M###" / "part###" application numbers, and
+      // OTC "Drug Facts" labels carry purpose / ask-a-doctor sections, while
+      // prescription labels carry clinical pharmacology / boxed warnings.
+      final isMonograph = appNum != null &&
+          appNum.any((n) {
+            final s = n.toString().toUpperCase();
+            return RegExp(r'^M\d').hasMatch(s) || s.startsWith('PART');
+          });
+      bool has(String key) => item[key] is List && (item[key] as List).isNotEmpty;
+      final drugFacts = has('purpose') ||
+          has('keep_out_of_reach_of_children') ||
+          has('ask_doctor') ||
+          has('stop_use');
+      final rxSections = has('clinical_pharmacology') ||
+          has('boxed_warning') ||
+          has('contraindications') ||
+          has('spl_patient_package_insert');
+      if (isMonograph || (drugFacts && !rxSections)) {
+        isRx = false;
+      } else {
+        isRx = rxSections || hasNda;
+      }
+    }
 
     if (isHomeo) {
       return (

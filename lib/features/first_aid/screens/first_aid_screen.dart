@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -63,7 +64,8 @@ class FirstAidTip {
         t.contains('seizure');
   }
 
-  String stepTitle(int i) => i < stepTitles.length ? stepTitles[i] : 'Step ${i + 1}';
+  String stepTitle(int i) =>
+      i < stepTitles.length ? stepTitles[i] : 'Step ${i + 1}';
 }
 
 /// Designed First Aid feature: the static, offline-ready protocol catalog.
@@ -103,7 +105,12 @@ class FirstAidScreen extends StatelessWidget {
       icon: Icons.healing_rounded,
       accent: Color(0xFF0D9488),
       cue: 'Clean, close, cover',
-      stepTitles: ['Wash your hands', 'Rinse the wound', 'Stop the bleeding', 'Cover it'],
+      stepTitles: [
+        'Wash your hands',
+        'Rinse the wound',
+        'Stop the bleeding',
+        'Cover it',
+      ],
       steps: [
         'Wash your hands before touching the wound.',
         'Rinse with clean water to remove dirt.',
@@ -188,7 +195,12 @@ class FirstAidScreen extends StatelessWidget {
       icon: Icons.emergency_rounded,
       accent: Color(0xFFDC2626),
       cue: "Can't speak, cough or breathe",
-      stepTitles: ['Ask and encourage coughing', 'Call for help', 'Back blows', 'Abdominal thrusts'],
+      stepTitles: [
+        'Ask and encourage coughing',
+        'Call for help',
+        'Back blows',
+        'Abdominal thrusts',
+      ],
       steps: [
         'Ask “Are you choking?” If they can cough or speak, encourage coughing.',
         'If they cannot breathe, call emergency services immediately.',
@@ -205,7 +217,12 @@ class FirstAidScreen extends StatelessWidget {
       icon: Icons.thermostat_rounded,
       accent: Color(0xFF0F766E),
       cue: 'Fluids, rest, monitor',
-      stepTitles: ['Rest and drink', 'Stay cool', 'Use medicine carefully', 'Keep track'],
+      stepTitles: [
+        'Rest and drink',
+        'Stay cool',
+        'Use medicine carefully',
+        'Keep track',
+      ],
       steps: [
         'Rest and drink fluids regularly.',
         'Dress lightly and keep the room comfortably cool.',
@@ -222,7 +239,12 @@ class FirstAidScreen extends StatelessWidget {
       icon: Icons.water_drop_rounded,
       accent: Color(0xFFDB2777),
       cue: 'Lean forward, pinch',
-      stepTitles: ['Lean forward', 'Pinch the nose', 'Breathe through your mouth', 'Don\'t pack the nose'],
+      stepTitles: [
+        'Lean forward',
+        'Pinch the nose',
+        'Breathe through your mouth',
+        'Don\'t pack the nose',
+      ],
       steps: [
         'Sit upright and lean slightly forward.',
         'Pinch the soft part of the nose for 10–15 minutes.',
@@ -235,11 +257,18 @@ class FirstAidScreen extends StatelessWidget {
     ),
     FirstAidTip(
       title: 'Heart Attack Signs',
-      summary: 'Recognize chest pain, shortness of breath, and seek urgent care.',
+      summary:
+          'Recognize chest pain, shortness of breath, and seek urgent care.',
       icon: Icons.monitor_heart_rounded,
       accent: Color(0xFFDC2626),
       cue: 'Chest pain, arm or jaw pain',
-      stepTitles: ['Call for help', 'Sit them down', 'Loosen clothing', 'Help with their medicine', 'Be ready for CPR'],
+      stepTitles: [
+        'Call for help',
+        'Sit them down',
+        'Loosen clothing',
+        'Help with their medicine',
+        'Be ready for CPR',
+      ],
       steps: [
         'Call emergency services immediately if you suspect a heart attack.',
         'Have the person sit down, rest, and try to keep calm.',
@@ -252,11 +281,18 @@ class FirstAidScreen extends StatelessWidget {
     ),
     FirstAidTip(
       title: 'Allergic Reactions (Anaphylaxis)',
-      summary: 'Use an epinephrine auto-injector if available and call for help.',
+      summary:
+          'Use an epinephrine auto-injector if available and call for help.',
       icon: Icons.sick_rounded,
       accent: Color(0xFFDC2626),
       cue: 'Swelling, hives, wheeze · use EpiPen',
-      stepTitles: ['Call for help', 'Use their EpiPen', 'Lie them down', 'Nothing by mouth', 'Be ready for CPR'],
+      stepTitles: [
+        'Call for help',
+        'Use their EpiPen',
+        'Lie them down',
+        'Nothing by mouth',
+        'Be ready for CPR',
+      ],
       steps: [
         'Call emergency services immediately.',
         'Ask if they carry an epinephrine auto-injector (EpiPen) and help them use it.',
@@ -274,7 +310,13 @@ class FirstAidScreen extends StatelessWidget {
       accent: Color(0xFFDC2626),
       cue: 'Protect the head, time it',
       audience: 'All ages',
-      stepTitles: ['Stay calm and time it', 'Protect the head', 'Don\'t hold them down', 'Recovery position', 'Stay with them'],
+      stepTitles: [
+        'Stay calm and time it',
+        'Protect the head',
+        'Don\'t hold them down',
+        'Recovery position',
+        'Stay with them',
+      ],
       steps: [
         'Stay calm and note the time the seizure started.',
         'Move hard or sharp objects away and cushion the head with something soft.',
@@ -329,7 +371,11 @@ class _EmergencyProtocolDetailScreenState
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: Text(_isBookmarked ? 'Saved to Emergency Quick-Access' : 'Removed from Quick-Access'),
+          content: Text(
+            _isBookmarked
+                ? 'Saved to Emergency Quick-Access'
+                : 'Removed from Quick-Access',
+          ),
           duration: const Duration(seconds: 2),
           behavior: SnackBarBehavior.floating,
         ),
@@ -342,7 +388,9 @@ class _EmergencyProtocolDetailScreenState
     final tip = widget.tip;
     if (tip.isCpr) {
       Navigator.of(context, rootNavigator: true).push(
-        MaterialPageRoute(builder: (_) => const VideoLibraryScreen(initialTopic: 'First aid')),
+        MaterialPageRoute(
+          builder: (_) => const VideoLibraryScreen(initialTopic: 'First aid'),
+        ),
       );
       return;
     }
@@ -354,7 +402,8 @@ class _EmergencyProtocolDetailScreenState
           video: HealthVideo(
             videoId: tip.videoUrl!,
             title: '${tip.title} Technique Demo',
-            thumbnailUrl: 'https://img.youtube.com/vi/${tip.videoUrl!}/hqdefault.jpg',
+            thumbnailUrl:
+                'https://img.youtube.com/vi/${tip.videoUrl!}/hqdefault.jpg',
             duration: 'Demo',
             category: 'First Aid',
             organization: 'Official Clinical Guidance',
@@ -362,7 +411,12 @@ class _EmergencyProtocolDetailScreenState
             keySteps: tip.steps
                 .asMap()
                 .entries
-                .map((e) => VideoKeyStep(time: 'Step ${e.key + 1}', action: tip.stepTitle(e.key)))
+                .map(
+                  (e) => VideoKeyStep(
+                    time: 'Step ${e.key + 1}',
+                    action: tip.stepTitle(e.key),
+                  ),
+                )
                 .toList(),
             verificationStatus: 'Verified Medical Guideline',
           ),
@@ -412,10 +466,16 @@ class _EmergencyProtocolDetailScreenState
                     top: MediaQuery.paddingOf(context).top + 16,
                     right: 16,
                     child: VnIconButton(
-                      icon: _isBookmarked ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
-                      tooltip: _isBookmarked ? 'Remove saved guide' : 'Save guide',
+                      icon: _isBookmarked
+                          ? Icons.bookmark_rounded
+                          : Icons.bookmark_border_rounded,
+                      tooltip: _isBookmarked
+                          ? 'Remove saved guide'
+                          : 'Save guide',
                       background: Colors.white,
-                      foreground: _isBookmarked ? const Color(0xFF0F766E) : const Color(0xFF0F172A),
+                      foreground: _isBookmarked
+                          ? const Color(0xFF0F766E)
+                          : const Color(0xFF0F172A),
                       onPressed: _toggleBookmark,
                     ),
                   ),
@@ -428,83 +488,109 @@ class _EmergencyProtocolDetailScreenState
                 child: Container(
                   decoration: BoxDecoration(
                     color: p.page,
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(24),
+                    ),
                   ),
                   padding: const EdgeInsets.fromLTRB(20, 22, 20, 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 6,
-                        children: [
-                          if (tip.isCritical)
-                            const VnTag(
-                              label: 'LIFE-THREATENING',
-                              bg: Color(0xFFFEE2E2),
-                              fg: Color(0xFF991B1B),
+                  alignment: Alignment.topCenter,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      maxWidth: _kReadableWidth,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 6,
+                          children: [
+                            if (tip.isCritical)
+                              const VnTag(
+                                label: 'LIFE-THREATENING',
+                                bg: Color(0xFFFEE2E2),
+                                fg: Color(0xFF991B1B),
+                                fontSize: 12,
+                                weight: FontWeight.w800,
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 5,
+                                ),
+                              )
+                            else
+                              const VnTag(
+                                label: 'URGENT BUT MANAGEABLE',
+                                bg: Color(0xFFFFEDD5),
+                                fg: Color(0xFF9A3412),
+                                fontSize: 12,
+                                weight: FontWeight.w800,
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 5,
+                                ),
+                              ),
+                            VnTag(
+                              label: tip.audience,
+                              bg: const Color(0xFFF1F5F9),
+                              fg: const Color(0xFF475569),
                               fontSize: 12,
-                              weight: FontWeight.w800,
-                              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                            )
-                          else
-                            const VnTag(
-                              label: 'URGENT BUT MANAGEABLE',
-                              bg: Color(0xFFFFEDD5),
-                              fg: Color(0xFF9A3412),
-                              fontSize: 12,
-                              weight: FontWeight.w800,
-                              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              weight: FontWeight.w600,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 5,
+                              ),
                             ),
-                          VnTag(
-                            label: tip.audience,
-                            bg: const Color(0xFFF1F5F9),
-                            fg: const Color(0xFF475569),
-                            fontSize: 12,
-                            weight: FontWeight.w600,
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Semantics(
+                          header: true,
+                          child: Text(
+                            tip.isCpr ? 'CPR: hands-only' : tip.title,
+                            style: VnText.heading(
+                              26,
+                              color: p.ink,
+                              height: 1.2,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          tip.summary,
+                          style: VnText.body(15, color: p.inkSoft, height: 1.5),
+                        ),
+                        if (tip.isCpr) ...[
+                          const SizedBox(height: 16),
+                          const _MetronomeCard(),
+                        ],
+                        const SizedBox(height: 16),
+                        for (var i = 0; i < tip.steps.length; i++) ...[
+                          _StepCard(
+                            index: i,
+                            title: tip.stepTitle(i),
+                            body: tip.steps[i],
+                            done: _completedSteps.contains(i),
+                            onTap: () => _toggleStep(i),
+                          ),
+                          const SizedBox(height: 10),
+                        ],
+                        const SizedBox(height: 6),
+                        _SeekHelpCard(
+                          text: tip.whenToSeekHelp.replaceAll('911', number),
+                        ),
+                        if (hasDemo) ...[
+                          const SizedBox(height: 16),
+                          _DemoCard(
+                            tip: tip,
+                            subtitle: tip.isCpr && cprVideo != null
+                                ? '${cprVideo.channelName} · ${cprVideo.formattedDuration}'
+                                : 'Video demonstration',
+                            onTap: () => _openDemonstration(cprVideo),
                           ),
                         ],
-                      ),
-                      const SizedBox(height: 16),
-                      Semantics(
-                        header: true,
-                        child: Text(
-                          tip.isCpr ? 'CPR: hands-only' : tip.title,
-                          style: VnText.heading(26, color: p.ink, height: 1.2),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(tip.summary, style: VnText.body(15, color: p.inkSoft, height: 1.5)),
-                      if (tip.isCpr) ...[
                         const SizedBox(height: 16),
-                        const _MetronomeCard(),
                       ],
-                      const SizedBox(height: 16),
-                      for (var i = 0; i < tip.steps.length; i++) ...[
-                        _StepCard(
-                          index: i,
-                          title: tip.stepTitle(i),
-                          body: tip.steps[i],
-                          done: _completedSteps.contains(i),
-                          onTap: () => _toggleStep(i),
-                        ),
-                        const SizedBox(height: 10),
-                      ],
-                      const SizedBox(height: 6),
-                      _SeekHelpCard(text: tip.whenToSeekHelp.replaceAll('911', number)),
-                      if (hasDemo) ...[
-                        const SizedBox(height: 16),
-                        _DemoCard(
-                          tip: tip,
-                          subtitle: tip.isCpr && cprVideo != null
-                              ? '${cprVideo.channelName} · ${cprVideo.formattedDuration}'
-                              : 'Video demonstration',
-                          onTap: () => _openDemonstration(cprVideo),
-                        ),
-                      ],
-                      const SizedBox(height: 16),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -513,22 +599,36 @@ class _EmergencyProtocolDetailScreenState
         ),
       ),
       bottomNavigationBar: Container(
-        padding: EdgeInsets.fromLTRB(20, 12, 20, MediaQuery.paddingOf(context).bottom + 20),
+        padding: EdgeInsets.fromLTRB(
+          20,
+          12,
+          20,
+          MediaQuery.paddingOf(context).bottom + 20,
+        ),
         decoration: BoxDecoration(
           color: p.surface,
           border: Border(top: BorderSide(color: p.line)),
         ),
-        child: VnButton(
-          label: 'Call $number · Put on speaker',
-          icon: Icons.phone_rounded,
-          background: const Color(0xFFB91C1C),
-          foreground: Colors.white,
-          onPressed: () => LaunchHelpers.dialOrSnack(context, number),
+        child: Center(
+          heightFactor: 1,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: _kReadableWidth),
+            child: VnButton(
+              label: 'Call $number · Put on speaker',
+              icon: Icons.phone_rounded,
+              background: const Color(0xFFB91C1C),
+              foreground: Colors.white,
+              onPressed: () => LaunchHelpers.dialOrSnack(context, number),
+            ),
+          ),
         ),
       ),
     );
   }
 }
+
+/// Readable max width for protocol content on tablets / desktop.
+const double _kReadableWidth = 720;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Hero
@@ -543,12 +643,20 @@ class _ProtocolHero extends StatelessWidget {
     final top = MediaQuery.paddingOf(context).top;
     final critical = tip.isCritical;
     final bg = critical ? const Color(0xFF7F1D1D) : const Color(0xFF7C2D12);
-    final ringColor = critical ? const Color(0xFFFECACA) : const Color(0xFFFED7AA);
+    final ringColor = critical
+        ? const Color(0xFFFECACA)
+        : const Color(0xFFFED7AA);
     return Semantics(
       image: true,
-      label: tip.isCpr ? 'CPR: hands stacked in the centre of the chest' : tip.title,
+      label: tip.isCpr
+          ? 'CPR: hands stacked in the centre of the chest'
+          : tip.title,
       excludeSemantics: true,
+      // Full-bleed: the hero sits in a loose Stack, so without an explicit
+      // width it shrank to its 300px ring and hugged the top-left corner on
+      // wide screens.
       child: Container(
+        width: double.infinity,
         height: 240 + top,
         color: bg,
         padding: EdgeInsets.only(top: top),
@@ -559,20 +667,28 @@ class _ProtocolHero extends StatelessWidget {
               _ring(300, ringColor.withValues(alpha: 0.15)),
               _ring(210, ringColor.withValues(alpha: 0.22)),
               if (tip.isCpr)
-                const CustomPaint(size: Size(150, 150), painter: _CprHeartPainter())
+                const CustomPaint(
+                  size: Size(150, 150),
+                  painter: _CprHeartPainter(),
+                )
               else
                 Container(
                   width: 120,
                   height: 120,
                   decoration: BoxDecoration(
-                    color: critical ? const Color(0xFFB91C1C) : const Color(0xFFC2410C),
+                    color: critical
+                        ? const Color(0xFFB91C1C)
+                        : const Color(0xFFC2410C),
                     shape: BoxShape.circle,
                     border: Border.all(color: ringColor, width: 3),
                   ),
                   child: Icon(tip.icon, size: 56, color: Colors.white),
                 ),
               Positioned(
-                right: 16,
+                right: math.max(
+                  16,
+                  (MediaQuery.sizeOf(context).width - _kReadableWidth) / 2 + 16,
+                ),
                 bottom: 36,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
@@ -583,8 +699,14 @@ class _ProtocolHero extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      tip.isCpr ? 'pushes per minute' : (tip.cue ?? 'first aid guide'),
-                      style: VnText.body(12, weight: FontWeight.w600, color: ringColor),
+                      tip.isCpr
+                          ? 'pushes per minute'
+                          : (tip.cue ?? 'first aid guide'),
+                      style: VnText.body(
+                        12,
+                        weight: FontWeight.w600,
+                        color: ringColor,
+                      ),
                     ),
                   ],
                 ),
@@ -597,10 +719,13 @@ class _ProtocolHero extends StatelessWidget {
   }
 
   Widget _ring(double size, Color color) => Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: color)),
-      );
+    width: size,
+    height: size,
+    decoration: BoxDecoration(
+      shape: BoxShape.circle,
+      border: Border.all(color: color),
+    ),
+  );
 }
 
 /// Heart with a pulse trace and a downward "push" arrow (FirstAid design SVG,
@@ -680,7 +805,8 @@ class _MetronomeCard extends StatefulWidget {
   State<_MetronomeCard> createState() => _MetronomeCardState();
 }
 
-class _MetronomeCardState extends State<_MetronomeCard> with SingleTickerProviderStateMixin {
+class _MetronomeCardState extends State<_MetronomeCard>
+    with SingleTickerProviderStateMixin {
   static const _bpm = 110;
   Timer? _timer;
   late final AnimationController _pulse = AnimationController(
@@ -700,7 +826,10 @@ class _MetronomeCardState extends State<_MetronomeCard> with SingleTickerProvide
     _beats = 0;
     _beat();
     setState(() {
-      _timer = Timer.periodic(const Duration(milliseconds: 60000 ~/ _bpm), (_) => _beat());
+      _timer = Timer.periodic(
+        const Duration(milliseconds: 60000 ~/ _bpm),
+        (_) => _beat(),
+      );
     });
   }
 
@@ -742,7 +871,10 @@ class _MetronomeCardState extends State<_MetronomeCard> with SingleTickerProvide
                 border: Border.all(color: const Color(0xFF2DD4BF), width: 3),
               ),
               alignment: Alignment.center,
-              child: Text('$_bpm', style: VnText.heading(14, color: const Color(0xFF5EEAD4))),
+              child: Text(
+                '$_bpm',
+                style: VnText.heading(14, color: const Color(0xFF5EEAD4)),
+              ),
             ),
           ),
           const SizedBox(width: 14),
@@ -750,10 +882,19 @@ class _MetronomeCardState extends State<_MetronomeCard> with SingleTickerProvide
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Compression rhythm', style: VnText.body(15, weight: FontWeight.w700, color: Colors.white)),
+                Text(
+                  'Compression rhythm',
+                  style: VnText.body(
+                    15,
+                    weight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
                 const SizedBox(height: 2),
                 Text(
-                  _running ? 'Push on every beat · $_beats compressions' : '100–120 per minute, 5–6 cm deep',
+                  _running
+                      ? 'Push on every beat · $_beats compressions'
+                      : '100–120 per minute, 5–6 cm deep',
                   style: VnText.body(13, color: const Color(0xFF94A3B8)),
                 ),
               ],
@@ -836,17 +977,38 @@ class _StepCard extends StatelessWidget {
               ),
               alignment: Alignment.center,
               child: done
-                  ? const Icon(Icons.check_rounded, size: 18, color: Colors.white)
-                  : Text('${index + 1}', style: VnText.body(14, weight: FontWeight.w800, color: p.ink)),
+                  ? const Icon(
+                      Icons.check_rounded,
+                      size: 18,
+                      color: Colors.white,
+                    )
+                  : Text(
+                      '${index + 1}',
+                      style: VnText.body(
+                        14,
+                        weight: FontWeight.w800,
+                        color: p.ink,
+                      ),
+                    ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: VnText.body(15, weight: FontWeight.w700, color: p.ink)),
+                  Text(
+                    title,
+                    style: VnText.body(
+                      15,
+                      weight: FontWeight.w700,
+                      color: p.ink,
+                    ),
+                  ),
                   const SizedBox(height: 3),
-                  Text(body, style: VnText.body(13, color: p.inkSoft, height: 1.45)),
+                  Text(
+                    body,
+                    style: VnText.body(13, color: p.inkSoft, height: 1.45),
+                  ),
                 ],
               ),
             ),
@@ -870,7 +1032,9 @@ class _SeekHelpCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: p.isDark ? const Color(0xFF2A1212) : const Color(0xFFFEF2F2),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: p.isDark ? const Color(0xFF5B1D1D) : const Color(0xFFFECACA)),
+        border: Border.all(
+          color: p.isDark ? const Color(0xFF5B1D1D) : const Color(0xFFFECACA),
+        ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -881,7 +1045,10 @@ class _SeekHelpCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('When to get urgent help', style: VnText.body(14, weight: FontWeight.w700, color: fg)),
+                Text(
+                  'When to get urgent help',
+                  style: VnText.body(14, weight: FontWeight.w700, color: fg),
+                ),
                 const SizedBox(height: 2),
                 Text(text, style: VnText.body(13, color: fg, height: 1.45)),
               ],
@@ -897,7 +1064,11 @@ class _DemoCard extends StatelessWidget {
   final FirstAidTip tip;
   final String subtitle;
   final VoidCallback onTap;
-  const _DemoCard({required this.tip, required this.subtitle, required this.onTap});
+  const _DemoCard({
+    required this.tip,
+    required this.subtitle,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -920,12 +1091,20 @@ class _DemoCard extends StatelessWidget {
                       fit: StackFit.expand,
                       children: [
                         VnNetworkPhoto(
-                          url: 'https://img.youtube.com/vi/${tip.videoUrl}/hqdefault.jpg',
-                          fallbackAsset: VnPhotos.forTopic(tip.title, fallback: VnPhotos.firstAidKit),
+                          url:
+                              'https://img.youtube.com/vi/${tip.videoUrl}/hqdefault.jpg',
+                          fallbackAsset: VnPhotos.forTopic(
+                            tip.title,
+                            fallback: VnPhotos.firstAidKit,
+                          ),
                           cacheWidth: 300,
                         ),
                         const Center(
-                          child: Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 26),
+                          child: Icon(
+                            Icons.play_circle_fill_rounded,
+                            color: Colors.white,
+                            size: 26,
+                          ),
                         ),
                       ],
                     ),
@@ -936,7 +1115,10 @@ class _DemoCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Watch the demonstration', style: VnText.body(14, weight: FontWeight.w700, color: p.ink)),
+                Text(
+                  'Watch the demonstration',
+                  style: VnText.body(14, weight: FontWeight.w700, color: p.ink),
+                ),
                 const SizedBox(height: 2),
                 Text(subtitle, style: VnText.body(12, color: p.muted)),
               ],

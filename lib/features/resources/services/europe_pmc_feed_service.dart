@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../models/health_article.dart';
+import '../widgets/resource_media.dart';
 import 'medical_image_resolver.dart';
 
 /// Response payload from Europe PMC REST API with cursor pagination.
@@ -256,46 +257,19 @@ class EuropePmcFeedService {
     return takeaways;
   }
 
-  /// Infers clinical domain category for tag styling.
+  /// Infers the article's topic from its title (word-boundary keywords, in
+  /// priority order), then its MeSH headings. The abstract and the feed query
+  /// are deliberately ignored: they mention many topics in passing and caused
+  /// e.g. sports papers to be tagged "Sleep". Unmatched articles get the
+  /// neutral "Research" category.
   static String _inferCategory(
     String title,
     String abstractText,
     List<String> meshHeadings,
     String queryContext,
   ) {
-    final text = '$title $abstractText ${meshHeadings.join(' ')} $queryContext'.toLowerCase();
-
-    if (text.contains('cardio') || text.contains('heart') || text.contains('vascular') || text.contains('hypertension')) {
-      return 'Cardiology';
-    }
-    if (text.contains('nutrit') || text.contains('diet') || text.contains('fasting') || text.contains('micronutrient')) {
-      return 'Nutrition';
-    }
-    if (text.contains('sleep') || text.contains('circadian') || text.contains('insomnia') || text.contains('neurolog') || text.contains('brain')) {
-      return 'Sleep';
-    }
-    if (text.contains('exercise') || text.contains('fitness') || text.contains('muscle') || text.contains('resistance') || text.contains('physical activity')) {
-      return 'Fitness';
-    }
-    if (text.contains('immun') || text.contains('vaccine') || text.contains('antibody') || text.contains('cytokine') || text.contains('infection')) {
-      return 'Immunology';
-    }
-    if (text.contains('diabetes') || text.contains('insulin') || text.contains('glucose') || text.contains('metabolic')) {
-      return 'Endocrinology';
-    }
-    if (text.contains('cancer') || text.contains('oncolog') || text.contains('tumor')) {
-      return 'Oncology';
-    }
-    if (text.contains('depress') || text.contains('anxiety') || text.contains('mental') || text.contains('psychiatr')) {
-      return 'Mental Health';
-    }
-    if (text.contains('longev') || text.contains('aging') || text.contains('senescen')) {
-      return 'Longevity';
-    }
-
-    return 'Clinical';
+    return VnTopics.categorize(title, meshHeadings: meshHeadings);
   }
-
   static IconData _getCategoryIcon(String category) {
     switch (category.toLowerCase()) {
       case 'cardiology':
@@ -314,6 +288,14 @@ class EuropePmcFeedService {
         return Icons.coronavirus_rounded;
       case 'mental health':
         return Icons.psychology_rounded;
+      case 'respiratory':
+        return Icons.air_rounded;
+      case 'medicines':
+        return Icons.medication_rounded;
+      case "women's health":
+        return Icons.pregnant_woman_rounded;
+      case "children's health":
+        return Icons.child_care_rounded;
       default:
         return Icons.article_rounded;
     }

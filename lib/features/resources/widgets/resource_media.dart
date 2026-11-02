@@ -37,32 +37,171 @@ class VnPhotos {
   static const xray = '$_base/xray.jpg';
 
   /// Picks the local photo whose subject matches the given topic text.
-  /// Keyword order matters: the most specific subjects are checked first.
+  ///
+  /// Matching is word-boundary based (see [VnTopics]); when nothing matches
+  /// confidently, [fallback] is returned rather than a loosely related photo.
   static String forTopic(String text, {String fallback = laptopStethoscope}) {
-    final t = text.toLowerCase();
-    bool has(List<String> keys) => keys.any(t.contains);
-
-    if (has(['smartwatch', 'wearable', 'atrial', 'arrhythm', 'fibrillation', 'heart rate', 'pulse'])) {
-      return smartwatchWrist;
-    }
-    if (has(['blood pressure', 'hypertens', 'systolic', 'bp '])) return bloodPressureCheck;
-    if (has(['child', 'pediatric', 'paediatric', 'infant', 'neonat', 'kids'])) return doctorsWithChild;
-    if (has(['sleep', 'insomnia', 'circadian', 'melatonin'])) return sleep;
-    if (has(['breath', 'meditat', 'mindful', 'panic', 'stress', 'anxiety', 'vagal', 'grounding'])) return meditation;
-    if (has(['mental', 'depress', 'caregiv', 'carer', 'burnout', 'loneliness', 'grief', 'psychiat'])) return holdingHands;
-    if (has(['vaccin', 'immun', 'antibod', 'infection', 'virus', 'viral'])) return vaccination;
-    if (has(['antibiotic', 'medicine', 'medication', 'drug', 'pharmac', 'dose', 'tablet'])) return pillsOrange;
-    if (has(['diet', 'nutrition', 'food', 'eating', 'fasting', 'gut', 'plate', 'meal', 'dash'])) return healthyPlate;
-    if (has(['exercise', 'fitness', 'training', 'physical activity', 'physio', 'posture', 'spine', 'muscle', 'sciatica', 'lumbar'])) {
-      return workout;
-    }
-    if (has(['fracture', 'x-ray', 'xray', 'bone', 'orthop'])) return xray;
-    if (has(['surgery', 'surgical', 'cancer', 'tumor', 'tumour', 'oncolog', 'chemo'])) return operatingTheatre;
-    if (has(['first aid', 'cpr', 'bleed', 'burn', 'choking', 'wound', 'recovery position', 'trauma'])) return firstAidKit;
-    if (has(['cardio', 'heart', 'stroke', 'atheroscl', 'cholesterol', 'vital'])) return bloodPressureCheck;
-    if (has(['women', 'pregnan', 'menopaus', 'maternal'])) return doctorWithPatient;
-    return fallback;
+    if (VnTopics._matches(text, _firstAidPattern)) return firstAidKit;
+    if (VnTopics._matches(text, _xrayPattern)) return xray;
+    final topic = VnTopics.classify(text);
+    return topic == null ? fallback : topic.photoFor(text);
   }
+
+  static const _firstAidPattern =
+      r'first aid|cpr|resuscitat|bleed|burns?\b|chok|wounds?\b|recovery position|trauma|defibrillat|\baed\b';
+  static const _xrayPattern = r'fractur|x-ray|xray|orthop';
+}
+
+/// One health-library topic: its display category and matching photo(s).
+class VnTopic {
+  /// Category label stored on articles (e.g. "Cardiology").
+  final String category;
+
+  /// Regex alternation of word-start stems that identify the topic.
+  final String pattern;
+
+  /// Default photo for the topic.
+  final String photo;
+
+  /// Optional (pattern, photo) refinements checked before [photo].
+  final List<(String, String)> refinements;
+
+  const VnTopic(this.category, this.pattern, this.photo, [this.refinements = const []]);
+
+  /// Most specific photo for [text] within this topic.
+  String photoFor(String text) {
+    for (final (pattern, photo) in refinements) {
+      if (VnTopics._matches(text, pattern)) return photo;
+    }
+    return photo;
+  }
+}
+
+/// Strict, word-boundary topic classification shared by the library feed,
+/// article photos and video fallbacks.
+class VnTopics {
+  VnTopics._();
+
+  /// Neutral category used when no topic matches confidently.
+  static const research = 'Research';
+
+  /// Ordered by priority: the first topic that matches wins, so specific
+  /// patient-facing subjects (mental health, sleep, heart) beat broad ones.
+  static const List<VnTopic> all = [
+    VnTopic(
+      'Mental Health',
+      r'mental health|mental illness|depress|anxiety|anxious|psychiatr|psycholog|well-?being|'
+          r'(?<!oxidative )(?<!oxidant )stress(?!-strain)|burnout|suicid|loneli|mood|ptsd|mindful|meditat|'
+          r'grief|bereave|schizophren|bipolar|eating disorder|self-harm|panic',
+      VnPhotos.meditation,
+      [(r'depress|grief|bereave|loneli|suicid|caregiv|carers?\b|dementia', VnPhotos.holdingHands)],
+    ),
+    VnTopic('Sleep', r'sleep|insomnia|circadian|melatonin|apnoea|apnea|napping', VnPhotos.sleep),
+    VnTopic(
+      'Cardiology',
+      r'hearts?\b|cardiac|cardio|hypertens|blood pressure|strokes?\b|atrial|arrhythm|myocard|coronary|'
+          r'cholesterol|atheroscl|heart failure',
+      VnPhotos.bloodPressureCheck,
+      [(r'atrial|arrhythm|heart rate|wearable|smartwatch|ecg\b|electrocardiog', VnPhotos.smartwatchWrist)],
+    ),
+    VnTopic('Respiratory', r'asthma|copd\b|lungs?\b|pulmonar|respirator|breath|pneumon|inhaler|bronch',
+        VnPhotos.doctorWithPatient),
+    VnTopic('Endocrinology', r'diabet|insulin|glucose|glycaem|glycem|thyroid|hba1c', VnPhotos.doctorWithPatient),
+    VnTopic(
+      'Nutrition',
+      r'nutrition|nutrient|diets?\b|dietary|food|eating|meals?\b|fasting|vitamin|obes|mediterranean|'
+          r'healthy plate|fruit|vegetable|salt intake|sugar intake',
+      VnPhotos.healthyPlate,
+      [(r'fruit|vegetable|plant-based|vegan|vegetarian|mediterranean', VnPhotos.saladBowl)],
+    ),
+    VnTopic(
+      'Medicines',
+      r'medications?\b|drugs?\b|antibiotic|pharmac|prescri|analgesic|paracetamol|acetaminophen|ibuprofen|'
+          r'statins?\b|opioid|polypharmacy|dosing|tablets?\b|adherence',
+      VnPhotos.pillsOrange,
+      [(r'pharmac', VnPhotos.blisterPacks)],
+    ),
+    VnTopic(
+      'Immunology',
+      r'vaccin|immun|antibod|infection|infectious|virus|viral|covid|sars-cov|influenza|\bflu\b|hiv\b|antimicrobial',
+      VnPhotos.vaccination,
+    ),
+    VnTopic('Oncology', r'cancer|tumou?r|oncolog|chemo|carcinoma|leuka?emia|lymphoma|melanoma',
+        VnPhotos.medicalTeam, [(r'surg', VnPhotos.operatingTheatre)]),
+    VnTopic(
+      "Women's Health",
+      r'pregnan|maternal|menopaus|women|prenatal|antenatal|postpartum|breastfeed|contracept|endometriosis|menstru',
+      VnPhotos.doctorWithPatient,
+    ),
+    VnTopic("Children's Health", r'child|paediatric|pediatric|infant|neonat|kids\b|adolescen',
+        VnPhotos.doctorsWithChild),
+    VnTopic(
+      'Fitness',
+      r'exercis|fitness|physical activity|sports?\b|athlet|olympi|strength training|resistance training|'
+          r'muscle|running|walking|yoga|physiotherap|sedentary',
+      VnPhotos.workout,
+    ),
+    VnTopic('Longevity', r'ageing|aging|longevity|older adults|frailty|senescen', VnPhotos.doctorWithPatient),
+    VnTopic('Surgery', r'surg', VnPhotos.operatingTheatre),
+  ];
+
+  static final Map<String, RegExp> _cache = {};
+
+  static bool _matches(String text, String pattern) {
+    final re = _cache.putIfAbsent(pattern, () => RegExp('\\b(?:$pattern)', caseSensitive: false));
+    return re.hasMatch(text);
+  }
+
+  /// First topic whose keywords appear in [text], or `null`.
+  static VnTopic? classify(String text) {
+    if (text.trim().isEmpty) return null;
+    for (final t in all) {
+      if (_matches(text, t.pattern)) return t;
+    }
+    return null;
+  }
+
+  /// Topic for a stored category label (case-insensitive), or `null`.
+  static VnTopic? byCategory(String category) {
+    final c = category.trim().toLowerCase();
+    if (c == 'sleep science') return all[1];
+    if (c == 'metabolic health') return all[4];
+    if (c == 'sports medicine') return all.firstWhere((t) => t.category == 'Fitness');
+    for (final t in all) {
+      if (t.category.toLowerCase() == c) return t;
+    }
+    return null;
+  }
+
+  /// Category for a research article: title first, then MeSH headings,
+  /// otherwise the neutral [research] category.
+  static String categorize(String title, {List<String> meshHeadings = const []}) {
+    return classify(title)?.category ??
+        (meshHeadings.isEmpty ? null : classify(meshHeadings.join(' ; '))?.category) ??
+        research;
+  }
+
+  /// Photo for an article that matches its category (neutral when unknown).
+  static String photoForArticle(String title, String category) {
+    final topic = byCategory(category);
+    if (topic == null) return VnPhotos.laptopStethoscope;
+    return topic.photoFor(title);
+  }
+}
+
+/// Centres [child] in a column no wider than [maxWidth] on tablets / desktop
+/// so cards and photos don't stretch across the whole window. The side
+/// gutters are painted with [background] so they blend with the page.
+Widget vnReadableWidth(Widget child, {double maxWidth = 960, required Color background}) {
+  return ColoredBox(
+    color: background,
+    child: Center(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: child,
+      ),
+    ),
+  );
 }
 
 /// Opens the AI chat tab and hands it a prompt to answer.

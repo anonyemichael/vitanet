@@ -112,7 +112,7 @@ class _HealthArticleDetailScreenState extends State<HealthArticleDetailScreen> {
     final s = _textScale;
     final bodyColor = p.isDark ? p.inkSoft : const Color(0xFF1E293B);
 
-    return Scaffold(
+    return vnReadableWidth(Scaffold(
       backgroundColor: p.surface,
       body: SafeArea(
         bottom: false,
@@ -310,7 +310,7 @@ class _HealthArticleDetailScreenState extends State<HealthArticleDetailScreen> {
           ],
         ),
       ),
-    );
+    ), maxWidth: 840, background: p.surface);
   }
 
   Widget _buildQuiz(VnPalette p) {

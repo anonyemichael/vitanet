@@ -20,7 +20,7 @@ bool isCprVideo(ClinicalVideo v) {
 String videoFallbackPhoto(ClinicalVideo v) =>
     VnPhotos.forTopic('${v.title} ${v.category}', fallback: VnPhotos.doctorOnPhone);
 
-String videoViews(ClinicalVideo v) => '${v.viewsCount} views';
+String videoViews(ClinicalVideo v) => v.viewsCount.isEmpty ? '' : '${v.viewsCount} views';
 
 String videoAgo(ClinicalVideo v) => v.publishedAgo
     .replaceAll(' yrs ', ' years ')
@@ -30,7 +30,65 @@ String videoAgo(ClinicalVideo v) => v.publishedAgo
     .replaceAll(' wks ', ' weeks ')
     .replaceAll(' wk ', ' week ');
 
-String videoMeta(ClinicalVideo v) => '${videoViews(v)} · ${videoAgo(v)}';
+/// Views and age, omitting parts we have no verified value for. Falls back
+/// to the video's category so the line is never blank.
+String videoMeta(ClinicalVideo v) {
+  final parts = [videoViews(v), videoAgo(v)].where((s) => s.isNotEmpty).toList();
+  return parts.isEmpty ? v.category : parts.join(' · ');
+}
+
+/// Max content width of the video feeds on desktop / web.
+const double kVideoContentMaxWidth = 1400;
+
+/// Phone layout (one full-width card per row) below this width.
+const double kVideoGridBreakpoint = 700;
+
+/// Columns for the video feed at [width]: 1 on phones, then 2-4 like desktop
+/// YouTube.
+int videoGridColumns(double width) {
+  final w = width > kVideoContentMaxWidth ? kVideoContentMaxWidth : width;
+  if (w < kVideoGridBreakpoint) return 1;
+  if (w < 1000) return 2;
+  if (w < 1300) return 3;
+  return 4;
+}
+
+/// Grid of video cards laid out in rows (so each row sizes to its tallest
+/// card instead of forcing a fixed tile height).
+Widget videoGridSliver({
+  required List<ClinicalVideo> videos,
+  required int columns,
+  required Widget Function(ClinicalVideo v) itemBuilder,
+  double gap = 16,
+}) {
+  final rows = (videos.length / columns).ceil();
+  return SliverPadding(
+    padding: EdgeInsets.symmetric(horizontal: gap),
+    sliver: SliverList.builder(
+      itemCount: rows,
+      itemBuilder: (context, r) {
+        final children = <Widget>[];
+        for (var c = 0; c < columns; c++) {
+          if (c > 0) children.add(SizedBox(width: gap));
+          final i = r * columns + c;
+          children.add(Expanded(
+            child: i < videos.length
+                ? ClipRRect(borderRadius: BorderRadius.circular(12), child: itemBuilder(videos[i]))
+                : const SizedBox.shrink(),
+          ));
+        }
+        return Row(crossAxisAlignment: CrossAxisAlignment.start, children: children);
+      },
+    ),
+  );
+}
+
+/// List padding that centres list content in a 1000px column on wide screens.
+EdgeInsets videoListPadding(BuildContext context, {double top = 8, double bottom = 24}) {
+  final side = (MediaQuery.sizeOf(context).width - 1000) / 2;
+  final h = side > 12 ? side : 12.0;
+  return EdgeInsets.fromLTRB(h, top, h, bottom);
+}
 
 String youtubeUrl(ClinicalVideo v) => 'https://www.youtube.com/watch?v=${v.youtubeId}';
 
@@ -326,11 +384,12 @@ class VideoThumbnail extends StatelessWidget {
             url: video.thumbnailUrl,
             fallbackAsset: videoFallbackPhoto(video),
           ),
-        Positioned(
-          right: mini ? 5 : 8,
-          bottom: mini ? 5 : 8,
-          child: DurationBadge(video.formattedDuration, fontSize: durationFontSize),
-        ),
+        if (video.formattedDuration.isNotEmpty)
+          Positioned(
+            right: mini ? 5 : 8,
+            bottom: mini ? 5 : 8,
+            child: DurationBadge(video.formattedDuration, fontSize: durationFontSize),
+          ),
         if (showProgress)
           ListenableBuilder(
             listenable: store,

@@ -1,6 +1,7 @@
 [
   {
     "id": "med_001",
+    "is_rx": false,
     "name": "Acetaminophen (Paracetamol)",
     "type": "Pain Reliever & Antipyretic",
     "description": "First-line analgesic and antipyretic medication indicated for mild-to-moderate pain and fever reduction.",
@@ -29,6 +30,7 @@
   },
   {
     "id": "med_002",
+    "is_rx": false,
     "name": "Ibuprofen",
     "type": "NSAID (Non-Steroidal Anti-Inflammatory)",
     "description": "Nonsteroidal anti-inflammatory drug used for relief of acute pain, swelling, fever, and musculoskeletal inflammation.",
@@ -57,6 +59,7 @@
   },
   {
     "id": "med_003",
+    "is_rx": true,
     "name": "Amoxicillin",
     "type": "Penicillin Antibacterial",
     "description": "Broad-spectrum beta-lactam antibiotic indicated for respiratory tract, ear, nose, and bacterial urinary infections.",
@@ -84,6 +87,7 @@
   },
   {
     "id": "med_004",
+    "is_rx": false,
     "name": "Loratadine",
     "type": "Second-Generation Antihistamine",
     "description": "Non-sedating selective peripheral H1 receptor antagonist for seasonal allergic rhinitis, sneezing, and urticaria.",
@@ -111,6 +115,7 @@
   },
   {
     "id": "med_005",
+    "is_rx": false,
     "name": "Omeprazole",
     "type": "Proton Pump Inhibitor (PPI)",
     "description": "Suppresses gastric acid secretion by specific inhibition of the H+/K+-ATPase proton pump for GERD and peptic ulcers.",
@@ -138,6 +143,7 @@
   },
   {
     "id": "med_006",
+    "is_rx": false,
     "name": "Naproxen",
     "type": "NSAID (Pain & Fever)",
     "description": "Long-acting nonsteroidal anti-inflammatory analgesic indicated for arthritis, musculoskeletal pain, and dysmenorrhea.",
@@ -165,6 +171,7 @@
   },
   {
     "id": "med_007",
+    "is_rx": false,
     "name": "Aspirin (Acetylsalicylic Acid)",
     "type": "Antiplatelet & Analgesic (Pain & Cardio)",
     "description": "Irreversible cyclooxygenase inhibitor used for cardiovascular prophylaxis (low-dose) and mild pain/inflammation relief.",
@@ -192,6 +199,7 @@
   },
   {
     "id": "med_008",
+    "is_rx": true,
     "name": "Azithromycin",
     "type": "Macrolide Antibiotic",
     "description": "Broad-spectrum macrolide antibiotic indicated for community-acquired pneumonia, strep pharyngitis, and skin infections.",
@@ -219,6 +227,7 @@
   },
   {
     "id": "med_009",
+    "is_rx": true,
     "name": "Ciprofloxacin",
     "type": "Fluoroquinolone Antibacterial",
     "description": "Potent bactericidal fluoroquinolone targeting bacterial DNA gyrase; indicated for complicated UTI and bone infections.",
@@ -246,6 +255,7 @@
   },
   {
     "id": "med_010",
+    "is_rx": true,
     "name": "Doxycycline",
     "type": "Tetracycline Antibiotic",
     "description": "Broad-spectrum tetracycline antibiotic indicated for atypical pneumonia, Lyme disease, acne vulgaris, and rickettsial diseases.",
@@ -273,6 +283,7 @@
   },
   {
     "id": "med_011",
+    "is_rx": true,
     "name": "Lisinopril",
     "type": "ACE Inhibitor (Cardiovascular)",
     "description": "Angiotensin-converting enzyme (ACE) inhibitor indicated for essential hypertension, congestive heart failure, and post-MI recovery.",
@@ -300,6 +311,7 @@
   },
   {
     "id": "med_012",
+    "is_rx": true,
     "name": "Amlodipine",
     "type": "Calcium Channel Blocker (Cardiovascular)",
     "description": "Dihydropyridine calcium channel blocker promoting peripheral vascular vasodilation for hypertension and chronic stable angina.",
@@ -327,6 +339,7 @@
   },
   {
     "id": "med_013",
+    "is_rx": true,
     "name": "Atorvastatin",
     "type": "HMG-CoA Reductase Inhibitor (Cardiovascular)",
     "description": "Statin lipid-lowering agent indicated for primary hypercholesterolemia and secondary prevention of cardiovascular atherosclerotic events.",
@@ -354,6 +367,7 @@
   },
   {
     "id": "med_014",
+    "is_rx": true,
     "name": "Metoprolol",
     "type": "Beta-1 Selective Blocker (Cardiovascular)",
     "description": "Cardioselective beta-adrenergic blocker indicated for hypertension, angina pectoris, hemodynamically stable heart failure, and post-MI.",
@@ -381,6 +395,7 @@
   },
   {
     "id": "med_015",
+    "is_rx": true,
     "name": "Metformin",
     "type": "Biguanide Antidiabetic (Metabolic)",
     "description": "First-line oral antidiabetic biguanide that decreases hepatic glucose production and enhances peripheral insulin sensitivity.",
@@ -408,6 +423,7 @@
   },
   {
     "id": "med_016",
+    "is_rx": true,
     "name": "Pantoprazole",
     "type": "Proton Pump Inhibitor (Gastrointestinal)",
     "description": "Substituted benzimidazole proton pump inhibitor indicated for healing of erosive esophagitis and pathological hypersecretory states.",
@@ -435,6 +451,7 @@
   },
   {
     "id": "med_017",
+    "is_rx": false,
     "name": "Cetirizine",
     "type": "Second-Generation Antihistamine (Respiratory)",
     "description": "Potent peripheral H1 receptor antagonist for symptomatic management of allergic rhinitis, perennial allergies, and chronic urticaria.",
@@ -462,6 +479,7 @@
   },
   {
     "id": "med_018",
+    "is_rx": true,
     "name": "Albuterol (Salbutamol)",
     "type": "Beta-2 Agonist Bronchodilator (Respiratory)",
     "description": "Short-acting beta-2 adrenergic agonist (SABA) providing rapid relief of acute bronchospasm and exercise-induced asthma.",
@@ -489,6 +507,7 @@
   },
   {
     "id": "med_019",
+    "is_rx": true,
     "name": "Sertraline",
     "type": "SSRI Antidepressant (Mental Health)",
     "description": "Selective serotonin reuptake inhibitor (SSRI) indicated for major depressive disorder, obsessive-compulsive disorder, and PTSD.",
@@ -516,6 +535,7 @@
   },
   {
     "id": "med_020",
+    "is_rx": true,
     "name": "Escitalopram",
     "type": "SSRI Antidepressant (Mental Health)",
     "description": "Highly selective pure serotonin reuptake inhibitor indicated for acute and maintenance treatment of generalized anxiety disorder and major depression.",

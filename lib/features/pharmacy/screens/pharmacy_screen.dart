@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
@@ -5,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:vitanet/core/utils/launch_helpers.dart';
+import 'package:vitanet/features/resources/widgets/resource_media.dart';
 import 'package:vitanet/shared/widgets/vn_kit.dart';
 
 /// Find care nearby: live location, nearby pharmacies / hospitals / clinics
@@ -49,35 +51,62 @@ class _PharmacyScreenState extends State<PharmacyScreen> {
     super.dispose();
   }
 
+  /// Incremented on every locate attempt so a late answer (e.g. a browser
+  /// permission prompt accepted after the timeout) can't overwrite a newer
+  /// state.
+  int _locateRun = 0;
+
+  /// Upper bound for the whole permission + GPS step. Browsers never resolve
+  /// the permission request while the prompt is left unanswered, so without
+  /// this the screen would spin forever.
+  static const _locateTimeout = Duration(seconds: 8);
+
   Future<void> _locateAndLoad() async {
+    final run = ++_locateRun;
     setState(() => _state = _LoadState.locating);
+    final Position pos;
     try {
-      if (!await Geolocator.isLocationServiceEnabled()) {
-        _fail(_LoadState.noLocation, 'Turn on location to see places near you.');
-        return;
+      pos = await _getPosition().timeout(_locateTimeout);
+    } on _LocationUnavailable catch (e) {
+      if (run == _locateRun) _fail(_LoadState.noLocation, e.message);
+      return;
+    } on TimeoutException {
+      if (run == _locateRun) {
+        _fail(
+          _LoadState.noLocation,
+          "We couldn't get your location. Allow location access and retry, or search for a town or postcode above.",
+        );
       }
-      var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
-        _fail(_LoadState.noLocation, 'Location permission is off. You can still search in Maps.');
-        return;
-      }
-      final pos = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, timeLimit: Duration(seconds: 8)),
-      );
-      if (!mounted) return;
-      setState(() {
-        _position = pos;
-        _state = _LoadState.loading;
-      });
-      await _loadPlaces(pos);
+      return;
     } catch (_) {
-      _fail(_LoadState.noLocation, 'We could not get your location. You can still search in Maps.');
+      if (run == _locateRun) {
+        _fail(_LoadState.noLocation, 'We could not get your location. You can still search by area above or in Maps.');
+      }
+      return;
     }
+    if (!mounted || run != _locateRun) return;
+    setState(() {
+      _position = pos;
+      _state = _LoadState.loading;
+    });
+    await _loadPlaces(pos);
   }
 
+  Future<Position> _getPosition() async {
+    if (!await Geolocator.isLocationServiceEnabled()) {
+      throw const _LocationUnavailable('Turn on location to see places near you, or search by area above.');
+    }
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+      throw const _LocationUnavailable('Location permission is off. You can still search by area above or in Maps.');
+    }
+    return Geolocator.getCurrentPosition(
+      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, timeLimit: _locateTimeout),
+    );
+  }
   void _fail(_LoadState state, String message) {
     if (!mounted) return;
     setState(() {
@@ -162,7 +191,7 @@ class _PharmacyScreenState extends State<PharmacyScreen> {
     final visible = _visible;
     final top = MediaQuery.paddingOf(context).top;
 
-    return Scaffold(
+    return vnReadableWidth(Scaffold(
       backgroundColor: p.page,
       body: CustomScrollView(
         slivers: [
@@ -265,7 +294,7 @@ class _PharmacyScreenState extends State<PharmacyScreen> {
           ),
         ],
       ),
-    );
+    ), maxWidth: 960, background: p.page);
   }
 
   Widget _buildSearch() {
@@ -366,6 +395,11 @@ class _PharmacyScreenState extends State<PharmacyScreen> {
         );
     }
   }
+}
+
+class _LocationUnavailable implements Exception {
+  final String message;
+  const _LocationUnavailable(this.message);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -171,6 +171,7 @@ class DynamicResourcesService {
     Medicine(
       id: 'med_001',
       name: 'Acetaminophen (Paracetamol)',
+      isRx: false,
       type: 'Pain Reliever & Antipyretic',
       description: 'First-line analgesic and antipyretic medication indicated for mild-to-moderate pain and fever reduction.',
       color: const Color(0xFF0D9488),
@@ -197,6 +198,7 @@ class DynamicResourcesService {
     Medicine(
       id: 'med_002',
       name: 'Ibuprofen',
+      isRx: false,
       type: 'NSAID (Non-Steroidal Anti-Inflammatory)',
       description: 'Nonsteroidal anti-inflammatory drug used for relief of acute pain, swelling, fever, and musculoskeletal inflammation.',
       color: const Color(0xFFF97316),
@@ -234,6 +236,7 @@ class DynamicResourcesService {
     Medicine(
       id: 'med_004',
       name: 'Loratadine',
+      isRx: false,
       type: 'Second-Generation Antihistamine',
       description: 'Non-sedating selective peripheral H1 receptor antagonist for seasonal allergic rhinitis, sneezing, and urticaria.',
       color: const Color(0xFF8B5CF6),
@@ -250,6 +253,7 @@ class DynamicResourcesService {
     Medicine(
       id: 'med_005',
       name: 'Omeprazole',
+      isRx: false,
       type: 'Proton Pump Inhibitor (PPI)',
       description: 'Suppresses gastric acid secretion by specific inhibition of the H+/K+-ATPase proton pump for GERD and peptic ulcers.',
       color: const Color(0xFF06B6D4),
@@ -266,6 +270,7 @@ class DynamicResourcesService {
     Medicine(
       id: 'med_006',
       name: 'Naproxen',
+      isRx: false,
       type: 'NSAID (Pain & Fever)',
       description: 'Long-acting nonsteroidal anti-inflammatory analgesic indicated for arthritis, musculoskeletal pain, and dysmenorrhea.',
       color: const Color(0xFFF97316),
@@ -282,6 +287,7 @@ class DynamicResourcesService {
     Medicine(
       id: 'med_007',
       name: 'Aspirin (Acetylsalicylic Acid)',
+      isRx: false,
       type: 'Antiplatelet & Analgesic (Pain & Cardio)',
       description: 'Irreversible cyclooxygenase inhibitor used for cardiovascular prophylaxis (low-dose) and mild pain/inflammation relief.',
       color: const Color(0xFFEF4444),

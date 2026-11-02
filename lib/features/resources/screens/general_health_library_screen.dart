@@ -15,11 +15,10 @@ import 'health_article_detail_screen.dart';
 /// Clean alias for backward compatibility across navigation routes
 typedef GeneralHealthLibraryScreen = HealthLibraryScreen;
 
-/// Topic photo for an article: a matching local photo, or the feed's own
-/// (topic-resolved) image when no local photo fits.
+/// Topic photo for an article. The photo always follows the article's
+/// category, so tag and image agree; unknown categories get a neutral photo.
 ({String asset, String url}) articlePhoto(HealthArticle a) {
-  final asset = VnPhotos.forTopic('${a.title} ${a.category} ${a.meshHeadings.join(' ')}', fallback: '');
-  return (asset: asset.isEmpty ? VnPhotos.laptopStethoscope : asset, url: asset.isEmpty ? a.imageUrl : '');
+  return (asset: VnTopics.photoForArticle(a.title, a.category), url: '');
 }
 
 /// Health library: Europe PMC live literature interleaved with curated
@@ -36,11 +35,11 @@ class _HealthLibraryScreenState extends ConsumerState<HealthLibraryScreen> {
   static const List<(String, String)> _categories = [
     ('For you', 'All'),
     ('Heart', 'Cardiology'),
-    ('Breathing', '(asthma OR "lung function" OR respiratory OR breathing)'),
-    ('Mental health', '("mental health" OR anxiety OR depression OR stress)'),
+    ('Breathing', 'TITLE:(asthma OR "lung function" OR respiratory OR breathing)'),
+    ('Mental health', 'TITLE:("mental health" OR anxiety OR depression OR stress)'),
     ('Nutrition', 'Nutrition'),
     ('Sleep', 'Sleep'),
-    ("Women's health", '("women\'s health" OR pregnancy OR menopause OR maternal)'),
+    ("Women's health", 'TITLE:("women\'s health" OR pregnancy OR menopause OR maternal)'),
     ('Fitness', 'Fitness'),
     ('Immunity', 'Immunology'),
   ];
@@ -203,7 +202,7 @@ class _HealthLibraryScreenState extends ConsumerState<HealthLibraryScreen> {
   @override
   Widget build(BuildContext context) {
     final p = VnPalette.of(context);
-    return Scaffold(
+    return vnReadableWidth(Scaffold(
       backgroundColor: p.page,
       body: SafeArea(
         bottom: false,
@@ -297,7 +296,7 @@ class _HealthLibraryScreenState extends ConsumerState<HealthLibraryScreen> {
           ),
         ),
       ),
-    );
+    ), maxWidth: 1000, background: p.page);
   }
 
   Widget _buildSearchField(VnPalette p) {

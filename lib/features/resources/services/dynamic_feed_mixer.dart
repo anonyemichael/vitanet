@@ -64,7 +64,9 @@ class DynamicFeedMixer {
     final shuffled = List<String>.from(discoveryDomains)..shuffle(random);
     final topThree = shuffled.take(3).toList();
 
-    final domainsSubquery = topThree.map((d) => '"$d"').join(' OR ');
+    // Bias "For you" towards patient-friendly, everyday-health subjects by
+    // matching on titles rather than anywhere in the full record.
+    final domainsSubquery = topThree.map((d) => _forYouTitleQuery[d] ?? 'TITLE:"$d"').join(' OR ');
     return '(OPEN_ACCESS:y) AND (has_abstract:y) AND (FIRST_PDATE:[2024 TO 2026]) AND ($domainsSubquery)';
   }
 
@@ -142,18 +144,30 @@ class DynamicFeedMixer {
     return result;
   }
 
+  /// Patient-friendly title queries for each "For you" discovery domain.
+  static const Map<String, String> _forYouTitleQuery = {
+    'Cardiology': 'TITLE:("heart health" OR "blood pressure" OR hypertension OR "heart disease")',
+    'Nutrition': 'TITLE:(diet OR nutrition OR "healthy eating" OR "dietary")',
+    'Sleep Science': 'TITLE:(sleep OR insomnia)',
+    'Metabolic Health': 'TITLE:(diabetes OR "blood sugar" OR obesity OR "weight loss")',
+    'Sports Medicine': 'TITLE:("physical activity" OR exercise OR walking)',
+    'Immunology': 'TITLE:(vaccination OR vaccine OR influenza OR "infection prevention")',
+    'Mental Health': 'TITLE:("mental health" OR anxiety OR depression OR stress OR loneliness)',
+    'Longevity': 'TITLE:("healthy ageing" OR "healthy aging" OR "older adults")',
+  };
+
   String _getCategorySpecificQuery(String category) {
     switch (category.toLowerCase()) {
       case 'cardiology':
-        return '(cardiology OR "heart health" OR "cardiovascular" OR myocardial)';
+        return 'TITLE:(cardiology OR "heart health" OR cardiovascular OR "blood pressure" OR hypertension OR "heart disease")';
       case 'nutrition':
-        return '(nutrition OR dietary OR fasting OR "metabolic health" OR micronutrients)';
+        return 'TITLE:(nutrition OR diet OR dietary OR fasting OR "healthy eating" OR micronutrients)';
       case 'sleep':
-        return '(sleep OR "circadian rhythm" OR insomnia OR neurology OR "brain health")';
+        return 'TITLE:(sleep OR "circadian rhythm" OR insomnia OR melatonin)';
       case 'fitness':
-        return '("exercise physiology" OR "physical activity" OR "strength training" OR biomechanics)';
+        return 'TITLE:(exercise OR "physical activity" OR "strength training" OR fitness)';
       case 'immunology':
-        return '(immunology OR vaccine OR antibodies OR cellular OR infection)';
+        return 'TITLE:(immunology OR vaccine OR vaccination OR antibodies OR infection)';
       case 'neurology':
         return '(neurology OR neuroscience OR cognition OR "brain function")';
       case 'longevity':

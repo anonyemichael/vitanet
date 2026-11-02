@@ -201,7 +201,7 @@ class _MedicineSearchScreenState extends ConsumerState<MedicineSearchScreen>
     final showSkeleton = (_isLoading || _isSearchingLive) && displayed.isEmpty;
     final myMeds = ref.watch(userProfileProvider)?.medications ?? const <String>[];
 
-    return Scaffold(
+    return vnReadableWidth(Scaffold(
       backgroundColor: p.page,
       body: SafeArea(
         child: NotificationListener<ScrollNotification>(
@@ -296,7 +296,7 @@ class _MedicineSearchScreenState extends ConsumerState<MedicineSearchScreen>
               child: const Icon(Icons.arrow_upward_rounded, size: 18),
             )
           : null,
-    );
+    ), maxWidth: 960, background: p.page);
   }
 
   Widget _buildSearchField(VnPalette p) {

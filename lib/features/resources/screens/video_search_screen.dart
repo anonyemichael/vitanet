@@ -243,7 +243,14 @@ class _VideoSearchScreenState extends ConsumerState<VideoSearchScreen> {
                     ],
                   ),
                 ),
-                Expanded(child: _body(p, visible)),
+                Expanded(
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 1000),
+                      child: _body(p, visible),
+                    ),
+                  ),
+                ),
               ],
             );
           },

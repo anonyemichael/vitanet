@@ -392,7 +392,12 @@ class _VideoTutorialsScreenState extends ConsumerState<VideoTutorialsScreen> {
       child: RefreshIndicator(
         color: p.brand,
         onRefresh: _loadInitialVideos,
-        child: CustomScrollView(
+        child: LayoutBuilder(builder: (context, box) {
+          final cols = videoGridColumns(box.maxWidth);
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: kVideoContentMaxWidth),
+              child: CustomScrollView(
           controller: _scrollController,
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
@@ -460,6 +465,28 @@ class _VideoTutorialsScreenState extends ConsumerState<VideoTutorialsScreen> {
                   ),
                 ),
               )
+            else if (cols > 1) ...[
+              // Wide screens: YouTube-style grid instead of full-width cards.
+              videoGridSliver(
+                videos: feed.take(cols).toList(),
+                columns: cols,
+                itemBuilder: (v) => VideoFeedCard(
+                  video: v,
+                  onTap: () => _openVideo(v),
+                  onMore: () => showVideoOptionsSheet(context, v),
+                ),
+              ),
+              if (shorts.isNotEmpty) SliverToBoxAdapter(child: _buildShortsShelf(p, shorts)),
+              videoGridSliver(
+                videos: feed.skip(cols).toList(),
+                columns: cols,
+                itemBuilder: (v) => VideoFeedCard(
+                  video: v,
+                  onTap: () => _openVideo(v),
+                  onMore: () => showVideoOptionsSheet(context, v),
+                ),
+              ),
+            ]
             else ...[
               SliverList.list(
                 children: [
@@ -490,7 +517,10 @@ class _VideoTutorialsScreenState extends ConsumerState<VideoTutorialsScreen> {
               ),
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
           ],
-        ),
+              ),
+            ),
+          );
+        }),
       ),
     );
   }
@@ -552,7 +582,7 @@ class _ShortCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
-      label: '${short.title}, ${videoViews(short)}',
+      label: '${short.title}, ${short.channelName}',
       excludeSemantics: true,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
@@ -593,7 +623,10 @@ class _ShortCard extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                             style: VnText.body(14, weight: FontWeight.w700, color: Colors.white, height: 1.3)),
                         const SizedBox(height: 4),
-                        Text(videoViews(short), style: VnText.body(12, color: const Color(0xFFE2E8F0))),
+                        Text(videoViews(short).isNotEmpty ? videoViews(short) : short.channelName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: VnText.body(12, color: const Color(0xFFE2E8F0))),
                       ],
                     ),
                   ),
@@ -683,7 +716,7 @@ class _ChannelsTab extends StatelessWidget {
         return sa != sb ? sa - sb : a.compareTo(b);
       });
     return ListView(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
+      padding: videoListPadding(context),
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(4, 8, 4, 4),
@@ -768,7 +801,7 @@ class _SavedTab extends StatelessWidget {
     }
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
+      padding: videoListPadding(context),
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(0, 8, 0, 0),

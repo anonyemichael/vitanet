@@ -57,7 +57,7 @@ class _AddContactScreenState extends ConsumerState<AddContactScreen> {
 
     try {
       final auth = ref.read(authProvider);
-      final userId = auth.user?.uid ?? '00000000-0000-0000-0000-000000000001';
+      final userId = auth.user?.uid ?? '';
       await ref.read(apiServiceProvider).addCareCircleMember(
         userId: userId,
         fullName: newContact.name,

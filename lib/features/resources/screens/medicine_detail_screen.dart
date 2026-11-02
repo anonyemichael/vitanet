@@ -222,7 +222,7 @@ class _MedicineDetailScreenState extends ConsumerState<MedicineDetailScreen> {
     final sections = _sectionsForTab;
     final avoid = _dontTakeWith;
 
-    return Scaffold(
+    return vnReadableWidth(Scaffold(
       backgroundColor: p.page,
       body: NotificationListener<ScrollNotification>(
         onNotification: (n) => handleScrollNotification(n, ref),
@@ -390,7 +390,7 @@ class _MedicineDetailScreenState extends ConsumerState<MedicineDetailScreen> {
           ],
         ),
       ),
-    );
+    ), maxWidth: 900, background: p.page);
   }
 }
 

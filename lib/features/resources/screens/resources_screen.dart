@@ -134,7 +134,7 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
     final filtered = _filteredCategories;
     final picked = _pickedArticle();
 
-    return Scaffold(
+    return vnReadableWidth(Scaffold(
       backgroundColor: p.page,
       body: SafeArea(
         bottom: false,
@@ -223,7 +223,7 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
           ),
         ),
       ),
-    );
+    ), maxWidth: 1100, background: p.page);
   }
 
   Widget _buildSearch(VnPalette p) {

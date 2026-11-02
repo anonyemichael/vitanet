@@ -70,6 +70,48 @@ class Medicine {
     this.genericName,
   });
 
+  /// Active ingredients commonly sold over the counter (at standard OTC
+  /// strengths) in the US/UK/EU. Used only when a record carries no explicit
+  /// `is_rx` flag, e.g. older Firestore documents.
+  static const Set<String> commonOtcIngredients = {
+    'acetaminophen',
+    'paracetamol',
+    'ibuprofen',
+    'naproxen',
+    'aspirin',
+    'loratadine',
+    'cetirizine',
+    'fexofenadine',
+    'diphenhydramine',
+    'chlorphenamine',
+    'chlorpheniramine',
+    'omeprazole',
+    'esomeprazole',
+    'lansoprazole',
+    'famotidine',
+    'loperamide',
+    'calcium carbonate',
+    'simethicone',
+    'bisacodyl',
+    'docusate',
+    'guaifenesin',
+    'dextromethorphan',
+    'pseudoephedrine',
+    'phenylephrine',
+    'oxymetazoline',
+    'hydrocortisone',
+    'clotrimazole',
+    'miconazole',
+    'terbinafine',
+  };
+
+  /// Whether [name] refers to a commonly OTC medicine (word-boundary match).
+  static bool isCommonOtc(String name) {
+    final n = name.toLowerCase();
+    return commonOtcIngredients
+        .any((i) => RegExp('\\b${RegExp.escape(i)}\\b').hasMatch(n));
+  }
+
   factory Medicine.fromJson(Map<String, dynamic> json) {
     IconData getIcon(String iconName) {
       switch (iconName) {
@@ -123,7 +165,7 @@ class Medicine {
       relatedVideoId: json['related_video_id'] as String?,
       isFdaApproved: json['is_fda_approved'] as bool? ?? true,
       route: json['route'] as String? ?? 'ORAL',
-      isRx: json['is_rx'] as bool? ?? true,
+      isRx: json['is_rx'] as bool? ?? !isCommonOtc(json['name'] as String? ?? ''),
       isHomeopathic: json['is_homeopathic'] as bool? ?? false,
       brandName: json['brand_name'] as String?,
       genericName: json['generic_name'] as String?,

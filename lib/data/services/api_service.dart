@@ -123,7 +123,7 @@ class ApiService {
 
   /// Fetches the latest live vitals for a patient from the backend.
   Future<Map<String, double>> getLatestVitals([
-    String userId = '00000000-0000-0000-0000-000000000001',
+    String userId = '',
   ]) async {
     try {
       final response = await _dio.get('vitals/$userId/latest');
@@ -143,7 +143,7 @@ class ApiService {
 
   /// Persists a new biometric reading to the backend.
   Future<bool> postVitalReading({
-    String userId = '00000000-0000-0000-0000-000000000001',
+    String userId = '',
     required String vitalType,
     required double value,
     String source = 'device',
@@ -163,7 +163,7 @@ class ApiService {
 
   /// Fetches active care circle members for a user.
   Future<List<Map<String, dynamic>>> getCareCircleMembers([
-    String userId = '00000000-0000-0000-0000-000000000001',
+    String userId = '',
   ]) async {
     try {
       final response = await _dio.get('care-circles/user/$userId');
@@ -176,7 +176,7 @@ class ApiService {
 
   /// Invites a new emergency contact / care circle member and sends an invite email.
   Future<bool> addCareCircleMember({
-    String userId = '00000000-0000-0000-0000-000000000001',
+    String userId = '',
     required String fullName,
     required String relationship,
     String? contactEmail,

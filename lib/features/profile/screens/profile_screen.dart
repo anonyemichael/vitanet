@@ -90,12 +90,11 @@ class ProfileScreen extends ConsumerWidget {
     final profile = ref.watch(userProfileProvider);
     final auth = ref.watch(authProvider);
     final history = ref.watch(triageHistoryProvider);
-    final devices = ref.watch(deviceConnectionProvider).maybeWhen(
-          data: (m) => m.values.where((v) => v).length,
-          orElse: () => 0,
-        );
-    final liveCount = ref.watch(liveVitalsProvider).isNotEmpty ? 1 : 0;
-    final deviceCount = devices > 0 ? devices : liveCount;
+    // Count only health sources that have actually delivered readings this
+    // session (Health Connect / Apple Health, or the signed-in user's backend
+    // record). ApiService.getDeviceConnections() returns a hard-coded map, so
+    // it is deliberately not used here.
+    final deviceCount = ref.watch(liveVitalsProvider).isNotEmpty ? 1 : 0;
 
     final name = (profile?.name.trim().isNotEmpty ?? false)
         ? profile!.name.trim()

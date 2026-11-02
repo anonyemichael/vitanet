@@ -41,15 +41,15 @@ void main() {
     test('Computes deterministic 16:9 and 9:16 thumbnail URLs from youtubeId', () {
       const video = ClinicalVideo(
         youtubeId: 'hizBdM1Ob68',
-        title: 'How to Do CPR on an Adult',
-        channelName: 'St John Ambulance',
-        channelAvatarUrl: 'SJ',
-        isVerifiedChannel: true,
+        title: 'Learn How To Do CPR',
+        channelName: 'HealthSketch',
+        channelAvatarUrl: 'HS',
+        isVerifiedChannel: false,
         category: 'First Aid & CPR',
-        durationSeconds: 248,
-        formattedDuration: '4:08',
-        viewsCount: '7.2M',
-        publishedAgo: '1 yr ago',
+        durationSeconds: 243,
+        formattedDuration: '4:03',
+        viewsCount: '',
+        publishedAgo: '',
         isShort: false,
         keyTakeaways: ['Check safety', 'Call 999/112', 'Compress 5-6cm at 100-120 bpm'],
       );
@@ -61,7 +61,7 @@ void main() {
       expect(video.highResThumbnailUrl, equals('https://i.ytimg.com/vi/hizBdM1Ob68/maxresdefault.jpg'));
     });
 
-    test('Contains verified medical YouTube IDs from St John Ambulance, Mayo Clinic, Osmosis, Red Cross', () {
+    test('Contains the audited first-aid and health YouTube IDs', () {
       final masterclasses = ClinicalVideoRepository.verifiedMasterclasses;
       final shorts = ClinicalVideoRepository.verifiedShorts;
 
@@ -81,6 +81,13 @@ void main() {
       // Verify dataset sizes: initial page must have >= 10 Masterclasses and >= 8 Shorts
       expect(masterclasses.length, greaterThanOrEqualTo(10));
       expect(shorts.length, greaterThanOrEqualTo(8));
+
+      // Audited metadata must match what YouTube reports for the ID.
+      final cpr = masterclasses.firstWhere((v) => v.youtubeId == 'hizBdM1Ob68');
+      expect(cpr.title, equals('Learn How To Do CPR'));
+      expect(cpr.channelName, equals('HealthSketch'));
+      // No unverifiable view counts are shipped in the curated catalog.
+      expect([...masterclasses, ...shorts].every((v) => v.viewsCount.isEmpty), isTrue);
     });
   });
 

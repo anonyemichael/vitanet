@@ -11,7 +11,8 @@ class ClinicalVideo {
   final String channelName;
   final String channelAvatarUrl;
   final bool isVerifiedChannel;
-  final String category; // 'Physical Therapy', 'Cardio & Vitals', 'First Aid & CPR', 'Trauma', 'Guided Breathing', 'Nutrition & Sleep'
+  final String
+  category; // 'Physical Therapy', 'Cardio & Vitals', 'First Aid & CPR', 'Trauma', 'Guided Breathing', 'Nutrition & Sleep'
   final int durationSeconds;
   final String formattedDuration;
   final String viewsCount;
@@ -47,7 +48,8 @@ class ClinicalVideo {
   String get shortsThumbnailUrl => 'https://i.ytimg.com/vi/$youtubeId/oar2.jpg';
 
   /// High-resolution thumbnail when available
-  String get highResThumbnailUrl => 'https://i.ytimg.com/vi/$youtubeId/maxresdefault.jpg';
+  String get highResThumbnailUrl =>
+      'https://i.ytimg.com/vi/$youtubeId/maxresdefault.jpg';
 
   /// Fallback to HealthVideo model for legacy compatibility
   HealthVideo toHealthVideo() {
@@ -61,12 +63,11 @@ class ClinicalVideo {
       summary: keyTakeaways.isNotEmpty ? keyTakeaways.join('. ') : title,
       keySteps: keyTakeaways.asMap().entries.map((e) {
         final minutes = e.key + 1;
-        return VideoKeyStep(
-          time: '0$minutes:00',
-          action: e.value,
-        );
+        return VideoKeyStep(time: '0$minutes:00', action: e.value);
       }).toList(),
-      verificationStatus: isVerifiedChannel ? 'Verified Clinical Source' : 'Community Guide',
+      verificationStatus: isVerifiedChannel
+          ? 'Verified Clinical Source'
+          : 'Community Guide',
     );
   }
 }
@@ -91,375 +92,432 @@ class ClinicalVideoRepository {
   static final Map<String, List<ClinicalVideo>> _searchCache = {};
   static final Map<String, String?> _searchNextPageTokens = {};
 
-  /// Verified YouTube Shorts (Duration <= 60 seconds)
+  // Catalog audit (Nov 2026): every title, channel and duration below was
+  // checked against YouTube oEmbed / the watch page for its ID. View counts
+  // and "published ago" values are not stored because they change over time
+  // and could not be verified; the UI hides them when empty.
+
+  /// Verified YouTube Shorts (duration <= 60 seconds, or just over for the
+  /// short-form clips published as Shorts by the channel).
   static final List<ClinicalVideo> verifiedShorts = [
     const ClinicalVideo(
-      youtubeId: 'tEmt1Znux58',
-      title: 'Box Breathing to Instantly Stop Panic & Anxiety',
-      channelName: 'Mayo Clinic',
-      channelAvatarUrl: 'MC',
-      isVerifiedChannel: true,
-      category: 'Guided Breathing',
-      durationSeconds: 45,
-      formattedDuration: '0:45',
-      viewsCount: '1.8M',
-      publishedAgo: '3 mos ago',
-      isShort: true,
-      keyTakeaways: [
-        'Inhale 4s, hold lungs full 4s, exhale 4s, hold lungs empty 4s',
-        'Stimulates vagus nerve to slow down acute sinus tachycardia',
-        'Used clinically by trauma first responders to regain cognitive control',
-      ],
-    ),
-    const ClinicalVideo(
-      youtubeId: 'y6Sxv-sUYtM',
-      title: 'Hands-Only CPR in 60 Seconds: Save a Life',
+      youtubeId: 'IRP5dgOB42U',
+      title: 'What is an abnormal heart rate and is it dangerous?',
       channelName: 'British Heart Foundation',
       channelAvatarUrl: 'BHF',
       isVerifiedChannel: true,
-      category: 'First Aid & CPR',
-      durationSeconds: 60,
-      formattedDuration: '1:00',
-      viewsCount: '2.4M',
-      publishedAgo: '8 mos ago',
+      category: 'Cardio & Vitals',
+      durationSeconds: 37,
+      formattedDuration: '0:37',
+      viewsCount: '',
+      publishedAgo: '',
       isShort: true,
-      keyTakeaways: [
-        'Call emergency dispatch (999/112/911) immediately on speaker',
-        'Place hands center of chest and compress hard & fast at 100-120 bpm',
-        'Do not interrupt compressions until paramedic handover',
-      ],
+      keyTakeaways: [],
     ),
     const ClinicalVideo(
-      youtubeId: 'aUaInS6HIGo',
-      title: '30-Second Sciatica Nerve Floss for Acute Relief',
-      channelName: 'Mayo Clinic',
-      channelAvatarUrl: 'MC',
+      youtubeId: 'P18Id5CLzBE',
+      title: '3 best exercises for a healthy heart',
+      channelName: 'British Heart Foundation',
+      channelAvatarUrl: 'BHF',
       isVerifiedChannel: true,
-      category: 'Physical Therapy',
-      durationSeconds: 52,
-      formattedDuration: '0:52',
-      viewsCount: '890K',
-      publishedAgo: '5 mos ago',
+      category: 'Cardio & Vitals',
+      durationSeconds: 53,
+      formattedDuration: '0:53',
+      viewsCount: '',
+      publishedAgo: '',
       isShort: true,
-      keyTakeaways: [
-        'Seated knee extension paired with synchronized ankle dorsiflexion',
-        'Glides the sciatic nerve trunk through piriformis muscle without irritation',
-        'Perform 10 gentle repetitions per side; stop if sharp pain occurs',
-      ],
+      keyTakeaways: [],
     ),
     const ClinicalVideo(
-      youtubeId: 'NxO5LvgqZe0',
-      title: 'Emergency Burn First Aid: Crucial First 10 Minutes',
-      channelName: 'St John Ambulance',
-      channelAvatarUrl: 'SJ',
-      isVerifiedChannel: true,
-      category: 'Trauma',
-      durationSeconds: 55,
-      formattedDuration: '0:55',
-      viewsCount: '1.1M',
-      publishedAgo: '6 mos ago',
-      isShort: true,
-      keyTakeaways: [
-        'Cool thermal burns immediately under cool running tap water for 20 minutes',
-        'Remove constricting rings and jewelry before edema swelling starts',
-        'Cover loosely with clean cling wrap; never apply butter or oil',
-      ],
-    ),
-    const ClinicalVideo(
-      youtubeId: 'WuyPuH9ojCE',
-      title: 'Diaphragmatic Breath to Calm Tachycardia & High Vitals',
-      channelName: 'Johns Hopkins Medicine',
-      channelAvatarUrl: 'JH',
+      youtubeId: 'kFY--rPwMFY',
+      title: "Anthony's experience of panic disorder | NHS Talking Therapies",
+      channelName: 'NHS',
+      channelAvatarUrl: 'NHS',
       isVerifiedChannel: true,
       category: 'Guided Breathing',
-      durationSeconds: 55,
-      formattedDuration: '0:55',
-      viewsCount: '620K',
-      publishedAgo: '4 mos ago',
+      durationSeconds: 53,
+      formattedDuration: '0:53',
+      viewsCount: '',
+      publishedAgo: '',
       isShort: true,
-      keyTakeaways: [
-        'Anchor hand on epigastrium to ensure abdominal wall expands first',
-        'Lengthen exhalation phase through pursed lips to twice the inhale duration',
-        'Suppresses acute catecholamine surge and lowers arterial blood pressure',
-      ],
+      keyTakeaways: [],
     ),
     const ClinicalVideo(
-      youtubeId: 'BHY0FxzoKZE',
-      title: '30-Sec Posture Reset & Cervicothoracic Decompression',
+      youtubeId: 'djNFiWcxofM',
+      title: 'Heat exhaustion in sports.',
+      channelName: 'Cleveland Clinic',
+      channelAvatarUrl: 'CC',
+      isVerifiedChannel: true,
+      category: 'First Aid & CPR',
+      durationSeconds: 55,
+      formattedDuration: '0:55',
+      viewsCount: '',
+      publishedAgo: '',
+      isShort: true,
+      keyTakeaways: [],
+    ),
+    const ClinicalVideo(
+      youtubeId: 'DrCIrl9WBls',
+      title: 'Are eggs good or bad for cholesterol?',
+      channelName: 'British Heart Foundation',
+      channelAvatarUrl: 'BHF',
+      isVerifiedChannel: true,
+      category: 'Nutrition & Sleep',
+      durationSeconds: 52,
+      formattedDuration: '0:52',
+      viewsCount: '',
+      publishedAgo: '',
+      isShort: true,
+      keyTakeaways: [],
+    ),
+    const ClinicalVideo(
+      youtubeId: 'YO_RJLyu9to',
+      title: 'If your joints hurt, you should avoid exercise?',
       channelName: 'Cleveland Clinic',
       channelAvatarUrl: 'CC',
       isVerifiedChannel: true,
       category: 'Physical Therapy',
-      durationSeconds: 45,
-      formattedDuration: '0:45',
-      viewsCount: '540K',
-      publishedAgo: '2 mos ago',
+      durationSeconds: 31,
+      formattedDuration: '0:31',
+      viewsCount: '',
+      publishedAgo: '',
       isShort: true,
-      keyTakeaways: [
-        'Retract chin horizontally against gentle isometric counter-resistance',
-        'Engage lower trapezius and release chronic levator scapulae tension',
-        'Counteracts forward head posture from prolonged desk work',
-      ],
+      keyTakeaways: [],
     ),
     const ClinicalVideo(
-      youtubeId: 'hizBdM1Ob68',
-      title: 'Spot a Stroke Fast: F.A.S.T Clinical Screening Signs',
-      channelName: 'American Red Cross',
-      channelAvatarUrl: 'ARC',
+      youtubeId: 'dtJErRKjtG8',
+      title: 'IBS diet tips | NHS',
+      channelName: 'NHS',
+      channelAvatarUrl: 'NHS',
+      isVerifiedChannel: true,
+      category: 'Nutrition & Sleep',
+      durationSeconds: 51,
+      formattedDuration: '0:51',
+      viewsCount: '',
+      publishedAgo: '',
+      isShort: true,
+      keyTakeaways: [],
+    ),
+    const ClinicalVideo(
+      youtubeId: '1QElp8toGcg',
+      title: 'How to measure your waist',
+      channelName: 'British Heart Foundation',
+      channelAvatarUrl: 'BHF',
       isVerifiedChannel: true,
       category: 'Cardio & Vitals',
-      durationSeconds: 50,
-      formattedDuration: '0:50',
-      viewsCount: '1.4M',
-      publishedAgo: '9 mos ago',
+      durationSeconds: 40,
+      formattedDuration: '0:40',
+      viewsCount: '',
+      publishedAgo: '',
       isShort: true,
-      keyTakeaways: [
-        'F: Face drooping on one side when asked to smile',
-        'A: Arm weakness or drifting downwards when raised',
-        'S: Speech slurred or strange; T: Time to dial emergency dispatch immediately',
-      ],
+      keyTakeaways: [],
     ),
     const ClinicalVideo(
-      youtubeId: 'jNQXAC9IVRw',
-      title: '5-4-3-2-1 Sensory Grounding for Clinical Panic',
-      channelName: 'Osmosis from Elsevier',
-      channelAvatarUrl: 'OS',
+      youtubeId: 'FCpVck1RSvI',
+      title: 'How to start exercising: 3 tips for beginners',
+      channelName: 'British Heart Foundation',
+      channelAvatarUrl: 'BHF',
       isVerifiedChannel: true,
-      category: 'Guided Breathing',
-      durationSeconds: 48,
-      formattedDuration: '0:48',
-      viewsCount: '980K',
-      publishedAgo: '7 mos ago',
+      category: 'Physical Therapy',
+      durationSeconds: 63,
+      formattedDuration: '1:03',
+      viewsCount: '',
+      publishedAgo: '',
       isShort: true,
-      keyTakeaways: [
-        'Acknowledge 5 visual cues, 4 physical touch textures, 3 ambient sounds',
-        'Identify 2 subtle scents, 1 taste or conscious breath sensation',
-        'Restores prefrontal cortical control over hyperactive amygdala signaling',
-      ],
+      keyTakeaways: [],
+    ),
+    const ClinicalVideo(
+      youtubeId: 'y-y4O5yNAGo',
+      title: 'How much exercise do you need?',
+      channelName: 'British Heart Foundation',
+      channelAvatarUrl: 'BHF',
+      isVerifiedChannel: true,
+      category: 'Physical Therapy',
+      durationSeconds: 78,
+      formattedDuration: '1:18',
+      viewsCount: '',
+      publishedAgo: '',
+      isShort: true,
+      keyTakeaways: [],
     ),
   ];
 
-  /// Verified Long-Form Clinical Masterclasses (12 Verified Real Embeds)
+  /// Verified long-form videos (titles/channels as published on YouTube).
   static final List<ClinicalVideo> verifiedMasterclasses = [
     const ClinicalVideo(
       youtubeId: 'hizBdM1Ob68',
-      title: 'How to Do CPR on an Adult: Comprehensive Clinical Protocol',
-      channelName: 'St John Ambulance',
-      channelAvatarUrl: 'SJ',
-      isVerifiedChannel: true,
+      title: 'Learn How To Do CPR',
+      channelName: 'HealthSketch',
+      channelAvatarUrl: 'HS',
+      isVerifiedChannel: false,
       category: 'First Aid & CPR',
-      durationSeconds: 248,
-      formattedDuration: '4:08',
-      viewsCount: '7.2M',
-      publishedAgo: '1 yr ago',
+      durationSeconds: 243,
+      formattedDuration: '4:03',
+      viewsCount: '',
+      publishedAgo: '',
       isShort: false,
       keyTakeaways: [
-        'Verify scene safety, check verbal responsiveness, and scan chest for breathing (10s max)',
-        'Call emergency dispatch immediately and place the phone on speakerphone',
-        'Interlock hands in the center of the chest and compress 5-6 cm deep at 100-120 bpm',
-        'Deploy an Automated External Defibrillator (AED) as soon as available and follow voice prompts',
+        'Check the scene is safe and whether the person responds and is breathing normally',
+        'Call emergency services straight away, ideally on speakerphone',
+        'Push hard and fast in the centre of the chest, about 100-120 compressions a minute',
+        'Use an AED as soon as one arrives and follow its voice prompts',
       ],
     ),
     const ClinicalVideo(
       youtubeId: 'GmqXqwSV3bo',
-      title: 'How to Put an Unresponsive Casualty in the Recovery Position',
+      title: 'The Recovery Position - First Aid Training - St John Ambulance',
       channelName: 'St John Ambulance',
       channelAvatarUrl: 'SJ',
       isVerifiedChannel: true,
       category: 'First Aid & CPR',
-      durationSeconds: 195,
-      formattedDuration: '3:15',
-      viewsCount: '3.8M',
-      publishedAgo: '1 yr ago',
+      durationSeconds: 152,
+      formattedDuration: '2:32',
+      viewsCount: '',
+      publishedAgo: '',
       isShort: false,
       keyTakeaways: [
-        'Position the casualty lateral recumbent to maintain a clear, unobstructed airway',
-        'Place nearest arm at a right angle and draw far leg upward at the knee',
-        'Tilt head back gently to prevent tongue collapse and aspiration of gastric fluid',
-        'Continually observe chest rise and fall while waiting for paramedics',
+        'Use the recovery position for someone unresponsive who is breathing normally',
+        'Roll them onto their side and tilt the head back to keep the airway open',
+        'Call for emergency help and keep checking their breathing',
       ],
     ),
     const ClinicalVideo(
       youtubeId: 'PA9hpOnvtCk',
-      title: 'First Aid for Severe Adult Choking & Airway Clearance',
+      title:
+          'What To Do When Someone Is Choking - First Aid Training - St John Ambulance',
       channelName: 'St John Ambulance',
       channelAvatarUrl: 'SJ',
       isVerifiedChannel: true,
       category: 'First Aid & CPR',
-      durationSeconds: 215,
-      formattedDuration: '3:35',
-      viewsCount: '4.6M',
-      publishedAgo: '2 yrs ago',
+      durationSeconds: 145,
+      formattedDuration: '2:25',
+      viewsCount: '',
+      publishedAgo: '',
       isShort: false,
       keyTakeaways: [
-        'Encourage natural coughing if victim has partial airway exchange',
-        'Deliver up to 5 firm back blows between shoulder blades using palm heel',
-        'If obstruction persists, perform up to 5 sharp abdominal thrusts (Heimlich maneuver)',
-        'If the casualty loses consciousness, transition immediately to CPR compressions',
+        'Encourage them to cough if they can',
+        'Give up to 5 back blows between the shoulder blades, then up to 5 abdominal thrusts',
+        'Call emergency services if the blockage does not clear',
       ],
     ),
     const ClinicalVideo(
       youtubeId: 'NxO5LvgqZe0',
-      title: 'How to Treat Severe Bleeding & Hemorrhage Management',
+      title:
+          'How to Treat Severe Bleeding - First Aid Training - St John Ambulance',
       channelName: 'St John Ambulance',
       channelAvatarUrl: 'SJ',
       isVerifiedChannel: true,
       category: 'Trauma',
-      durationSeconds: 180,
-      formattedDuration: '3:00',
-      viewsCount: '2.9M',
-      publishedAgo: '1 yr ago',
+      durationSeconds: 268,
+      formattedDuration: '4:28',
+      viewsCount: '',
+      publishedAgo: '',
       isShort: false,
       keyTakeaways: [
-        'Apply direct, uninterrupted pressure over the wound using sterile gauze or clean dressing',
-        'Maintain firm continuous pressure; do not peel back dressing to check bleeding',
-        'Secure with tight pressure bandage and monitor distal circulation/capillary refill',
-        'Never remove deeply embedded foreign objects; stabilize around them',
+        'Apply firm, direct pressure to the wound',
+        'Call emergency services for severe bleeding',
+        'Secure a dressing and watch for signs of shock',
       ],
     ),
     const ClinicalVideo(
       youtubeId: '2v8vlXgGXwE',
-      title: 'First Aid for Suspected Fractures, Dislocations & Sprains',
+      title:
+          'How To Treat A Fracture & Fracture Types - First Aid Training - St John Ambulance',
       channelName: 'St John Ambulance',
       channelAvatarUrl: 'SJ',
       isVerifiedChannel: true,
       category: 'Trauma',
-      durationSeconds: 220,
-      formattedDuration: '3:40',
-      viewsCount: '1.9M',
-      publishedAgo: '11 mos ago',
+      durationSeconds: 172,
+      formattedDuration: '2:52',
+      viewsCount: '',
+      publishedAgo: '',
       isShort: false,
       keyTakeaways: [
-        'Immobilize the injured extremity above and below the involved fracture site',
-        'Do not attempt to push exposed bone fragments back into open puncture wounds',
-        'Apply cold compression packs wrapped in protective cloth to limit acute hemarthrosis',
-        'Transport for urgent clinical radiography and orthopedic evaluation',
+        'Keep the injured part still and supported in the position found',
+        'Do not try to straighten a suspected fracture',
+        'Get medical help; call emergency services for open or serious fractures',
       ],
     ),
     const ClinicalVideo(
-      youtubeId: 'diG519dFVNs',
-      title: 'Clinical Blood Pressure Measurement & Hypertension Screening',
-      channelName: 'Mayo Clinic',
-      channelAvatarUrl: 'MC',
+      youtubeId: 'tEmt1Znux58',
+      title:
+          'Box breathing relaxation technique: how to calm feelings of stress or anxiety',
+      channelName: 'Sunnybrook Hospital',
+      channelAvatarUrl: 'SH',
       isVerifiedChannel: true,
-      category: 'Cardio & Vitals',
-      durationSeconds: 380,
-      formattedDuration: '6:20',
-      viewsCount: '980K',
-      publishedAgo: '9 mos ago',
+      category: 'Guided Breathing',
+      durationSeconds: 167,
+      formattedDuration: '2:47',
+      viewsCount: '',
+      publishedAgo: '',
       isShort: false,
       keyTakeaways: [
-        'Patient must sit quietly with feet flat on the floor for 5 minutes prior to inflation',
-        'Support arm at heart level; position pneumatic bladder over brachial pulse',
-        'Duplicate readings 1-2 minutes apart to determine authentic baseline arterial pressure',
-      ],
-    ),
-    const ClinicalVideo(
-      youtubeId: 'V-_O7nl0Ii0',
-      title: 'Cardiovascular Physiology: Atherosclerosis & Heart Attack Risk',
-      channelName: 'Johns Hopkins Medicine',
-      channelAvatarUrl: 'JH',
-      isVerifiedChannel: true,
-      category: 'Cardio & Vitals',
-      durationSeconds: 490,
-      formattedDuration: '8:10',
-      viewsCount: '1.3M',
-      publishedAgo: '1 yr ago',
-      isShort: false,
-      keyTakeaways: [
-        'Chronic vascular endothelial inflammation accelerates atheromatous plaque formation',
-        'Recognize atypical cardiac ischemic symptoms including epigastric discomfort & jaw ache',
-        'Door-to-balloon reperfusion window directly preserves viable myocardium',
+        'Breathe in for 4, hold for 4, breathe out for 4, hold for 4',
+        'Repeat the cycle slowly to help calm feelings of stress or anxiety',
       ],
     ),
     const ClinicalVideo(
       youtubeId: 'wWGulLAa0O0',
-      title: 'Lumbar Spine Biomechanics & Core Decompression Masterclass',
-      channelName: 'Mayo Clinic',
-      channelAvatarUrl: 'MC',
+      title: 'What happens inside your body when you exercise?',
+      channelName: 'British Heart Foundation',
+      channelAvatarUrl: 'BHF',
       isVerifiedChannel: true,
-      category: 'Physical Therapy',
-      durationSeconds: 490,
-      formattedDuration: '8:10',
-      viewsCount: '1.2M',
-      publishedAgo: '6 mos ago',
+      category: 'Cardio & Vitals',
+      durationSeconds: 153,
+      formattedDuration: '2:33',
+      viewsCount: '',
+      publishedAgo: '',
       isShort: false,
-      keyTakeaways: [
-        'Engage deep transverse abdominis rather than superficial rectus abdominis crunches',
-        'Perform neutral-spine bird-dog and side bridge exercises for paraspinal stability',
-        'Avoid extreme early morning lumbar flexion when intervertebral discs are fully hydrated',
-      ],
+      keyTakeaways: [],
     ),
     const ClinicalVideo(
       youtubeId: 'BHY0FxzoKZE',
-      title: 'Cervicothoracic Posture Reset & Neck Pain Rehabilitation',
-      channelName: 'Cleveland Clinic',
-      channelAvatarUrl: 'CC',
+      title: 'The Brain-Changing Benefits of Exercise | Wendy Suzuki | TED',
+      channelName: 'TED',
+      channelAvatarUrl: 'TED',
       isVerifiedChannel: true,
       category: 'Physical Therapy',
-      durationSeconds: 420,
-      formattedDuration: '7:00',
-      viewsCount: '710K',
-      publishedAgo: '5 mos ago',
+      durationSeconds: 783,
+      formattedDuration: '13:03',
+      viewsCount: '',
+      publishedAgo: '',
       isShort: false,
       keyTakeaways: [
-        'Position computer display at eye height to eliminate cervical forward shear forces',
-        'Strengthen deep cervical flexors and lower trapezius with horizontal chin retraction',
-        'Incorporate 2-minute active mobility breaks every 45 minutes of sedentary work',
+        'A single workout can lift mood and improve focus',
+        'Regular exercise supports the hippocampus, a brain area important for memory',
+      ],
+    ),
+    const ClinicalVideo(
+      youtubeId: 'aUaInS6HIGo',
+      title:
+          '23 and 1/2 hours: What is the single best thing we can do for our health?',
+      channelName: 'DocMikeEvans',
+      channelAvatarUrl: 'DM',
+      isVerifiedChannel: false,
+      category: 'Physical Therapy',
+      durationSeconds: 558,
+      formattedDuration: '9:18',
+      viewsCount: '',
+      publishedAgo: '',
+      isShort: false,
+      keyTakeaways: [
+        'Limiting sitting and moving for about 30 minutes a day, such as walking, has wide health benefits',
+      ],
+    ),
+    const ClinicalVideo(
+      youtubeId: 'WuyPuH9ojCE',
+      title: 'How stress affects your brain - Madhumita Murgia',
+      channelName: 'TED-Ed',
+      channelAvatarUrl: 'TE',
+      isVerifiedChannel: true,
+      category: 'Guided Breathing',
+      durationSeconds: 256,
+      formattedDuration: '4:16',
+      viewsCount: '',
+      publishedAgo: '',
+      isShort: false,
+      keyTakeaways: [
+        'Long-term stress keeps cortisol levels high, which can affect memory and mood',
+        'Exercise and meditation can help reduce the effects of stress',
       ],
     ),
     const ClinicalVideo(
       youtubeId: 'inpok4MKVLM',
-      title: 'Physiological Stress Reduction & Autonomic Vagal Regulation',
-      channelName: 'Mayo Clinic',
-      channelAvatarUrl: 'MC',
-      isVerifiedChannel: true,
+      title: '5-Minute Meditation You Can Do Anywhere | Goodful',
+      channelName: 'Goodful',
+      channelAvatarUrl: 'GF',
+      isVerifiedChannel: false,
       category: 'Guided Breathing',
-      durationSeconds: 675,
-      formattedDuration: '11:15',
-      viewsCount: '1.7M',
-      publishedAgo: '1 yr ago',
+      durationSeconds: 317,
+      formattedDuration: '5:17',
+      viewsCount: '',
+      publishedAgo: '',
       isShort: false,
       keyTakeaways: [
-        'Extended exhalations shift autonomic tone from sympathetic drive to parasympathetic rest',
-        'Documented reductions in circulating serum cortisol and resting heart rate',
-        'Practice 10-15 minutes daily in a relaxed, erect seated position',
+        'A short guided meditation focused on slow, steady breathing',
+      ],
+    ),
+    const ClinicalVideo(
+      youtubeId: 'DxIDKZHW3-E',
+      title: 'We All Have Mental Health',
+      channelName: 'Anna Freud',
+      channelAvatarUrl: 'AF',
+      isVerifiedChannel: true,
+      category: 'Guided Breathing',
+      durationSeconds: 339,
+      formattedDuration: '5:39',
+      viewsCount: '',
+      publishedAgo: '',
+      isShort: false,
+      keyTakeaways: [
+        'Everyone has mental health, and it can change over time',
+        'Talking to someone you trust is a good first step when things feel hard',
       ],
     ),
     const ClinicalVideo(
       youtubeId: 'gedoSfZvBgE',
-      title: 'Circadian Biology, Melatonin Secretion & Sleep Architecture',
-      channelName: 'Stanford Center for Health Education',
-      channelAvatarUrl: 'SM',
+      title: "The benefits of a good night's sleep - Shai Marcu",
+      channelName: 'TED-Ed',
+      channelAvatarUrl: 'TE',
       isVerifiedChannel: true,
       category: 'Nutrition & Sleep',
-      durationSeconds: 850,
-      formattedDuration: '14:10',
-      viewsCount: '2.3M',
-      publishedAgo: '1 yr ago',
+      durationSeconds: 345,
+      formattedDuration: '5:45',
+      viewsCount: '',
+      publishedAgo: '',
       isShort: false,
       keyTakeaways: [
-        'Early morning sunlight exposure anchors the suprachiasmatic nucleus master circadian clock',
-        'Core body temperature must drop approximately 1°C to initiate deep slow-wave sleep',
-        'Restrict ambient screen illumination and blue spectrum light 90 minutes before sleep',
+        'Sleep moves through several stages each night',
+        'Good sleep supports memory, and missing sleep affects how we think and feel',
+      ],
+    ),
+    const ClinicalVideo(
+      youtubeId: '5MuIMqhT8DM',
+      title: 'Sleep Is Your Superpower | Matt Walker | TED',
+      channelName: 'TED',
+      channelAvatarUrl: 'TED',
+      isVerifiedChannel: true,
+      category: 'Nutrition & Sleep',
+      durationSeconds: 1158,
+      formattedDuration: '19:18',
+      viewsCount: '',
+      publishedAgo: '',
+      isShort: false,
+      keyTakeaways: [
+        'Lack of sleep harms learning, memory and the immune system',
+        'Keep a regular sleep schedule and a cool bedroom',
       ],
     ),
     const ClinicalVideo(
       youtubeId: '3dqXHHCc5lA',
-      title: 'The Gut-Brain Axis & Clinical Neurochemical Regulation',
-      channelName: 'Osmosis from Elsevier',
-      channelAvatarUrl: 'OS',
+      title:
+          'The surprisingly dramatic role of nutrition in mental health | Julia Rucklidge | TEDxChristchurch',
+      channelName: 'TEDx Talks',
+      channelAvatarUrl: 'TX',
+      isVerifiedChannel: false,
+      category: 'Nutrition & Sleep',
+      durationSeconds: 1063,
+      formattedDuration: '17:43',
+      viewsCount: '',
+      publishedAgo: '',
+      isShort: false,
+      keyTakeaways: ['Diet quality and nutrients play a role in mental health'],
+    ),
+    const ClinicalVideo(
+      youtubeId: 'lEXBxijQREo',
+      title: 'How sugar affects the brain - Nicole Avena',
+      channelName: 'TED-Ed',
+      channelAvatarUrl: 'TE',
       isVerifiedChannel: true,
       category: 'Nutrition & Sleep',
-      durationSeconds: 614,
-      formattedDuration: '10:14',
-      viewsCount: '1.6M',
-      publishedAgo: '1 yr ago',
+      durationSeconds: 303,
+      formattedDuration: '5:03',
+      viewsCount: '',
+      publishedAgo: '',
       isShort: false,
       keyTakeaways: [
-        'Gut microbiota produce neuroactive metabolites including GABA, dopamine, and serotonin',
-        'Short-chain fatty acids (acetate, propionate, butyrate) maintain the mucosal barrier',
-        'Diverse dietary fiber and polyphenol intake enriches beneficial microbiome diversity',
+        "Sugar activates the brain's reward system",
+        'Eating a lot of added sugar regularly can make cravings stronger',
       ],
     ),
   ];
@@ -475,8 +533,11 @@ class ClinicalVideoRepository {
     String? pageToken,
   }) async {
     final cleanQuery = searchQuery?.trim() ?? '';
-    final cleanCategory = (category != null && category != 'All') ? category : null;
-    final cacheKey = '${cleanQuery.toLowerCase()}_${cleanCategory ?? "all"}_$pageIndex';
+    final cleanCategory = (category != null && category != 'All')
+        ? category
+        : null;
+    final cacheKey =
+        '${cleanQuery.toLowerCase()}_${cleanCategory ?? "all"}_$pageIndex';
 
     // 1. Check in-memory result cache so duplicate searches cost 0 API quota
     if (_searchCache.containsKey(cacheKey)) {
@@ -492,7 +553,10 @@ class ClinicalVideoRepository {
       String apiKey = '';
       try {
         if (dotenv.isInitialized) {
-          apiKey = dotenv.env['GOOGLE_API_KEY'] ?? dotenv.env['YOUTUBE_API_KEY'] ?? '';
+          apiKey =
+              dotenv.env['GOOGLE_API_KEY'] ??
+              dotenv.env['YOUTUBE_API_KEY'] ??
+              '';
         }
       } catch (_) {}
 
@@ -592,7 +656,11 @@ class ClinicalVideoRepository {
       queryParams['pageToken'] = pageToken;
     }
 
-    final uri = Uri.https('www.googleapis.com', '/youtube/v3/search', queryParams);
+    final uri = Uri.https(
+      'www.googleapis.com',
+      '/youtube/v3/search',
+      queryParams,
+    );
     final response = await http.get(uri).timeout(const Duration(seconds: 6));
 
     if (response.statusCode == 200) {
@@ -607,14 +675,17 @@ class ClinicalVideoRepository {
         if (videoId == null || videoId.isEmpty) continue;
 
         final snippet = item['snippet'] as Map<String, dynamic>? ?? {};
-        final rawTitle = snippet['title'] as String? ?? 'Clinical Medical Guide';
+        final rawTitle =
+            snippet['title'] as String? ?? 'Clinical Medical Guide';
         final cleanTitle = _unescapeHtml(rawTitle);
-        final channelTitle = snippet['channelTitle'] as String? ?? 'Verified Health Education';
+        final channelTitle =
+            snippet['channelTitle'] as String? ?? 'Verified Health Education';
         final publishedAt = snippet['publishedAt'] as String? ?? '';
         final description = snippet['description'] as String? ?? '';
 
         final isVerified = _isLikelyVerifiedMedicalChannel(channelTitle);
-        final derivedCategory = category ?? _deriveCategoryFromText('$cleanTitle $description');
+        final derivedCategory =
+            category ?? _deriveCategoryFromText('$cleanTitle $description');
 
         videos.add(
           ClinicalVideo(
@@ -624,12 +695,15 @@ class ClinicalVideoRepository {
             channelAvatarUrl: _extractInitials(channelTitle),
             isVerifiedChannel: isVerified,
             category: derivedCategory,
-            durationSeconds: 300,
-            formattedDuration: 'Clinical',
-            viewsCount: 'Verified',
+            durationSeconds: 0,
+            formattedDuration: '',
+            viewsCount: '',
             publishedAgo: _formatRelativeTime(publishedAt),
             isShort: false,
-            keyTakeaways: _extractKeyTakeawaysFromDescription(description, cleanTitle),
+            keyTakeaways: _extractKeyTakeawaysFromDescription(
+              description,
+              cleanTitle,
+            ),
           ),
         );
       }
@@ -680,28 +754,46 @@ class ClinicalVideoRepository {
 
   static String _deriveCategoryFromText(String text) {
     final lower = text.toLowerCase();
-    if (lower.contains('cpr') || lower.contains('chok') || lower.contains('first aid')) {
+    if (lower.contains('cpr') ||
+        lower.contains('chok') ||
+        lower.contains('first aid')) {
       return 'First Aid & CPR';
     }
-    if (lower.contains('bleed') || lower.contains('burn') || lower.contains('fracture') || lower.contains('wound')) {
+    if (lower.contains('bleed') ||
+        lower.contains('burn') ||
+        lower.contains('fracture') ||
+        lower.contains('wound')) {
       return 'Trauma';
     }
-    if (lower.contains('heart') || lower.contains('cardio') || lower.contains('pressure') || lower.contains('vital')) {
+    if (lower.contains('heart') ||
+        lower.contains('cardio') ||
+        lower.contains('pressure') ||
+        lower.contains('vital')) {
       return 'Cardio & Vitals';
     }
-    if (lower.contains('spine') || lower.contains('back') || lower.contains('stretch') || lower.contains('posture')) {
+    if (lower.contains('spine') ||
+        lower.contains('back') ||
+        lower.contains('stretch') ||
+        lower.contains('posture')) {
       return 'Physical Therapy';
     }
-    if (lower.contains('breath') || lower.contains('panic') || lower.contains('anxiety')) {
+    if (lower.contains('breath') ||
+        lower.contains('panic') ||
+        lower.contains('anxiety')) {
       return 'Guided Breathing';
     }
-    if (lower.contains('sleep') || lower.contains('diet') || lower.contains('nutrition')) {
+    if (lower.contains('sleep') ||
+        lower.contains('diet') ||
+        lower.contains('nutrition')) {
       return 'Nutrition & Sleep';
     }
     return 'First Aid & CPR';
   }
 
-  static List<String> _extractKeyTakeawaysFromDescription(String desc, String fallbackTitle) {
+  static List<String> _extractKeyTakeawaysFromDescription(
+    String desc,
+    String fallbackTitle,
+  ) {
     if (desc.trim().isEmpty) {
       return [
         'Physician-reviewed clinical protocol and technique demonstration',

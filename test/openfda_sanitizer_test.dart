@@ -50,11 +50,11 @@ void main() {
     test('Handles empty and whitespace-only indications with clinical fallback', () {
       expect(
         OpenFdaSanitizer.cleanIndication(null),
-        equals('Prescription medication monograph verified by the FDA.'),
+        equals('Medication label information from the FDA.'),
       );
       expect(
         OpenFdaSanitizer.cleanIndication('   '),
-        equals('Prescription medication monograph verified by the FDA.'),
+        equals('Medication label information from the FDA.'),
       );
     });
 
@@ -279,6 +279,34 @@ void main() {
       expect(status.isHomeopathic, isTrue);
       expect(status.isFdaApproved, isFalse);
       expect(status.regulatoryStatus, equals('Homeopathic / Unverified'));
+    });
+
+    test('ANDA generic with Drug Facts sections and no product_type is OTC', () {
+      final item = {
+        'openfda': {
+          'application_number': ['ANDA078682'],
+        },
+        'purpose': ['Pain reliever/fever reducer'],
+        'keep_out_of_reach_of_children': ['Keep out of reach of children.'],
+      };
+      final status = OpenFdaSanitizer.resolveRegulatoryStatus(item);
+      expect(status.isRx, isFalse);
+      expect(status.regulatoryStatus, equals('OTC'));
+    });
+
+    test('OTC monograph application numbers are OTC', () {
+      final item = {
+        'openfda': {
+          'application_number': ['M013'],
+        },
+      };
+      expect(OpenFdaSanitizer.resolveRegulatoryStatus(item).isRx, isFalse);
+    });
+
+    test('Common OTC catalog entries without is_rx default to OTC', () {
+      expect(Medicine.isCommonOtc('Acetaminophen (Paracetamol)'), isTrue);
+      expect(Medicine.isCommonOtc('Cetirizine'), isTrue);
+      expect(Medicine.isCommonOtc('Amoxicillin'), isFalse);
     });
   });
 
