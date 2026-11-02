@@ -6,6 +6,9 @@ resend.api_key = settings.RESEND_API_KEY
 
 
 def send_care_circle_invite(to_email: str, requester_name: str, invite_token: str):
+    if not settings.RESEND_API_KEY:
+        print(f"[EMAIL SERVICE] Dev mode: simulated invite to {to_email} from {requester_name}, token={invite_token}")
+        return
     base_url = "https://dreaded-bagpipe-trapped.ngrok-free.dev"
     accept_url = f"{base_url}/care-circles/respond?token={invite_token}&action=accept"
     reject_url = f"{base_url}/care-circles/respond?token={invite_token}&action=reject"
@@ -26,4 +29,7 @@ def send_care_circle_invite(to_email: str, requester_name: str, invite_token: st
     
 # # app/services/email.py
 # def send_care_circle_invite(to_email: str, requester_name: str, invite_token: str):
+    if not settings.RESEND_API_KEY:
+        print(f"[EMAIL SERVICE] Dev mode: simulated invite to {to_email} from {requester_name}, token={invite_token}")
+        return
 #     print(f"[EMAIL STUB] Would send invite to {to_email} from {requester_name}, token={invite_token}")

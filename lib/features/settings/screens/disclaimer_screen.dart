@@ -1,77 +1,136 @@
 import 'package:flutter/material.dart';
-import 'package:vitanet/core/constants/app_spacing.dart';
-import 'package:vitanet/core/constants/app_strings.dart';
-import 'package:vitanet/core/extensions/context_ext.dart';
+import 'package:go_router/go_router.dart';
+import 'package:vitanet/core/utils/launch_helpers.dart';
+import 'package:vitanet/shared/widgets/vn_kit.dart';
 
 class DisclaimerScreen extends StatelessWidget {
   const DisclaimerScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final isDark = context.isDark;
-    final bgColor = isDark ? const Color(0xFF121212) : Colors.grey.shade50;
-    final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final borderColor = isDark ? Colors.grey.shade800 : Colors.grey.shade200;
+    final p = VnPalette.of(context);
 
-    return Scaffold(
-      backgroundColor: bgColor,
-      appBar: AppBar(
-        title: const Text('Medical Disclaimer'),
-        elevation: 0,
-        backgroundColor: bgColor,
-        iconTheme: IconThemeData(color: isDark ? Colors.white : Colors.black87),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(AppSpacing.xl),
-          decoration: BoxDecoration(
-            color: cardColor,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: borderColor, width: 1.5),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Column(
+    Widget point(IconData icon, Color color, String title, String body) => VnCard(
+          radius: 18,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: context.colorScheme.primaryContainer.withValues(alpha: 0.5),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(Icons.gavel_rounded, color: context.colorScheme.primary, size: 24),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Important Safety Information',
-                      style: context.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: isDark ? Colors.white : Colors.black87,
-                      ),
-                    ),
-                  ),
-                ],
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Icon(icon, size: 20, color: p.tintFg(color)),
               ),
-              const SizedBox(height: AppSpacing.xl),
-              Text(
-                AppStrings.fullDisclaimer,
-                style: context.textTheme.bodyMedium?.copyWith(
-                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade700,
-                  height: 1.6,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: VnText.body(14, weight: FontWeight.w700, color: p.ink)),
+                    const SizedBox(height: 3),
+                    Text(body, style: VnText.body(13, color: p.inkSoft, height: 1.5)),
+                  ],
                 ),
               ),
             ],
+          ),
+        );
+
+    return Scaffold(
+      backgroundColor: p.page,
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 720),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+              children: [
+                const VnTopBar(title: 'Medical disclaimer'),
+                const SizedBox(height: 18),
+                Material(
+                  color: p.isDark ? const Color(0xFF3B1414) : const Color(0xFFFEF2F2),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    side: BorderSide(
+                        color: p.isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFECACA)),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: () => LaunchHelpers.dialOrSnack(context, '112'),
+                    child: Semantics(
+                      button: true,
+                      label: 'In an emergency, call 112',
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFB91C1C),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: const Icon(Icons.call_outlined, color: Colors.white),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('In an emergency, call 112',
+                                      style: VnText.body(15,
+                                          weight: FontWeight.w800,
+                                          color: p.isDark
+                                              ? const Color(0xFFFCA5A5)
+                                              : const Color(0xFF991B1B))),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Chest pain, trouble breathing, heavy bleeding or loss of consciousness need emergency services, not an app.',
+                                    style: VnText.body(13,
+                                        color: p.isDark
+                                            ? const Color(0xFFFECACA)
+                                            : const Color(0xFF7F1D1D),
+                                        height: 1.5),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                point(Icons.check_rounded, const Color(0xFF047857), 'VitaNet can',
+                    'Suggest how urgently to seek care, explain results in plain language and help you prepare for appointments.'),
+                const SizedBox(height: 12),
+                point(Icons.close_rounded, const Color(0xFFB91C1C), 'VitaNet cannot',
+                    'Diagnose conditions, prescribe medicines, or replace an examination by a qualified clinician.'),
+                const SizedBox(height: 18),
+                Text(
+                  'The information in this app is for general guidance only. AI responses may be incomplete or wrong, and vitals from consumer devices are not medical-grade. Always follow the advice of your doctor or pharmacist, and never delay seeking care because of something you read here.',
+                  style: VnText.body(14, color: p.inkSoft, height: 1.7),
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  'Medicine information is sourced from FDA labelling and may differ from what is approved in your country. Check with a pharmacist before starting or stopping any medicine.',
+                  style: VnText.body(14, color: p.inkSoft, height: 1.7),
+                ),
+                const SizedBox(height: 28),
+                VnButton(
+                  label: 'I understand',
+                  onPressed: () {
+                    if (context.canPop()) {
+                      context.pop();
+                    } else {
+                      context.go('/home');
+                    }
+                  },
+                ),
+              ],
+            ),
           ),
         ),
       ),

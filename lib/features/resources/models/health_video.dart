@@ -1,3 +1,5 @@
+export 'clinical_video.dart';
+
 class VideoKeyStep {
   final String time;
   final String action;

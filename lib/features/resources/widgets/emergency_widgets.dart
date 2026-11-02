@@ -1,58 +1,194 @@
-import 'dart:async';
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:http/http.dart' as http;
-import 'package:vitanet/core/constants/app_spacing.dart';
-import 'package:vitanet/core/extensions/context_ext.dart';
 import 'package:vitanet/core/utils/launch_helpers.dart';
+import 'package:vitanet/features/first_aid/screens/first_aid_screen.dart';
+import 'package:vitanet/shared/widgets/vn_kit.dart';
 
+/// White "Call 112 first" card used in the red emergency header.
 class EmergencyCallCard extends StatelessWidget {
-  const EmergencyCallCard({super.key});
+  final String emergencyNumber;
+  const EmergencyCallCard({super.key, this.emergencyNumber = '112'});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.xl),
-      decoration: BoxDecoration(
-        color: context.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFDC2626).withValues(alpha: 0.3)),
+    return Semantics(
+      button: true,
+      label: 'Call $emergencyNumber first, then follow a guide below',
+      excludeSemantics: true,
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => LaunchHelpers.dialOrSnack(context, emergencyNumber),
+          child: SizedBox(
+            height: 60,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: const BoxDecoration(color: Color(0xFFB91C1C), shape: BoxShape.circle),
+                    child: const Icon(Icons.phone_rounded, size: 20, color: Colors.white),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Call $emergencyNumber first',
+                            style: VnText.body(16, weight: FontWeight.w800, color: const Color(0xFFB91C1C))),
+                        Text('Then follow a guide below',
+                            style: VnText.body(12, color: const Color(0xFF991B1B))),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
+    );
+  }
+}
+
+/// Deep red header: back + title, call card, protocol search and live location.
+class EmergencyHeader extends StatelessWidget {
+  final String emergencyNumber;
+  final TextEditingController searchController;
+  final ValueChanged<String> onSearchChanged;
+  final VoidCallback onClearSearch;
+  final VoidCallback onBack;
+  final String locationText;
+  final bool isLocating;
+  final VoidCallback onCopyLocation;
+
+  const EmergencyHeader({
+    super.key,
+    required this.emergencyNumber,
+    required this.searchController,
+    required this.onSearchChanged,
+    required this.onClearSearch,
+    required this.onBack,
+    required this.locationText,
+    required this.isLocating,
+    required this.onCopyLocation,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const onRed = Color(0xFFFECACA);
+    return Container(
+      color: const Color(0xFF7F1D1D),
+      padding: EdgeInsets.fromLTRB(20, MediaQuery.paddingOf(context).top + 16, 20, 22),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFDC2626).withValues(alpha: 0.15),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.warning_amber_rounded, size: 36, color: Color(0xFFDC2626)),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Text(
-            'Life-Threatening Emergency?',
-            textAlign: TextAlign.center,
-            style: context.textTheme.titleMedium?.copyWith(
-              color: context.colorScheme.onSurface,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.5,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.lg),
           SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () => LaunchHelpers.dialOrSnack(context, '911'),
-              icon: const Icon(Icons.phone_in_talk_rounded, color: Colors.white),
-              label: const Text('Call 911', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFDC2626),
-                foregroundColor: Colors.white,
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            height: 44,
+            child: Row(
+              children: [
+                VnIconButton(
+                  icon: Icons.chevron_left_rounded,
+                  tooltip: 'Back',
+                  iconSize: 26,
+                  background: const Color(0x1FFFFFFF),
+                  foreground: Colors.white,
+                  onPressed: onBack,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Semantics(
+                    header: true,
+                    child: Text('Emergency protocols', style: VnText.heading(20, color: Colors.white)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          EmergencyCallCard(emergencyNumber: emergencyNumber),
+          const SizedBox(height: 16),
+          Container(
+            height: 48,
+            padding: const EdgeInsets.only(left: 14, right: 2),
+            decoration: BoxDecoration(
+              color: const Color(0x1FFFFFFF),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.search_rounded, size: 20, color: onRed),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: TextField(
+                    controller: searchController,
+                    onChanged: onSearchChanged,
+                    cursorColor: Colors.white,
+                    style: VnText.body(15, color: Colors.white),
+                    decoration: InputDecoration(
+                      hintText: 'Search protocols',
+                      hintStyle: VnText.body(15, color: onRed),
+                      filled: false,
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      isDense: true,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                ),
+                ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: searchController,
+                  builder: (context, value, _) => value.text.isEmpty
+                      ? const SizedBox.shrink()
+                      : VnIconButton(
+                          icon: Icons.close_rounded,
+                          tooltip: 'Clear search',
+                          iconSize: 18,
+                          foreground: onRed,
+                          onPressed: onClearSearch,
+                        ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          Semantics(
+            button: true,
+            label: 'Your location: $locationText. Tap to copy for the dispatcher.',
+            excludeSemantics: true,
+            child: InkWell(
+              onTap: onCopyLocation,
+              borderRadius: BorderRadius.circular(10),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 44),
+                child: Row(
+                  children: [
+                    if (isLocating)
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: onRed),
+                      )
+                    else
+                      const Icon(Icons.my_location_rounded, size: 16, color: onRed),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        locationText,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: VnText.body(13, weight: FontWeight.w500, color: onRed),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text('Copy', style: VnText.body(13, weight: FontWeight.w700, color: Colors.white)),
+                  ],
+                ),
               ),
             ),
           ),
@@ -62,233 +198,83 @@ class EmergencyCallCard extends StatelessWidget {
   }
 }
 
-class LiveLocationCard extends StatefulWidget {
-  const LiveLocationCard({super.key});
-
-  @override
-  State<LiveLocationCard> createState() => _LiveLocationCardState();
-}
-
-class _LiveLocationCardState extends State<LiveLocationCard> {
-  Position? _currentPosition;
-  String? _currentAddress;
-  String _error = '';
-  StreamSubscription<Position>? _positionStreamSubscription;
-  bool _isLoading = true;
-  bool _isGeocoding = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _startLocationTracking();
-  }
-
-  Future<void> _getAddressFromCoordinates(double lat, double lon) async {
-    if (_isGeocoding) return;
-    _isGeocoding = true;
-    try {
-      final url = Uri.parse('https://nominatim.openstreetmap.org/reverse?lat=$lat&lon=$lon&format=json');
-      final response = await http.get(url, headers: {
-        'User-Agent': 'VitaNet/1.0',
-      });
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data != null && data['display_name'] != null) {
-          if (mounted) {
-            setState(() {
-              _currentAddress = data['display_name'];
-            });
-          }
-        } else {
-          if (mounted) {
-            setState(() {
-              _currentAddress = 'Address unavailable (using coordinates)';
-            });
-          }
-        }
-      } else {
-        if (mounted) {
-          setState(() {
-            _currentAddress = 'Address unavailable (using coordinates)';
-          });
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _currentAddress = 'Address unavailable (using coordinates)';
-        });
-      }
-    } finally {
-      _isGeocoding = false;
-    }
-  }
-
-  Future<void> _startLocationTracking() async {
-    try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        if (mounted) setState(() { _error = 'Location services are disabled.'; _isLoading = false; });
-        return;
-      }
-
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          if (mounted) setState(() { _error = 'Location permission denied.'; _isLoading = false; });
-          return;
-        }
-      }
-      
-      if (permission == LocationPermission.deniedForever) {
-        if (mounted) setState(() { _error = 'Location permissions permanently denied.'; _isLoading = false; });
-        return;
-      }
-
-      // Start listening to the live stream
-      final locationSettings = const LocationSettings(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 10,
-      );
-
-      _positionStreamSubscription = Geolocator.getPositionStream(locationSettings: locationSettings)
-          .listen((Position? position) async {
-        if (mounted && position != null) {
-          setState(() {
-            _currentPosition = position;
-            _isLoading = false;
-            _error = '';
-          });
-          
-          if (_currentAddress == null) {
-             _getAddressFromCoordinates(position.latitude, position.longitude);
-          }
-        }
-      }, onError: (e) {
-        if (mounted) setState(() { _error = 'Failed to get location.'; _isLoading = false; });
-      });
-
-    } catch (e) {
-      if (mounted) setState(() { _error = 'Failed to get location.'; _isLoading = false; });
-    }
-  }
-
-  @override
-  void dispose() {
-    _positionStreamSubscription?.cancel();
-    super.dispose();
-  }
+/// Full-width row for a life-threatening protocol.
+class CriticalProtocolTile extends StatelessWidget {
+  final FirstAidTip tip;
+  final VoidCallback onTap;
+  const CriticalProtocolTile({super.key, required this.tip, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
-        side: BorderSide(color: context.colorScheme.primary.withValues(alpha: 0.2)),
+    final p = VnPalette.of(context);
+    final sub = '${tip.cue ?? tip.summary} · ${tip.steps.length} steps';
+    return VnCard(
+      onTap: onTap,
+      radius: 18,
+      padding: const EdgeInsets.all(14),
+      semanticLabel: '${tip.title}. $sub',
+      child: Row(
+        children: [
+          VnIconTile(
+            icon: tip.icon,
+            bg: const Color(0xFFFEE2E2),
+            fg: const Color(0xFFB91C1C),
+            size: 46,
+            radius: 14,
+            iconSize: 22,
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(tip.title, style: VnText.body(15, weight: FontWeight.w700, color: p.ink)),
+                const SizedBox(height: 2),
+                Text(sub, maxLines: 2, overflow: TextOverflow.ellipsis, style: VnText.body(13, color: p.muted)),
+              ],
+            ),
+          ),
+          Icon(Icons.chevron_right_rounded, color: p.faint),
+        ],
       ),
-      elevation: 0,
-      color: context.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
+    );
+  }
+}
+
+/// Grid tile for an urgent-but-manageable guide.
+class MinorProtocolTile extends StatelessWidget {
+  final FirstAidTip tip;
+  final VoidCallback onTap;
+  const MinorProtocolTile({super.key, required this.tip, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = VnPalette.of(context);
+    final sub = tip.cue ?? tip.summary;
+    return VnCard(
+      onTap: onTap,
+      radius: 18,
+      padding: const EdgeInsets.all(14),
+      semanticLabel: '${tip.title}. $sub',
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 104),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: context.colorScheme.primary,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.my_location_rounded, color: Colors.white, size: 20),
-                ),
-                const SizedBox(width: AppSpacing.md),
-                Text(
-                  'Your Live Location',
-                  style: context.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: context.colorScheme.primary,
-                  ),
-                ),
-                const Spacer(),
-                if (_isLoading)
-                  SizedBox(
-                    width: 16, height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: context.colorScheme.primary),
-                  ),
-              ],
+            VnIconTile(
+              icon: tip.icon,
+              bg: const Color(0xFFFFEDD5),
+              fg: const Color(0xFFC2410C),
+              size: 40,
+              radius: 12,
             ),
-            const SizedBox(height: AppSpacing.md),
-            if (_error.isNotEmpty)
-              Text(_error, style: TextStyle(color: context.colorScheme.error))
-            else if (_currentPosition != null)
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: context.colorScheme.surface,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: context.colorScheme.primary.withValues(alpha: 0.1)),
-                  boxShadow: [
-                    if (!context.isDark)
-                      BoxShadow(
-                        color: context.colorScheme.primary.withValues(alpha: 0.05),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (_currentAddress != null) ...[
-                            Text(
-                              _currentAddress!,
-                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, height: 1.3),
-                            ),
-                            const SizedBox(height: 8),
-                          ],
-                          if (_currentAddress == null && !_isLoading) ...[
-                            Text(
-                              'Finding address...',
-                              style: TextStyle(color: context.colorScheme.primary, fontStyle: FontStyle.italic),
-                            ),
-                            const SizedBox(height: 8),
-                          ],
-                          Text(
-                            'Lat: ${_currentPosition!.latitude.toStringAsFixed(5)} • Lng: ${_currentPosition!.longitude.toStringAsFixed(5)}',
-                            style: context.textTheme.bodySmall?.copyWith(
-                              color: context.colorScheme.onSurfaceVariant,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    IconButton(
-                      onPressed: () {
-                        final textToCopy = _currentAddress != null 
-                          ? '$_currentAddress (Lat: ${_currentPosition!.latitude}, Lng: ${_currentPosition!.longitude})'
-                          : 'Lat: ${_currentPosition!.latitude}, Lng: ${_currentPosition!.longitude}';
-                        Clipboard.setData(ClipboardData(text: textToCopy));
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Location copied to clipboard')),
-                        );
-                      },
-                      style: IconButton.styleFrom(
-                        backgroundColor: context.colorScheme.primaryContainer,
-                      ),
-                      icon: Icon(Icons.copy_rounded, color: context.colorScheme.primary, size: 20),
-                      tooltip: 'Copy location',
-                    ),
-                  ],
-                ),
-              ),
+            const SizedBox(height: 10),
+            Text(tip.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: VnText.body(14, weight: FontWeight.w700, color: p.ink)),
+            const SizedBox(height: 4),
+            Text(sub, maxLines: 2, overflow: TextOverflow.ellipsis, style: VnText.body(12, color: p.muted)),
           ],
         ),
       ),

@@ -1,427 +1,291 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:vitanet/core/constants/app_spacing.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:vitanet/core/extensions/context_ext.dart';
-import 'package:vitanet/shared/widgets/premium_background.dart';
+import 'package:vitanet/shared/widgets/vn_kit.dart';
 
-class NotificationsScreen extends StatefulWidget {
+/// Whether there are unread notifications (drives the home bell badge).
+final notificationsUnreadProvider = StateProvider<bool>((ref) => true);
+
+enum _NotifKind { health, care, other }
+
+class _Notif {
+  final String title;
+  final String time;
+  final String body;
+  final IconData icon;
+  final Color bg;
+  final Color fg;
+  final _NotifKind kind;
+  final bool unread;
+  final String? action;
+  final void Function(BuildContext context)? onAction;
+
+  const _Notif({
+    required this.title,
+    required this.time,
+    required this.body,
+    required this.icon,
+    required this.bg,
+    required this.fg,
+    required this.kind,
+    this.unread = false,
+    this.action,
+    this.onAction,
+  });
+}
+
+class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
 
   @override
-  State<NotificationsScreen> createState() => _NotificationsScreenState();
+  ConsumerState<NotificationsScreen> createState() => _NotificationsScreenState();
 }
 
-class _NotificationsScreenState extends State<NotificationsScreen> {
-  int _selectedTabIndex = 0;
+class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
+  int _tab = 0;
 
-  final List<Map<String, dynamic>> _allNotifications = [
-    {
-      'id': '1',
-      'title': 'High Heart Rate Detected',
-      'description': 'Your resting heart rate was above 100 bpm for 10 minutes.',
-      'time': '2m ago',
-      'isRead': false,
-      'type': 'alert',
-      'icon': Icons.favorite_rounded,
-      'color': const Color(0xFFEF4444), // Red
-    },
-    {
-      'id': '2',
-      'title': 'Device Connected',
-      'description': 'Withings Blood Pressure Monitor was successfully connected.',
-      'time': '1h ago',
-      'isRead': false,
-      'type': 'system',
-      'icon': Icons.bluetooth_connected_rounded,
-      'color': const Color(0xFF3B82F6), // Blue
-    },
-    {
-      'id': '3',
-      'title': 'Medication Reminder',
-      'description': 'Time to take Lisinopril (10mg).',
-      'time': '3h ago',
-      'isRead': true,
-      'type': 'reminder',
-      'icon': Icons.medication_rounded,
-      'color': const Color(0xFF10B981), // Green
-    },
-    {
-      'id': '4',
-      'title': 'Weekly Health Report',
-      'description': 'Your health insights for this week are ready.',
-      'time': 'Yesterday',
-      'isRead': true,
-      'type': 'insight',
-      'icon': Icons.insights_rounded,
-      'color': const Color(0xFF8B5CF6), // Purple
-    },
-    {
-      'id': '5',
-      'title': 'Care Circle Update',
-      'description': 'Dr. Sarah has reviewed your latest ECG results.',
-      'time': '2 days ago',
-      'isRead': true,
-      'type': 'care',
-      'icon': Icons.person_rounded,
-      'color': const Color(0xFFF59E0B), // Orange
-    },
+  static final List<_Notif> _today = [
+    _Notif(
+      title: 'Heart rate spike',
+      time: '9:42',
+      body:
+          'Resting heart rate hit 118 bpm for 6 minutes while you were inactive. Log what you were doing?',
+      icon: Icons.monitor_heart_outlined,
+      bg: const Color(0xFFFFE4E6),
+      fg: const Color(0xFFBE123C),
+      kind: _NotifKind.health,
+      unread: true,
+      action: 'Log activity',
+      onAction: (c) => c.push('/health-trends/heart_rate'),
+    ),
+    _Notif(
+      title: 'Medication reminder',
+      time: '9:00',
+      body: 'Your preventer inhaler is due. Take it now to stay on your plan.',
+      icon: Icons.medication_outlined,
+      bg: const Color(0xFFEDE9FE),
+      fg: const Color(0xFF6D28D9),
+      kind: _NotifKind.health,
+      unread: true,
+      action: 'Log dose',
+      onAction: (c) => c.showSnack('Dose logged for today'),
+    ),
+    _Notif(
+      title: 'Care circle updated',
+      time: '8:15',
+      body:
+          'Your contacts will be alerted with your location if a check comes back urgent.',
+      icon: Icons.group_outlined,
+      bg: const Color(0xFFDBEAFE),
+      fg: const Color(0xFF1D4ED8),
+      kind: _NotifKind.care,
+      unread: true,
+    ),
+    _Notif(
+      title: 'Blood oxygen summary',
+      time: '7:02',
+      body: 'Overnight SpO2 stayed between 96% and 99%. No dips detected.',
+      icon: Icons.water_drop_outlined,
+      bg: const Color(0xFFE0E7FF),
+      fg: const Color(0xFF4338CA),
+      kind: _NotifKind.health,
+      action: 'View trend',
+      onAction: (c) => c.push('/health-trends/blood_oxygen'),
+    ),
   ];
 
-  void _markAllAsRead() {
-    setState(() {
-      for (var notification in _allNotifications) {
-        notification['isRead'] = true;
-      }
-    });
-  }
+  static const List<_Notif> _earlier = [
+    _Notif(
+      title: 'Activity goal met',
+      time: 'Tue',
+      body: 'Third day in a row above your step goal.',
+      icon: Icons.check_rounded,
+      bg: Color(0xFFD1FAE5),
+      fg: Color(0xFF047857),
+      kind: _NotifKind.health,
+    ),
+    _Notif(
+      title: 'Check result saved',
+      time: 'Mon',
+      body: 'Sore throat and mild fever. Advised: see a pharmacist.',
+      icon: Icons.description_outlined,
+      bg: Color(0xFFFEF3C7),
+      fg: Color(0xFFB45309),
+      kind: _NotifKind.other,
+    ),
+    _Notif(
+      title: 'New video in First Aid',
+      time: 'Sun',
+      body: 'Choking in infants: back blows and chest thrusts, 4 min.',
+      icon: Icons.play_arrow_outlined,
+      bg: Color(0xFFFFEDD5),
+      fg: Color(0xFFC2410C),
+      kind: _NotifKind.other,
+    ),
+  ];
+
+  bool _matches(_Notif n) => switch (_tab) {
+        1 => n.kind == _NotifKind.health,
+        2 => n.kind == _NotifKind.care,
+        _ => true,
+      };
 
   @override
   Widget build(BuildContext context) {
-    final isDark = context.isDark;
-    
-    final displayedNotifications = _selectedTabIndex == 0 
-        ? _allNotifications 
-        : _allNotifications.where((n) => !(n['isRead'] as bool)).toList();
+    final p = VnPalette.of(context);
+    final unread = ref.watch(notificationsUnreadProvider);
+    final today = _today.where(_matches).toList();
+    final earlier = _earlier.where(_matches).toList();
 
     return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: PremiumBackground(
-        child: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              if (constraints.maxWidth < 800) {
-                return _buildListContent(isDark, displayedNotifications, false);
-              } else {
-                return Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 800),
-                    child: _buildListContent(isDark, displayedNotifications, true),
-                  ),
-                );
-              }
-            },
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildListContent(bool isDark, List<Map<String, dynamic>> displayedNotifications, bool isDesktop) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Custom App Bar
-        Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: isDesktop ? 0 : AppSpacing.sm, 
-            vertical: isDesktop ? AppSpacing.xl : AppSpacing.md,
-          ),
-          child: Row(
-            children: [
-              IconButton(
-                icon: Icon(Icons.arrow_back_rounded, color: isDark ? Colors.white : Colors.black87),
-                onPressed: () => Navigator.pop(context),
-              ),
-              Expanded(
-                child: Text(
-                  'Notifications',
-                  style: TextStyle(
-                    fontSize: isDesktop ? 28 : 22,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : Colors.black87,
-                  ),
-                ),
-              ),
-              TextButton(
-                onPressed: _markAllAsRead,
-                style: TextButton.styleFrom(
-                  foregroundColor: const Color(0xFF6366F1),
-                ),
-                child: const Text('Mark all read', style: TextStyle(fontWeight: FontWeight.w600)),
-              ),
-            ],
-          ),
-        ),
-        
-        // Tabs
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: isDesktop ? 0 : AppSpacing.xl),
-          child: Container(
-            height: 40,
-            decoration: BoxDecoration(
-              color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
+      backgroundColor: p.page,
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 720),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
               children: [
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () => setState(() => _selectedTabIndex = 0),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: _selectedTabIndex == 0 
-                            ? (isDark ? Colors.white24 : Colors.white)
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: _selectedTabIndex == 0 && !isDark
-                            ? [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, 2))]
-                            : [],
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        'All',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: _selectedTabIndex == 0 
-                              ? (isDark ? Colors.white : Colors.black87)
-                              : (isDark ? Colors.white54 : Colors.black54),
+                VnTopBar(
+                  title: 'Notifications',
+                  actions: [
+                    Semantics(
+                      button: true,
+                      child: Material(
+                        color: p.brandWash,
+                        borderRadius: BorderRadius.circular(12),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: unread
+                              ? () => ref.read(notificationsUnreadProvider.notifier).state = false
+                              : null,
+                          child: Container(
+                            height: 44,
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            alignment: Alignment.center,
+                            child: Text('Mark all read',
+                                style: VnText.body(13,
+                                    weight: FontWeight.w700,
+                                    color: unread ? p.brand : p.faint)),
+                          ),
                         ),
                       ),
                     ),
-                  ),
+                  ],
                 ),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () => setState(() => _selectedTabIndex = 1),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: _selectedTabIndex == 1 
-                            ? (isDark ? Colors.white24 : Colors.white)
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: _selectedTabIndex == 1 && !isDark
-                            ? [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, 2))]
-                            : [],
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        'Unread',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: _selectedTabIndex == 1 
-                              ? (isDark ? Colors.white : Colors.black87)
-                              : (isDark ? Colors.white54 : Colors.black54),
-                        ),
-                      ),
+                const SizedBox(height: 18),
+                VnSegmented(
+                  options: const ['All', 'Health alerts', 'Care circle'],
+                  index: _tab,
+                  onChanged: (i) => setState(() => _tab = i),
+                ),
+                if (today.isNotEmpty) ...[
+                  const SizedBox(height: 18),
+                  const VnSectionLabel('Today', padding: EdgeInsets.zero),
+                  const SizedBox(height: 18),
+                  for (final n in today) ...[
+                    _NotificationTile(n: n, unread: n.unread && unread),
+                    const SizedBox(height: 10),
+                  ],
+                ],
+                if (earlier.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  const VnSectionLabel('Earlier this week', padding: EdgeInsets.zero),
+                  const SizedBox(height: 18),
+                  for (final n in earlier) ...[
+                    _NotificationTile(n: n, unread: false),
+                    const SizedBox(height: 10),
+                  ],
+                ],
+                if (today.isEmpty && earlier.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 48),
+                    child: Column(
+                      children: [
+                        Icon(Icons.notifications_off_outlined, size: 40, color: p.faint),
+                        const SizedBox(height: 12),
+                        Text('Nothing here yet',
+                            style: VnText.heading(16, weight: FontWeight.w700, color: p.ink)),
+                        const SizedBox(height: 4),
+                        Text('Updates from your care circle will appear here.',
+                            textAlign: TextAlign.center,
+                            style: VnText.body(13, color: p.muted)),
+                      ],
                     ),
                   ),
-                ),
               ],
             ),
           ),
         ),
-        
-        const SizedBox(height: AppSpacing.lg),
-        
-        // Notifications List
-        Expanded(
-          child: displayedNotifications.isEmpty
-              ? _buildEmptyState(isDark)
-              : ListView.separated(
-                  padding: EdgeInsets.fromLTRB(
-                    isDesktop ? 0 : AppSpacing.xl, 
-                    isDesktop ? AppSpacing.lg : 0, 
-                    isDesktop ? 0 : AppSpacing.xl, 
-                    AppSpacing.xxl,
-                  ),
-                  itemCount: displayedNotifications.length,
-                  separatorBuilder: (context, index) => const SizedBox(height: AppSpacing.md),
-                  itemBuilder: (context, index) {
-                    final item = displayedNotifications[index];
-                    return _NotificationTile(
-                      item: item,
-                      isDark: isDark,
-                      onTap: () {
-                        setState(() {
-                          item['isRead'] = true;
-                        });
-                      },
-                    );
-                  },
-                ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildEmptyState(bool isDark) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.notifications_off_rounded,
-            size: 64,
-            color: isDark ? Colors.white24 : Colors.black12,
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          Text(
-            'You\'re all caught up!',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: isDark ? Colors.white70 : Colors.black54,
-            ),
-          ),
-        ],
       ),
     );
   }
 }
 
 class _NotificationTile extends StatelessWidget {
-  final Map<String, dynamic> item;
-  final bool isDark;
-  final VoidCallback onTap;
-
-  const _NotificationTile({
-    required this.item,
-    required this.isDark,
-    required this.onTap,
-  });
+  final _Notif n;
+  final bool unread;
+  const _NotificationTile({required this.n, required this.unread});
 
   @override
   Widget build(BuildContext context) {
-    final bool isRead = item['isRead'];
-    final Color iconColor = item['color'];
-    final IconData icon = item['icon'];
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          boxShadow: [
-            if (!isDark && !isRead)
-              BoxShadow(
-                color: iconColor.withValues(alpha: 0.1),
-                blurRadius: 16,
-                offset: const Offset(0, 8),
-              ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-            child: Container(
-              decoration: BoxDecoration(
-                color: isDark 
-                    ? (isRead ? Colors.white.withValues(alpha: 0.02) : Colors.white.withValues(alpha: 0.05))
-                    : (isRead ? Colors.white.withValues(alpha: 0.6) : Colors.white.withValues(alpha: 0.9)),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: isDark 
-                      ? (isRead ? Colors.white.withValues(alpha: 0.03) : Colors.white.withValues(alpha: 0.1))
-                      : Colors.white,
-                  width: 1.5,
-                ),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch, // to make accent bar fill height
-                children: [
-                  // Glowing Left Accent Bar for unread items
-                  if (!isRead)
-                    Container(
-                      width: 4,
-                      decoration: BoxDecoration(
-                        color: iconColor,
-                        boxShadow: [
-                          BoxShadow(
-                            color: iconColor.withValues(alpha: 0.5),
-                            blurRadius: 8,
-                            offset: const Offset(2, 0),
-                          ),
-                        ],
-                      ),
+    final p = VnPalette.of(context);
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: unread ? p.brandWash : p.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: unread ? p.brandBorder : p.line),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          VnIconTile(icon: n.icon, bg: n.bg, fg: n.fg, size: 42, radius: 14),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(n.title,
+                          style: VnText.body(14, weight: FontWeight.w700, color: p.ink)),
                     ),
-                  
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Icon
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: iconColor.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(icon, color: iconColor, size: 24),
-                          ),
-                          const SizedBox(width: 16),
-                          
-                          // Content
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        item['title'],
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w800,
-                                          letterSpacing: -0.3,
-                                          color: isDark 
-                                              ? (isRead ? Colors.white70 : Colors.white) 
-                                              : (isRead ? Colors.black54 : Colors.black87),
-                                        ),
-                                      ),
-                                    ),
-                                    if (!isRead)
-                                      Container(
-                                        width: 8,
-                                        height: 8,
-                                        margin: const EdgeInsets.only(left: 8),
-                                        decoration: BoxDecoration(
-                                          color: iconColor,
-                                          shape: BoxShape.circle,
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: iconColor.withValues(alpha: 0.5),
-                                              blurRadius: 4,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  item['description'],
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    height: 1.4,
-                                    letterSpacing: -0.1,
-                                    color: isDark ? Colors.white70 : Colors.black87.withValues(alpha: 0.7),
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                                Text(
-                                  item['time'],
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: isDark ? Colors.white38 : Colors.black38,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
+                    const SizedBox(width: 8),
+                    Text(n.time, style: VnText.body(12, color: p.muted)),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(n.body, style: VnText.body(13, color: p.inkSoft, height: 1.45)),
+                if (n.action != null)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: VnLink(
+                      label: n.action!,
+                      fontSize: 13,
+                      weight: FontWeight.w700,
+                      onTap: () => n.onAction?.call(context),
                     ),
                   ),
-                ],
-              ),
+              ],
             ),
           ),
-        ),
+          if (unread)
+            Padding(
+              padding: const EdgeInsets.only(left: 8, top: 6),
+              child: Semantics(
+                label: 'Unread',
+                child: Container(
+                  width: 9,
+                  height: 9,
+                  decoration: BoxDecoration(color: p.brand, shape: BoxShape.circle),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

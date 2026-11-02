@@ -3,11 +3,11 @@ import uuid
 import enum
 from datetime import datetime
 from sqlalchemy import Column, String, Float, DateTime, ForeignKey, Enum as SqlEnum
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Uuid as UUID
 from app.database.base import Base
 
     # app/models/vitals.py — add this to the same file
-from sqlalchemy import ARRAY
+from sqlalchemy import JSON
 
 
 
@@ -35,4 +35,4 @@ class UserVitalSettings(Base):
     __tablename__ = "user_vital_settings"
 
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), primary_key=True)
-    enabled_vitals = Column(ARRAY(String), nullable=False, default=list)
+    enabled_vitals = Column(JSON, nullable=False, default=list)

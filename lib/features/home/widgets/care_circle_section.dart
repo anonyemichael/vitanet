@@ -1,265 +1,120 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'package:vitanet/core/constants/app_spacing.dart';
-import 'package:vitanet/core/extensions/context_ext.dart';
 import 'package:vitanet/data/providers/providers.dart';
 import 'package:vitanet/features/home/screens/add_contact_screen.dart';
-import 'package:vitanet/features/home/widgets/ai_health_alerts_section.dart';
+import 'package:vitanet/shared/widgets/vn_kit.dart';
 
-class CareCircleSection extends ConsumerStatefulWidget {
-  const CareCircleSection({super.key});
+/// Avatar colours cycled across care circle members.
+const careCircleAvatarColors = <(Color, Color)>[
+  (Color(0xFFEDE9FE), Color(0xFF5B21B6)),
+  (Color(0xFFFCE7F3), Color(0xFF9D174D)),
+  (Color(0xFFDBEAFE), Color(0xFF1E40AF)),
+  (Color(0xFFD1FAE5), Color(0xFF065F46)),
+  (Color(0xFFFEF3C7), Color(0xFF92400E)),
+];
 
-  @override
-  ConsumerState<CareCircleSection> createState() => _CareCircleSectionState();
-}
+class CareCircleSection extends ConsumerWidget {
+  final EdgeInsetsGeometry? padding;
+  const CareCircleSection({super.key, this.padding});
 
-class _CareCircleSectionState extends ConsumerState<CareCircleSection> {
-  Future<void> _launchUrl(String url) async {
-    final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-    }
-  }
-
-  void _navigateToAddContact() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const AddContactScreen(),
-      ),
+  void _openAddContact(BuildContext context) {
+    Navigator.of(context, rootNavigator: true).push(
+      MaterialPageRoute(builder: (context) => const AddContactScreen()),
     );
   }
 
+  String _names(List<String> names) {
+    if (names.isEmpty) return '';
+    if (names.length == 1) return names.first;
+    if (names.length == 2) return '${names[0]} and ${names[1]}';
+    if (names.length == 3) return '${names[0]}, ${names[1]} and ${names[2]}';
+    return '${names[0]}, ${names[1]} and ${names.length - 2} more';
+  }
+
   @override
-  Widget build(BuildContext context) {
-    final profile = ref.watch(userProfileProvider);
-    final contacts = profile?.emergencyContacts ?? [];
-    
+  Widget build(BuildContext context, WidgetRef ref) {
+    final p = VnPalette.of(context);
+    final contacts = ref.watch(userProfileProvider)?.emergencyContacts ?? const [];
+    final firstNames = contacts.map((c) => c.name.trim().split(RegExp(r'\s+')).first).toList();
+    final shown = contacts.take(3).toList();
+
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+        VnSectionHeader(
+          title: 'Care circle',
+          action: 'Manage',
+          onAction: () => _openAddContact(context),
+        ),
+        const SizedBox(height: 12),
+        VnCard(
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Care Circle',
-                style: TextStyle(
-                  color: context.isDark ? Colors.white : Colors.black87,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              TextButton(
-                onPressed: () {},
-                style: TextButton.styleFrom(
-                  foregroundColor: const Color(0xFF6366F1),
-                  padding: EdgeInsets.zero,
-                  minimumSize: const Size(0, 0),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: const Text(
-                  'Manage',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        
-        SizedBox(
-          height: 90,
-          child: ListView(
-            physics: const BouncingScrollPhysics(),
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
-            children: [
-              if (contacts.isEmpty) ...[
-                PulsatingAvatar(
-                  name: 'Dr. Sarah',
-                  icon: Icons.local_hospital_rounded,
-                  color: const Color(0xFF6366F1),
-                  isOnline: true,
-                  onTap: () => _launchUrl('tel:1234567890'),
-                ),
-                const SizedBox(width: AppSpacing.lg),
-                PulsatingAvatar(
-                  name: 'Mary S.',
-                  icon: Icons.person_rounded,
-                  color: const Color(0xFF10B981),
-                  isOnline: true,
-                  onTap: () => _launchUrl('tel:0987654321'),
-                ),
-              ] else ...[
-                for (var contact in contacts) ...[
-                  PulsatingAvatar(
-                    name: contact.name.split(' ').first,
-                    icon: Icons.person_rounded,
-                    color: const Color(0xFF10B981),
-                    isOnline: true, // Mock online status
-                    onTap: () {
-                      if (contact.phone.isNotEmpty) {
-                        _launchUrl('tel:${contact.phone}');
-                      }
-                    },
-                  ),
-                  const SizedBox(width: AppSpacing.lg),
-                ],
-              ],
-              PulsatingAvatar(
-                name: 'Add Member',
-                icon: Icons.add_rounded,
-                color: Colors.grey,
-                isOnline: false,
-                isDashed: true,
-                onTap: _navigateToAddContact,
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: AppSpacing.md),
-      ],
-    );
-  }
-}
-
-class PulsatingAvatar extends StatefulWidget {
-  final String name;
-  final IconData icon;
-  final Color color;
-  final bool isOnline;
-  final bool isDashed;
-  final VoidCallback? onTap;
-
-  const PulsatingAvatar({
-    super.key,
-    required this.name,
-    required this.icon,
-    required this.color,
-    this.isOnline = false,
-    this.isDashed = false,
-    this.onTap,
-  });
-
-  @override
-  State<PulsatingAvatar> createState() => _PulsatingAvatarState();
-}
-
-class _PulsatingAvatarState extends State<PulsatingAvatar> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _pulseAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    );
-
-    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.2).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
-
-    if (widget.isOnline) {
-      _controller.repeat(reverse: true);
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = context.isDark;
-    
-    return RepaintBoundary(
-      child: GestureDetector(
-      onTap: widget.onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Stack(
-          alignment: Alignment.center,
-          children: [
-            if (widget.isOnline)
-              AnimatedBuilder(
-                animation: _pulseAnimation,
-                builder: (context, child) {
-                  return Transform.scale(
-                    scale: _pulseAnimation.value,
-                    child: Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: widget.color.withValues(alpha: 1.0 - (_pulseAnimation.value - 1.0) * 5),
-                          width: 2,
+              if (shown.isEmpty)
+                VnIconTile(
+                  icon: Icons.group_add_outlined,
+                  bg: const Color(0xFFDBEAFE),
+                  fg: const Color(0xFF1E40AF),
+                  size: 44,
+                  radius: 22,
+                )
+              else
+                SizedBox(
+                  width: 44.0 + (shown.length - 1) * 32,
+                  height: 44,
+                  child: Stack(
+                    children: [
+                      for (var i = 0; i < shown.length; i++)
+                        Positioned(
+                          left: i * 32.0,
+                          child: VnAvatar(
+                            name: shown[i].name,
+                            size: 44,
+                            fontSize: 14,
+                            bg: careCircleAvatarColors[i % careCircleAvatarColors.length].$1,
+                            fg: careCircleAvatarColors[i % careCircleAvatarColors.length].$2,
+                            borderWidth: 3,
+                            borderColor: p.surface,
+                          ),
                         ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: widget.isDashed 
-                    ? Colors.transparent 
-                    : (isDark ? Colors.white.withValues(alpha: 0.1) : widget.color.withValues(alpha: 0.1)),
-                border: widget.isDashed
-                    ? Border.all(color: isDark ? Colors.white24 : Colors.black26, width: 2)
-                    : null,
-              ),
-              child: Icon(
-                widget.icon,
-                color: widget.isDashed 
-                    ? (isDark ? Colors.white54 : Colors.black54)
-                    : widget.color,
-                size: 28,
-              ),
-            ),
-            if (widget.isOnline)
-              Positioned(
-                bottom: 2,
-                right: 2,
-                child: Container(
-                  width: 14,
-                  height: 14,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF10B981), // Online green
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: isDark ? const Color(0xFF0F172A) : Colors.white,
-                      width: 2,
-                    ),
+                    ],
                   ),
                 ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      contacts.isEmpty
+                          ? 'No one is notified yet'
+                          : '${contacts.length} ${contacts.length == 1 ? "person" : "people"} notified on urgent results',
+                      style: VnText.body(14, weight: FontWeight.w700, color: p.ink),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      contacts.isEmpty
+                          ? 'Add family or caregivers to alert if a check is urgent'
+                          : _names(firstNames),
+                      style: VnText.body(13, color: p.muted),
+                    ),
+                  ],
+                ),
               ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Text(
-          widget.name,
-          style: TextStyle(
-            color: isDark ? Colors.white70 : Colors.black87,
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
+              const SizedBox(width: 8),
+              VnIconButton(
+                icon: Icons.add_rounded,
+                tooltip: 'Add contact',
+                size: 44,
+                radius: 12,
+                background: p.brand,
+                foreground: p.onBrand,
+                onPressed: () => _openAddContact(context),
+              ),
+            ],
           ),
         ),
       ],
-    ),
-    ),
-  );
-}
+    );
+  }
 }

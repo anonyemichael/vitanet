@@ -1,8 +1,10 @@
+// ignore_for_file: avoid_print
 import 'dart:io';
 import 'dart:convert';
 
 void main() async {
-  final file = File(r'C:\Users\atubt\.gemini\antigravity-ide\brain\a5e64f32-b784-43b5-986d-04c80d6723ff\.system_generated\logs\transcript.jsonl');
+  final file = File(r'transcript.jsonl');
+  if (!file.existsSync()) return;
   final lines = await file.readAsLines();
   for (final line in lines) {
     try {
@@ -11,9 +13,11 @@ void main() async {
       if (step >= 2390 && step <= 2395 && data['source'] == 'MODEL') {
         var msg = data['content'] as String?;
         if (msg != null) {
-          print('Step ${step}:\n${msg}\n-------------------');
+          print('Step $step:\n$msg\n-------------------');
         }
       }
-    } catch (e) {}
+    } catch (_) {
+      // Ignore malformed JSON lines
+    }
   }
 }

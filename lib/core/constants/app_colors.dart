@@ -19,6 +19,12 @@ class AppColors {
   static const Color onSurfaceVariantLight = Color(0xFF64748B);
   static const Color onPrimaryLight = Color(0xFFFFFFFF);
 
+  // ── Navigation & Modern Brand Tokens ──
+  static const Color navActiveLight = Color(0xFF0D9488); // Medical Teal
+  static const Color navActiveDark = Color(0xFF2DD4BF); // Mint Teal
+  static const Color navInactiveLight = Color(0xFF64748B); // Slate Gray 500
+  static const Color navInactiveDark = Color(0xFF94A3B8); // Slate Gray 400
+
   // ── Dark Mode ──
   static const Color primaryDark = Color(0xFF22D3EE); // Cyan 400
   static const Color primaryContainerDark = Color(0xFF164E63); // Cyan 900
@@ -66,6 +72,26 @@ class AppColors {
   static const Color lightShadow05 = Color(0x0D000000);       // black 5%
   static const Color lightShadow08 = Color(0x14000000);       // black 8%
   static const Color lightBorder = Color(0x0D000000);          // black 5%
+
+  // ── Redesign tokens (VitaNet App Redesign canvas) ──
+  static const Color brand = Color(0xFF0F766E); // Buttons, links, active states (AA on white)
+  static const Color brandDark = Color(0xFF115E59);
+  static const Color brandTint = Color(0xFFCCFBF1); // Active nav pill, selected chips
+  static const Color brandWash = Color(0xFFF0FDFA);
+  static const Color mint = Color(0xFF2DD4BF); // Accents on dark backgrounds
+  static const Color mintLight = Color(0xFF5EEAD4);
+  static const Color splashBg = Color(0xFF040A10);
+  static const Color staffNavy = Color(0xFF0B1220); // Hospital portal headers & primary buttons
+  static const Color staffBg = Color(0xFFF1F5F9); // Hospital portal page background
+  static const Color ink = Color(0xFF0F172A);
+  static const Color inkMuted = Color(0xFF64748B);
+  static const Color inkSoft = Color(0xFF475569);
+  static const Color line = Color(0xFFE2E9EE);
+  static const Color pageBg = Color(0xFFF8FAFC);
+  static const Color danger = Color(0xFFB91C1C); // Emergency buttons
+  static const Color dangerTint = Color(0xFFFEE2E2);
+  static const Color ai = Color(0xFF6D28D9); // AI accents
+  static const Color aiTint = Color(0xFFF5F3FF);
 
   // Primary with alpha (for selected states)
   static const Color primaryLight12 = Color(0x1F06B6D4);      // primary 12%

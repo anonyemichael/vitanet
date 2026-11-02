@@ -13,6 +13,7 @@ from app.schemas.care_circle_activity import CareCircleActivityOut
 from app.database.connection import get_db
 from app.models.care_circle import CareCircleStatus
 from app.schemas.care_circle import CareCircleOut, CareCircleUpdate
+from app.schemas.user import CareCircleMemberInput
 from app.services import care_circle_service
 
 from app.models.care_circle_activity import ActivityType
@@ -20,6 +21,19 @@ from app.services import care_circle_activity_service
 
 
 router = APIRouter(prefix="/care-circles", tags=["care-circles"])
+
+DEMO_USER_ID = UUID("00000000-0000-0000-0000-000000000001")
+
+
+def _resolve_user_id(db: Session, identifier: str) -> UUID:
+    try:
+        return UUID(identifier)
+    except ValueError:
+        from app.services import user_service
+        user = user_service.get_user_by_firebase_uid(db, identifier)
+        if user:
+            return user.id
+        return DEMO_USER_ID
 
 
 def render_response_page(success: bool, title: str, message: str) -> str:
@@ -95,8 +109,33 @@ def render_response_page(success: bool, title: str, message: str) -> str:
 
 
 @router.get("/user/{user_id}", response_model=list[CareCircleOut])
-def list_care_circle_for_user(user_id: UUID, db: Session = Depends(get_db)):
-    return care_circle_service.get_care_circle_for_user(db, user_id)
+def list_care_circle_for_user(user_id: str, db: Session = Depends(get_db)):
+    uid = _resolve_user_id(db, user_id)
+    return care_circle_service.get_care_circle_for_user(db, uid)
+
+
+
+@router.post("/user/{user_id}", response_model=CareCircleOut, status_code=status.HTTP_201_CREATED)
+def add_care_circle_member(user_id: str, payload: CareCircleMemberInput, db: Session = Depends(get_db)):
+    uid = _resolve_user_id(db, user_id)
+    member = care_circle_service.create_care_circle_member(db, uid, payload)
+    db.commit()
+    db.refresh(member)
+    if member.contact_email:
+        try:
+            from app.services.verify_care_email import send_care_circle_invite
+            from app.services import user_service
+            user = user_service.get_user_by_id(db, uid)
+            user_name = user.full_name if user else "A VitaNet User"
+            send_care_circle_invite(
+                to_email=member.contact_email,
+                requester_name=user_name,
+                invite_token=member.invite_token,
+            )
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+    return member
 
 
 @router.get("/respond")

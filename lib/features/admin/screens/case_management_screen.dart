@@ -1,331 +1,320 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
-import 'package:vitanet/core/constants/app_colors.dart';
-import 'package:vitanet/core/constants/app_spacing.dart';
-import 'package:vitanet/core/extensions/context_ext.dart';
-import 'package:vitanet/data/models/triage_result.dart';
+import 'package:vitanet/features/admin/widgets/patient_sheets.dart';
+import 'package:vitanet/features/admin/widgets/staff_demo_data.dart';
+import 'package:vitanet/features/admin/widgets/staff_ui.dart';
 
-final adminCasesProvider = Provider<List<Map<String, dynamic>>>((ref) {
-  return [
-    {
-      'id': 'case-1',
-      'timestamp': DateTime.now()
-          .subtract(const Duration(minutes: 10))
-          .toIso8601String(),
-      'primarySymptom': 'Severe Chest Pain',
-      'level': 'emergency',
-      'status': 'pending',
-    },
-    {
-      'id': 'case-2',
-      'timestamp': DateTime.now()
-          .subtract(const Duration(hours: 2))
-          .toIso8601String(),
-      'primarySymptom': 'Persistent Cough',
-      'level': 'pharmacist',
-      'status': 'reviewed',
-    },
-    {
-      'id': 'case-3',
-      'timestamp': DateTime.now()
-          .subtract(const Duration(days: 1))
-          .toIso8601String(),
-      'primarySymptom': 'Mild Headache',
-      'level': 'selfCare',
-      'status': 'pending',
-    },
+export 'package:vitanet/features/admin/models/case_model.dart';
+import 'package:vitanet/features/admin/models/case_model.dart';
+import 'package:vitanet/features/admin/services/hospital_api_service.dart';
+
+final adminCasesProvider = Provider<List<StaffCase>>((ref) {
+  return const [
+    StaffCase(id: 'C-2041', nameAge: 'Yaw Boateng, 62 M', complaint: 'Chest pain', level: CaseLevel.urgent, time: '31 min', where: 'Resus bay 2', initials: 'KM', assignee: 'Dr. Mensah', status: CaseStatus.waiting, recordId: 'P-10241'),
+    StaffCase(id: 'C-2043', nameAge: 'Amara Okafor, 35 F', complaint: 'Fever, neck stiffness', level: CaseLevel.urgent, time: 'ETA 9 min', where: 'Arriving', initials: '—', assignee: 'Unassigned', status: CaseStatus.waiting, recordId: 'P-10243'),
+    StaffCase(id: 'C-2044', nameAge: 'Efua Asante, 28 F', complaint: 'Abdominal pain, pregnant', level: CaseLevel.doctor, time: 'ETA 22 min', where: 'Arriving', initials: 'AA', assignee: 'Dr. Addo', status: CaseStatus.waiting, recordId: 'P-10244'),
+    StaffCase(id: 'C-2038', nameAge: 'Kofi Owusu, 9 M', complaint: 'Forearm injury', level: CaseLevel.doctor, time: '48 min', where: 'Minors 4', initials: 'EB', assignee: 'Nurse Badu', status: CaseStatus.waiting, recordId: 'P-10238'),
+    StaffCase(id: 'C-2035', nameAge: 'Abena Darko, 71 F', complaint: 'Dizziness, fall', level: CaseLevel.routine, time: '1 h 12 m', where: 'Waiting area', initials: 'EB', assignee: 'Nurse Badu', status: CaseStatus.waiting, recordId: 'P-10235'),
+    StaffCase(id: 'C-2029', nameAge: 'Ama Kuffour, 54 F', complaint: 'Pneumonia, low SpO2', level: CaseLevel.urgent, time: '2 h 32 m', where: 'Emergency · Bed 7', initials: 'KM', assignee: 'Dr. Mensah', status: CaseStatus.treatment, recordId: 'P-10233'),
+    StaffCase(id: 'C-2017', nameAge: 'Kwesi Nyarko, 47 M', complaint: 'Cellulitis, left leg', level: CaseLevel.doctor, time: '1 d 4 h', where: 'Ward B · Bed 3', initials: 'AA', assignee: 'Dr. Addo', status: CaseStatus.treatment, recordId: 'P-10198'),
+    StaffCase(id: 'C-2009', nameAge: 'Nana Agyei, 58 M', complaint: 'High blood glucose', level: CaseLevel.routine, time: '2 d 3 h', where: 'Ward C · Bed 5', initials: 'AA', assignee: 'Dr. Addo', status: CaseStatus.treatment, recordId: 'P-10164'),
+    StaffCase(id: 'C-2011', nameAge: 'Esi Mensah, 33 F', complaint: 'Appendicitis, post-op', level: CaseLevel.doctor, time: '1 d 22 h', where: 'Ward A · Bed 12', initials: 'KA', assignee: 'Dr. Asare', status: CaseStatus.treatment, recordId: 'P-10177'),
+    StaffCase(id: 'C-2032', nameAge: 'Kojo Antwi, 24 M', complaint: 'Ankle sprain', level: CaseLevel.routine, time: '09:52', where: 'Home, follow-up GP', initials: 'EB', assignee: 'Nurse Badu', status: CaseStatus.discharged),
+    StaffCase(id: 'C-2027', nameAge: 'Akua Sarpong, 41 F', complaint: 'Migraine', level: CaseLevel.routine, time: '08:40', where: 'Home', initials: 'KM', assignee: 'Dr. Mensah', status: CaseStatus.discharged),
+    StaffCase(id: 'C-2020', nameAge: 'Fiifi Quaye, 66 M', complaint: 'Asthma exacerbation', level: CaseLevel.doctor, time: '07:15', where: 'Home, inhaler plan', initials: 'AA', assignee: 'Dr. Addo', status: CaseStatus.discharged),
   ];
 });
 
+/// Case management (Cases.dc.html).
 class CaseManagementScreen extends ConsumerStatefulWidget {
   const CaseManagementScreen({super.key});
 
   @override
-  ConsumerState<CaseManagementScreen> createState() =>
-      _CaseManagementScreenState();
+  ConsumerState<CaseManagementScreen> createState() => _CaseManagementScreenState();
 }
 
 class _CaseManagementScreenState extends ConsumerState<CaseManagementScreen> {
-  late List<Map<String, dynamic>> _cases;
-  String _filter = 'All';
+  final ApiService _apiService = ApiService();
+  late List<StaffCase> _cases;
+  CaseStatus _tab = CaseStatus.waiting;
+  final _search = TextEditingController();
+  String _query = '';
 
   @override
   void initState() {
     super.initState();
     _cases = List.of(ref.read(adminCasesProvider));
+    _loadCases();
   }
 
-  void _updateStatus(String id, String newStatus) {
+  Future<void> _loadCases() async {
+    final live = await _apiService.getCases();
+    if (live.isNotEmpty && mounted) {
+      setState(() => _cases = live);
+    }
+  }
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  void _updateStatus(String id, CaseStatus newStatus) {
     setState(() {
-      final index = _cases.indexWhere((item) => item['id'] == id);
-      if (index != -1) {
-        _cases[index] = {..._cases[index], 'status': newStatus};
-      }
+      final index = _cases.indexWhere((c) => c.id == id);
+      if (index != -1) _cases[index] = _cases[index].withStatus(newStatus);
     });
+    _apiService.updateCase(id, status: newStatus.name);
+  }
+
+  Future<void> _newCase() async {
+    final record = await showAddPatientSheet(context, nextId: 'P-${10245 + _cases.length}');
+    if (record == null || !mounted) return;
+    final level = switch (record.status) {
+      PatientStatus.critical => CaseLevel.urgent,
+      PatientStatus.observation => CaseLevel.doctor,
+      _ => CaseLevel.routine,
+    };
+    final newId = 'C-${2045 + _cases.length}';
+    demoRecords[record.id] = record;
+    final newCase = StaffCase(
+      id: newId,
+      nameAge: record.nameAge,
+      complaint: record.diagnosis ?? 'New presentation',
+      level: level,
+      time: 'Just now',
+      where: record.location,
+      initials: '—',
+      assignee: 'Unassigned',
+      status: CaseStatus.waiting,
+      recordId: record.id,
+    );
+    setState(() {
+      _cases.insert(0, newCase);
+      _tab = CaseStatus.waiting;
+    });
+    // Persist to backend database
+    _apiService.createPatient(record);
+    _apiService.createCase(newCase);
+    showStaffSnack(context, 'Case $newId opened for ${record.name}');
+  }
+
+  Future<void> _moveCase(StaffCase c) async {
+    final p = StaffPalette.of(context);
+    final s = await showStaffSheet<CaseStatus>(
+      context,
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Move ${c.id}', style: staffHeading(20, color: p.ink)),
+            const SizedBox(height: 4),
+            Text(c.nameAge, style: staffBody(13, color: p.muted)),
+            const SizedBox(height: 14),
+            for (final st in CaseStatus.values) ...[
+              StaffButton(
+                st == c.status ? '${st.label} (current)' : st.label,
+                kind: st == c.status ? StaffButtonKind.secondary : StaffButtonKind.primary,
+                onPressed: st == c.status ? null : () => Navigator.pop(ctx, st),
+              ),
+              const SizedBox(height: 10),
+            ],
+          ],
+        ),
+      ),
+    );
+    if (s == null || !mounted) return;
+    _updateStatus(c.id, s);
+    showStaffSnack(context, '${c.id} moved to ${s.label.toLowerCase()}');
+  }
+
+  void _openCase(StaffCase c) {
+    final rec = c.recordId != null ? demoRecords[c.recordId] : null;
+    if (rec == null) {
+      _moveCase(c);
+      return;
+    }
+    showPatientRecordSheet(context, rec, onUpdated: (r) => demoRecords[r.id] = r);
   }
 
   @override
   Widget build(BuildContext context) {
-    final visibleCases = _filter == 'All'
-        ? _cases
-        : _cases
-              .where((item) => item['status'] == _filter.toLowerCase())
-              .toList();
-    final pending = _cases.where((item) => item['status'] == 'pending').length;
+    final p = StaffPalette.of(context);
+    final q = _query.toLowerCase();
+    final visible = _cases.where((c) {
+      if (c.status != _tab) return false;
+      if (q.isEmpty) return true;
+      return c.nameAge.toLowerCase().contains(q) ||
+          c.id.toLowerCase().contains(q) ||
+          c.complaint.toLowerCase().contains(q);
+    }).toList();
+    int count(CaseStatus s) => _cases.where((c) => c.status == s).length;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Case queue')),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.xl,
-          AppSpacing.sm,
-          AppSpacing.xl,
-          AppSpacing.xxxl,
-        ),
-        children: [
-          Container(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            decoration: BoxDecoration(
-              color: context.colorScheme.surfaceContainerHighest.withValues(
-                alpha: 0.52,
-              ),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: pending > 0
-                        ? context.colorScheme.errorContainer
-                        : context.colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(
-                    pending > 0
-                        ? Icons.priority_high_rounded
-                        : Icons.task_alt_rounded,
-                    color: pending > 0
-                        ? context.colorScheme.error
-                        : context.colorScheme.primary,
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '$pending cases awaiting review',
-                        style: context.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        'Prioritize urgent assessments in the order they arrived.',
-                        style: context.textTheme.bodySmall?.copyWith(
-                          color: context.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xl),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: ['All', 'Pending', 'Reviewed'].map((label) {
-                final selected = _filter == label;
-                return Padding(
-                  padding: const EdgeInsets.only(right: AppSpacing.sm),
-                  child: FilterChip(
-                    label: Text(label),
-                    selected: selected,
-                    onSelected: (_) => setState(() => _filter = label),
-                    selectedColor: context.colorScheme.primaryContainer,
-                    showCheckmark: false,
-                    labelStyle: TextStyle(
-                      color: selected
-                          ? context.colorScheme.primary
-                          : context.colorScheme.onSurfaceVariant,
-                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+      backgroundColor: p.bg,
+      body: SafeArea(
+        bottom: false,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+          children: [
+            StaffContent(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  StaffPageHeader(
+                    title: 'Case management',
+                    fontSize: 21,
+                    onBack: Navigator.of(context).canPop() ? () => Navigator.of(context).pop() : null,
+                    trailing: StaffIconButton(
+                      icon: Icons.add_rounded,
+                      tooltip: 'New case',
+                      background: p.primaryBtn,
+                      foreground: Colors.white,
+                      onPressed: _newCase,
                     ),
                   ),
-                );
-              }).toList(),
-            ),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          if (visibleCases.isEmpty)
-            const _EmptyQueue()
-          else
-            ...visibleCases.map(
-              (caseData) => Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                child: _CaseCard(
-                  caseData: caseData,
-                  onStatusChanged: (value) =>
-                      _updateStatus(caseData['id'], value),
-                ),
+                  const SizedBox(height: 14),
+                  StaffSearchField(
+                    controller: _search,
+                    hint: 'Search name, case ID or complaint',
+                    onChanged: (v) => setState(() => _query = v.trim()),
+                  ),
+                  const SizedBox(height: 14),
+                  StaffSegmented(
+                    labels: [for (final s in CaseStatus.values) '${s.label} · ${count(s)}'],
+                    selected: _tab.index,
+                    onChanged: (i) => setState(() => _tab = CaseStatus.values[i]),
+                  ),
+                  const SizedBox(height: 14),
+                  if (visible.isEmpty)
+                    _EmptyQueue(searching: q.isNotEmpty)
+                  else
+                    for (final c in visible) ...[
+                      _CaseCard(
+                        data: c,
+                        onTap: () => _openCase(c),
+                        onLongPress: () => _moveCase(c),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+                  if (visible.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        'Long-press a case to move it between queues.',
+                        textAlign: TextAlign.center,
+                        style: staffBody(12, color: p.muted),
+                      ),
+                    ),
+                ],
               ),
             ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
 class _CaseCard extends StatelessWidget {
-  final Map<String, dynamic> caseData;
-  final ValueChanged<String> onStatusChanged;
+  final StaffCase data;
+  final VoidCallback onTap;
+  final VoidCallback onLongPress;
 
-  const _CaseCard({required this.caseData, required this.onStatusChanged});
+  const _CaseCard({required this.data, required this.onTap, required this.onLongPress});
 
   @override
   Widget build(BuildContext context) {
-    final level = TriageLevel.values.firstWhere(
-      (item) => item.name == caseData['level'],
-      orElse: () => TriageLevel.selfCare,
-    );
-    final levelStyle = _LevelStyle.from(level);
-    final isPending = caseData['status'] == 'pending';
-    final time = DateFormat.MMMd().add_jm().format(
-      DateTime.parse(caseData['timestamp']),
-    );
-
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      decoration: BoxDecoration(
-        color: context.colorScheme.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: levelStyle.color.withValues(alpha: isPending ? 0.35 : 0.16),
+    final p = StaffPalette.of(context);
+    final tone = p.tone(data.level.tone);
+    final c = data;
+    return Semantics(
+      button: true,
+      label: '${c.level.label} case ${c.id}, ${c.nameAge}, ${c.complaint}, ${c.assignee}',
+      excludeSemantics: true,
+      child: StaffTap(
+        color: p.card,
+        radius: 16,
+        onTap: onTap,
+        onLongPress: onLongPress,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  StaffDot(tone.strong, size: 10),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(c.nameAge, style: staffBody(15, weight: FontWeight.w700, color: p.ink)),
+                        const SizedBox(height: 1),
+                        Text(
+                          '${c.id} · ${c.complaint}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: staffBody(12, color: p.muted),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(c.time, style: staffBody(12, weight: FontWeight.w700, color: p.inkSoft)),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  StaffTag(c.level.label,
+                      tone: c.level.tone,
+                      fontSize: 12,
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      c.where,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: staffBody(12, color: p.muted),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  StaffInitialsAvatar(c.initials, size: 22, fontSize: 9),
+                  const SizedBox(width: 6),
+                  Text(c.assignee, style: staffBody(12, weight: FontWeight.w600, color: p.body)),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                decoration: BoxDecoration(
-                  color: levelStyle.color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(99),
-                ),
-                child: Text(
-                  levelStyle.label,
-                  style: context.textTheme.labelSmall?.copyWith(
-                    color: levelStyle.color,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-              const Spacer(),
-              Text(
-                time,
-                style: context.textTheme.labelSmall?.copyWith(
-                  color: context.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Text(
-            caseData['primarySymptom'],
-            style: context.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Row(
-            children: [
-              Icon(
-                isPending ? Icons.schedule_rounded : Icons.task_alt_rounded,
-                size: 17,
-                color: isPending
-                    ? context.colorScheme.onSurfaceVariant
-                    : context.colorScheme.primary,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                isPending ? 'Awaiting review' : 'Reviewed',
-                style: context.textTheme.bodySmall,
-              ),
-              const Spacer(),
-              DropdownButton<String>(
-                value: caseData['status'],
-                underline: const SizedBox.shrink(),
-                items: const [
-                  DropdownMenuItem(value: 'pending', child: Text('Pending')),
-                  DropdownMenuItem(value: 'reviewed', child: Text('Reviewed')),
-                  DropdownMenuItem(
-                    value: 'contacted',
-                    child: Text('Contacted'),
-                  ),
-                ],
-                onChanged: (value) {
-                  if (value != null) onStatusChanged(value);
-                },
-              ),
-            ],
-          ),
-        ],
-      ),
     );
-  }
-}
-
-class _LevelStyle {
-  final Color color;
-  final String label;
-
-  const _LevelStyle(this.color, this.label);
-
-  factory _LevelStyle.from(TriageLevel level) {
-    return switch (level) {
-      TriageLevel.selfCare => const _LevelStyle(
-        AppColors.triageSelfCare,
-        'SELF CARE',
-      ),
-      TriageLevel.pharmacist => const _LevelStyle(
-        AppColors.triagePharmacist,
-        'PHARMACIST',
-      ),
-      TriageLevel.doctor => const _LevelStyle(
-        AppColors.triageDoctor,
-        'DOCTOR',
-      ),
-      TriageLevel.emergency => const _LevelStyle(
-        AppColors.triageUrgent,
-        'URGENT',
-      ),
-    };
   }
 }
 
 class _EmptyQueue extends StatelessWidget {
-  const _EmptyQueue();
+  final bool searching;
+  const _EmptyQueue({required this.searching});
 
   @override
   Widget build(BuildContext context) {
+    final p = StaffPalette.of(context);
     return Padding(
-      padding: const EdgeInsets.only(top: AppSpacing.xxxl),
+      padding: const EdgeInsets.only(top: 40),
       child: Column(
         children: [
-          Icon(
-            Icons.inbox_outlined,
-            size: 48,
-            color: context.colorScheme.onSurfaceVariant.withValues(alpha: 0.45),
+          Icon(Icons.inbox_outlined, size: 44, color: p.faint),
+          const SizedBox(height: 12),
+          Text(
+            searching ? 'No matching cases' : 'This queue is empty',
+            style: staffHeading(16, weight: FontWeight.w700, color: p.ink),
           ),
-          const SizedBox(height: AppSpacing.md),
-          Text('No matching cases', style: context.textTheme.titleMedium),
         ],
       ),
     );

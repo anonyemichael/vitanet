@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:vitanet/core/constants/app_spacing.dart';
+import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:vitanet/core/extensions/context_ext.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
@@ -26,20 +27,34 @@ class _HealthInputBarState extends ConsumerState<HealthInputBar> {
   final ImagePicker _picker = ImagePicker();
   bool _isComposing = false;
   bool _isListening = false;
-  
+  bool _isFocused = false;
+  late final FocusNode _focusNode;
+
   OverlayEntry? _overlayEntry;
   bool _isMenuOpen = false;
   final LayerLink _layerLink = LayerLink();
-  
+
   @override
   void initState() {
     super.initState();
+    _focusNode = FocusNode();
+    _focusNode.addListener(_onFocusChange);
     widget.controller.addListener(_onTextChanged);
+  }
+
+  void _onFocusChange() {
+    if (mounted) {
+      setState(() {
+        _isFocused = _focusNode.hasFocus;
+      });
+    }
   }
 
   @override
   void dispose() {
     _closeMenu();
+    _focusNode.removeListener(_onFocusChange);
+    _focusNode.dispose();
     widget.controller.removeListener(_onTextChanged);
     super.dispose();
   }
@@ -47,14 +62,12 @@ class _HealthInputBarState extends ConsumerState<HealthInputBar> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Listen to voice service changes for auto-submission
     final voiceService = ref.read(voiceServiceProvider);
     voiceService.addListener(_onVoiceServiceChanged);
   }
 
   void _onVoiceServiceChanged() {
     final voiceService = ref.read(voiceServiceProvider);
-    // If it WAS listening, but is NOT listening now (e.g. auto stopped by silence)
     if (_isListening && !voiceService.isListening) {
       if (mounted) {
         setState(() {
@@ -92,7 +105,7 @@ class _HealthInputBarState extends ConsumerState<HealthInputBar> {
       });
     }
   }
-  
+
   Future<void> _pickDocument() async {
     FilePickerResult? result = await FilePicker.pickFiles(
       type: FileType.custom,
@@ -100,9 +113,6 @@ class _HealthInputBarState extends ConsumerState<HealthInputBar> {
     );
 
     if (result != null) {
-      // The AI endpoint currently accepts images best. For text files we could extract text,
-      // but for now we'll pass the file path to our sender which supports imagePath.
-      // If the backend adds full PDF support, this path can be passed along identically.
       setState(() {
         _selectedImagePath = result.files.single.path;
         _isComposing = true;
@@ -123,7 +133,7 @@ class _HealthInputBarState extends ConsumerState<HealthInputBar> {
 
   Future<void> _toggleListening() async {
     final voiceService = ref.read(voiceServiceProvider);
-    
+
     if (_isListening) {
       await voiceService.stopListening();
       setState(() {
@@ -133,8 +143,7 @@ class _HealthInputBarState extends ConsumerState<HealthInputBar> {
         _submit(isVoice: true);
       }
     } else {
-      await voiceService.stopSpeaking(); // Stop AI speaking if user starts talking
-      
+      await voiceService.stopSpeaking();
       setState(() {
         _isListening = true;
       });
@@ -189,28 +198,29 @@ class _HealthInputBarState extends ConsumerState<HealthInputBar> {
             child: CompositedTransformFollower(
               link: _layerLink,
               showWhenUnlinked: false,
-              offset: const Offset(0, -170), // Opens above the button
+              offset: const Offset(0, -170),
               child: Material(
                 color: Colors.transparent,
                 child: Container(
                   width: 220,
-                  margin: const EdgeInsets.only(left: 16), // Align with input
                   decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF2A2A2A) : Colors.white,
-                    borderRadius: BorderRadius.circular(16),
+                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                    ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.2),
-                        blurRadius: 10,
-                        spreadRadius: 2,
+                        color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.12),
+                        blurRadius: 16,
                         offset: const Offset(0, 4),
-                      )
+                      ),
                     ],
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                       _buildMenuItem(Icons.image_outlined, 'Upload image', () {
                         _closeMenu();
                         _pickImage();
@@ -223,7 +233,7 @@ class _HealthInputBarState extends ConsumerState<HealthInputBar> {
                         _closeMenu();
                         _pickDocument();
                       }),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                     ],
                   ),
                 ),
@@ -239,17 +249,22 @@ class _HealthInputBarState extends ConsumerState<HealthInputBar> {
     final isDark = context.isDark;
     return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         child: Row(
           children: [
-            Icon(icon, size: 20, color: isDark ? Colors.white70 : Colors.black87),
+            Icon(
+              icon,
+              size: 18,
+              color: const Color(0xFF0D9488),
+            ),
             const SizedBox(width: 12),
             Text(
               label,
-              style: TextStyle(
-                fontSize: 14,
-                color: isDark ? Colors.white : Colors.black87,
+              style: GoogleFonts.inter(
+                fontSize: 13.5,
+                color: isDark ? Colors.white : const Color(0xFF0F172A),
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -261,12 +276,14 @@ class _HealthInputBarState extends ConsumerState<HealthInputBar> {
 
   Widget _buildImagePreview() {
     return Container(
-      margin: const EdgeInsets.only(left: 12, right: 12, bottom: 8),
+      margin: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: context.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: context.colorScheme.outlineVariant.withValues(alpha: 0.3)),
+        color: context.isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: context.isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -276,14 +293,19 @@ class _HealthInputBarState extends ConsumerState<HealthInputBar> {
             borderRadius: BorderRadius.circular(8),
             child: Image.file(
               File(_selectedImagePath!),
-              width: 60,
-              height: 60,
+              width: 56,
+              height: 56,
+              cacheWidth: 120,
               fit: BoxFit.cover,
             ),
           ),
           const SizedBox(width: 8),
           IconButton(
-            icon: Icon(Icons.close_rounded, size: 20, color: context.colorScheme.onSurfaceVariant),
+            icon: Icon(
+              Icons.close_rounded,
+              size: 18,
+              color: context.colorScheme.onSurfaceVariant,
+            ),
             onPressed: () {
               setState(() {
                 _selectedImagePath = null;
@@ -292,107 +314,227 @@ class _HealthInputBarState extends ConsumerState<HealthInputBar> {
             },
             constraints: const BoxConstraints(),
             padding: const EdgeInsets.all(4),
-          )
+          ),
         ],
       ),
     );
   }
 
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is KeyDownEvent &&
+        (event.logicalKey == LogicalKeyboardKey.enter ||
+         event.logicalKey == LogicalKeyboardKey.numpadEnter)) {
+      if (HardwareKeyboard.instance.isShiftPressed) {
+        // Shift + Enter: allow newline to be inserted
+        return KeyEventResult.ignored;
+      } else {
+        // Enter without Shift: Submit message cleanly
+        if (widget.controller.text.trim().isNotEmpty || _selectedImagePath != null) {
+          _submit(isVoice: false);
+        }
+        return KeyEventResult.handled;
+      }
+    }
+    return KeyEventResult.ignored;
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = context.isDark;
-    
+    final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final borderColor = _isFocused
+        ? const Color(0xFF0D9488)
+        : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0));
+
     return Column(
       mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (_selectedImagePath != null) _buildImagePreview(),
         Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           decoration: BoxDecoration(
-            color: isDark 
-                ? Colors.white.withValues(alpha: 0.06) 
-                : Colors.black.withValues(alpha: 0.04),
-            borderRadius: BorderRadius.circular(28),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(left: 6, bottom: 6),
-                child: CompositedTransformTarget(
-                  link: _layerLink,
-                  child: IconButton(
-                    icon: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 200),
-                      transitionBuilder: (child, anim) => RotationTransition(
-                        turns: child.key == const ValueKey('open') 
-                            ? Tween<double>(begin: -0.125, end: 0).animate(anim) 
-                            : Tween<double>(begin: 0.125, end: 0).animate(anim),
-                        child: FadeTransition(opacity: anim, child: child),
-                      ),
-                      child: Icon(
-                        _isMenuOpen ? Icons.close_rounded : Icons.add_rounded,
-                        key: ValueKey(_isMenuOpen ? 'open' : 'closed'),
-                        color: context.colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
-                        size: 24,
-                      ),
-                    ),
-                    onPressed: _toggleMenu,
-                    padding: const EdgeInsets.all(8),
-                    constraints: const BoxConstraints(),
-                  ),
-                ),
+            color: cardBg,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: borderColor,
+              width: 1.0,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: isDark
+                    ? Colors.black.withValues(alpha: 0.28)
+                    : const Color(0x0A0F172A),
+                blurRadius: 20,
+                offset: const Offset(0, 4),
               ),
-              Expanded(
+              BoxShadow(
+                color: isDark
+                    ? Colors.black.withValues(alpha: 0.14)
+                    : const Color(0x050F172A),
+                blurRadius: 6,
+                offset: const Offset(0, 1),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Top Row: Multi-Row Text Input with Enter-to-Send
+              Focus(
+                onKeyEvent: _handleKeyEvent,
                 child: TextField(
                   controller: widget.controller,
+                  focusNode: _focusNode,
+                  minLines: 2,
+                  maxLines: 6,
+                  style: GoogleFonts.inter(
+                    fontSize: 14.5,
+                    height: 1.45,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  ),
                   decoration: InputDecoration(
-                    hintText: 'Message AI...',
-                    hintStyle: TextStyle(
-                      fontSize: 15,
-                      color: context.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                    hintText: 'Describe your symptoms, upload a lab result, or ask a health question...',
+                    hintStyle: GoogleFonts.inter(
+                      fontSize: 14,
+                      color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
                     ),
                     border: InputBorder.none,
                     enabledBorder: InputBorder.none,
                     focusedBorder: InputBorder.none,
                     filled: false,
-                    fillColor: Colors.transparent,
-                    contentPadding: const EdgeInsets.only(top: 14, bottom: 14, left: 4, right: 8),
+                    contentPadding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
                     isDense: true,
                   ),
-                  textInputAction: TextInputAction.send,
-                  onSubmitted: (_) => _submit(isVoice: false),
-                  maxLines: 5,
-                  minLines: 1,
-                  style: const TextStyle(fontSize: 15),
                 ),
               ),
+
+              // Bottom Row: Action Toolbar (Attach, Voice, Submit)
               Padding(
-                padding: const EdgeInsets.only(right: 6, bottom: 6),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    color: _isComposing || _isListening 
-                        ? context.colorScheme.primary
-                        : Colors.transparent,
-                    shape: BoxShape.circle,
-                  ),
-                  child: IconButton(
-                    icon: Icon(
-                      _isListening ? Icons.stop_rounded :
-                      _isComposing ? Icons.arrow_upward_rounded : Icons.mic_rounded, 
-                      color: _isComposing || _isListening 
-                          ? context.colorScheme.onPrimary
-                          : context.colorScheme.onSurfaceVariant,
-                      size: 18,
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+                child: Row(
+                  children: [
+                    // Attachment Action in 36x36 Circular IconButton
+                    CompositedTransformTarget(
+                      link: _layerLink,
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: _isMenuOpen
+                              ? const Color(0xFF0D9488).withValues(alpha: 0.12)
+                              : Colors.transparent,
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: IconButton(
+                            tooltip: 'Attach file or image',
+                            splashRadius: 18,
+                            icon: Icon(
+                              _isMenuOpen ? Icons.close_rounded : Icons.attach_file_rounded,
+                              size: 19,
+                              color: _isMenuOpen
+                                  ? const Color(0xFF0D9488)
+                                  : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                            ),
+                            onPressed: _toggleMenu,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                            style: IconButton.styleFrom(
+                              hoverColor: isDark
+                                  ? const Color(0xFF334155).withValues(alpha: 0.5)
+                                  : const Color(0xFFF1F5F9),
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
-                    onPressed: _isComposing ? () => _submit(isVoice: false) : _toggleListening,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
+                    const SizedBox(width: 8),
+
+                    // Voice Dictation Action in 36x36 Circular IconButton
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _isListening
+                            ? const Color(0xFFEF4444).withValues(alpha: 0.12)
+                            : Colors.transparent,
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: IconButton(
+                          tooltip: _isListening ? 'Stop listening' : 'Voice dictation',
+                          splashRadius: 18,
+                          icon: Icon(
+                            _isListening ? Icons.graphic_eq_rounded : Icons.mic_none_rounded,
+                            size: 19,
+                            color: _isListening
+                                ? const Color(0xFFEF4444)
+                                : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                          ),
+                          onPressed: _toggleListening,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                          style: IconButton.styleFrom(
+                            hoverColor: isDark
+                                ? const Color(0xFF334155).withValues(alpha: 0.5)
+                                : const Color(0xFFF1F5F9),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const Spacer(),
+
+                    // Clean 36x36 Dynamic Submit Button (BorderRadius.circular(12))
+                    MouseRegion(
+                      cursor: (_isComposing || _isListening)
+                          ? SystemMouseCursors.click
+                          : SystemMouseCursors.basic,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 160),
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: (_isComposing || _isListening)
+                              ? const Color(0xFF0D9488)
+                              : (isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9)),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: (_isComposing || _isListening)
+                              ? [
+                                  BoxShadow(
+                                    color: const Color(0xFF0D9488).withValues(alpha: 0.35),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ]
+                              : null,
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(12),
+                            onTap: _isComposing
+                                ? () => _submit(isVoice: false)
+                                : (_isListening ? _toggleListening : null),
+                            child: Center(
+                              child: Icon(
+                                _isListening
+                                    ? Icons.stop_rounded
+                                    : Icons.arrow_upward_rounded,
+                                size: 18,
+                                color: (_isComposing || _isListening)
+                                    ? Colors.white
+                                    : const Color(0xFF94A3B8),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],

@@ -1,53 +1,37 @@
-import 'dart:ui';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:vitanet/core/constants/app_spacing.dart';
 import 'package:vitanet/core/extensions/context_ext.dart';
 import 'package:vitanet/data/models/user_profile.dart';
 import 'package:vitanet/data/providers/providers.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-
-class _DateFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    if (newValue.text.length < oldValue.text.length) {
-      return newValue;
-    }
-    final text = newValue.text.replaceAll('-', '');
-    if (text.length > 8) return oldValue;
-
-    var newText = '';
-    for (int i = 0; i < text.length; i++) {
-      if (i == 4 || i == 6) newText += '-';
-      newText += text[i];
-    }
-
-    return TextEditingValue(
-      text: newText,
-      selection: TextSelection.collapsed(offset: newText.length),
-    );
-  }
-}
+import 'package:vitanet/shared/widgets/vn_kit.dart';
 
 class _TempContact {
   final String name;
-  final String contactInfo; // Email or Phone
+  final String contactInfo; // Email or phone
   final String relation;
   final bool isPrimary;
 
-  _TempContact({
+  const _TempContact({
     required this.name,
     required this.contactInfo,
     required this.relation,
     required this.isPrimary,
   });
+
+  _TempContact copyWith({bool? isPrimary}) => _TempContact(
+        name: name,
+        contactInfo: contactInfo,
+        relation: relation,
+        isPrimary: isPrimary ?? this.isPrimary,
+      );
 }
 
+/// Three-step profile setup after first sign-in:
+/// 1. About you, 2. Health basics, 3. Care circle.
 class PatientCompletionScreen extends ConsumerStatefulWidget {
   const PatientCompletionScreen({super.key});
 
@@ -58,41 +42,64 @@ class PatientCompletionScreen extends ConsumerStatefulWidget {
 
 class _PatientCompletionScreenState
     extends ConsumerState<PatientCompletionScreen> {
-  int _currentStep = 0;
+  static const _stepNames = ['About you', 'Health basics', 'Care circle'];
+  static const _bloodTypes = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+  static const _conditionOptions = [
+    'Asthma',
+    'Hypertension',
+    'Type 2 diabetes',
+    'Pregnant or breastfeeding',
+  ];
+  static const _relationOptions = ['Family', 'Friend', 'Partner', 'Doctor', 'Other'];
 
-  // Step 1: Profile Details
-  final _profileFormKey = GlobalKey<FormState>();
+  int _step = 0;
+
+  // Step 1
+  final _aboutFormKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
-  final _dobController = TextEditingController();
-  String? _selectedSex;
-  final List<String> _sexOptions = ['Male', 'Female', 'Other'];
 
-  // Step 2: Care Circle
+  // Step 2
+  DateTime? _dob;
+  String? _sex;
+  final _heightController = TextEditingController();
+  final _weightController = TextEditingController();
+  String? _bloodType;
+  final List<String> _allergies = [];
+  final Set<String> _conditions = {};
+  final _medsController = TextEditingController();
+
+  // Step 3
   final _contactNameController = TextEditingController();
   final _contactInfoController = TextEditingController();
   String _selectedRelation = 'Family';
-  bool _isPrimary = false;
-  final List<String> _relationOptions = [
-    'Family',
-    'Friend',
-    'Partner',
-    'Doctor',
-    'Other',
-  ];
-
   final List<_TempContact> _careCircle = [];
 
   bool _isLoading = false;
-  String _loadingText = '';
+
+  @override
+  void initState() {
+    super.initState();
+    try {
+      if (Firebase.apps.isNotEmpty) {
+        _nameController.text = FirebaseAuth.instance.currentUser?.displayName ?? '';
+      }
+    } catch (_) {}
+  }
 
   @override
   void dispose() {
+    _nameController.dispose();
     _phoneController.dispose();
-    _dobController.dispose();
+    _heightController.dispose();
+    _weightController.dispose();
+    _medsController.dispose();
     _contactNameController.dispose();
     _contactInfoController.dispose();
     super.dispose();
   }
+
+  // ── Care circle helpers (kept from the original flow) ──
 
   void _addContactToCircle() {
     if (_contactNameController.text.trim().isEmpty ||
@@ -100,34 +107,16 @@ class _PatientCompletionScreenState
       context.showSnack('Please enter name and contact info');
       return;
     }
-
     setState(() {
-      if (_isPrimary) {
-        for (int i = 0; i < _careCircle.length; i++) {
-          _careCircle[i] = _TempContact(
-            name: _careCircle[i].name,
-            contactInfo: _careCircle[i].contactInfo,
-            relation: _careCircle[i].relation,
-            isPrimary: false,
-          );
-        }
-      } else if (_careCircle.isEmpty) {
-        _isPrimary = true;
-      }
-
-      _careCircle.add(
-        _TempContact(
-          name: _contactNameController.text.trim(),
-          contactInfo: _contactInfoController.text.trim(),
-          relation: _selectedRelation,
-          isPrimary: _isPrimary,
-        ),
-      );
-
+      _careCircle.add(_TempContact(
+        name: _contactNameController.text.trim(),
+        contactInfo: _contactInfoController.text.trim(),
+        relation: _selectedRelation,
+        isPrimary: _careCircle.isEmpty,
+      ));
       _contactNameController.clear();
       _contactInfoController.clear();
       _selectedRelation = 'Family';
-      _isPrimary = false;
     });
   }
 
@@ -135,93 +124,179 @@ class _PatientCompletionScreenState
     setState(() {
       _careCircle.removeAt(index);
       if (_careCircle.isNotEmpty && !_careCircle.any((c) => c.isPrimary)) {
-        _careCircle[0] = _TempContact(
-          name: _careCircle[0].name,
-          contactInfo: _careCircle[0].contactInfo,
-          relation: _careCircle[0].relation,
-          isPrimary: true,
-        );
+        _careCircle[0] = _careCircle[0].copyWith(isPrimary: true);
       }
     });
   }
 
   void _setPrimary(int index) {
     setState(() {
-      for (int i = 0; i < _careCircle.length; i++) {
-        _careCircle[i] = _TempContact(
-          name: _careCircle[i].name,
-          contactInfo: _careCircle[i].contactInfo,
-          relation: _careCircle[i].relation,
-          isPrimary: i == index,
-        );
+      for (var i = 0; i < _careCircle.length; i++) {
+        _careCircle[i] = _careCircle[i].copyWith(isPrimary: i == index);
       }
     });
   }
 
-  Future<void> _completeRegistration() async {
-    if (_currentStep == 0) {
-      if (!_profileFormKey.currentState!.validate()) return;
-      if (_selectedSex == null) {
-        context.showSnack('Please select Biological Sex');
+  Future<void> _addAllergy() async {
+    final ctrl = TextEditingController();
+    final value = await showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        final p = VnPalette.of(ctx);
+        return VnDialog(children: [
+          Text('Add allergy', style: VnText.heading(20, color: p.ink)),
+          VnTextField(
+            controller: ctrl,
+            hint: 'e.g. Penicillin',
+            autofocus: true,
+            onSubmitted: (v) => Navigator.pop(ctx, v),
+          ),
+          Row(children: [
+            Expanded(
+              child: VnOutlineButton(
+                label: 'Cancel',
+                background: p.surfaceAlt,
+                borderColor: Colors.transparent,
+                onPressed: () => Navigator.pop(ctx),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: VnButton(
+                label: 'Add',
+                height: 52,
+                onPressed: () => Navigator.pop(ctx, ctrl.text),
+              ),
+            ),
+          ]),
+        ]);
+      },
+    );
+    ctrl.dispose();
+    final v = value?.trim() ?? '';
+    if (v.isNotEmpty && !_allergies.contains(v)) {
+      setState(() => _allergies.add(v));
+    }
+  }
+
+  Future<void> _pickDob() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _dob ?? DateTime(now.year - 30, 1, 1),
+      firstDate: DateTime(1900),
+      lastDate: now,
+      helpText: 'Date of birth',
+    );
+    if (picked != null) setState(() => _dob = picked);
+  }
+
+  String _two(int n) => n.toString().padLeft(2, '0');
+
+  // ── Navigation ──
+
+  void _continue() {
+    HapticFeedback.lightImpact();
+    if (_step == 0) {
+      if (!(_aboutFormKey.currentState?.validate() ?? false)) return;
+      setState(() => _step = 1);
+      return;
+    }
+    if (_step == 1) {
+      if (_dob == null) {
+        context.showSnack('Please add your date of birth');
         return;
       }
-      setState(() => _currentStep = 1);
+      if (_sex == null) {
+        context.showSnack('Please select sex at birth');
+        return;
+      }
+      setState(() => _step = 2);
       return;
     }
-
-    if (_currentStep == 1 && _careCircle.isEmpty) {
-      context.showSnack('Please add at least one emergency contact');
+    if (_careCircle.isEmpty) {
+      context.showSnack('Please add at least one emergency contact, or tap Skip');
       return;
     }
+    _save();
+  }
 
-    setState(() {
-      _isLoading = true;
-      _loadingText = 'Saving Profile...';
-    });
+  void _skip() {
+    if (_step == 0) {
+      if (!(_aboutFormKey.currentState?.validate() ?? false)) return;
+      setState(() => _step = 1);
+    } else if (_step == 1) {
+      setState(() => _step = 2);
+    } else {
+      _save();
+    }
+  }
 
+  void _back() {
+    if (_step > 0) {
+      setState(() => _step -= 1);
+    } else if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/login/patient');
+    }
+  }
+
+  Future<void> _save() async {
+    setState(() => _isLoading = true);
     try {
-      final currentUser = FirebaseAuth.instance.currentUser;
-      if (currentUser == null) throw Exception('No authenticated user found.');
+      final currentUser =
+          Firebase.apps.isNotEmpty ? FirebaseAuth.instance.currentUser : null;
 
-      // Build local emergency contacts from the care circle
-      final List<EmergencyContact> finalContacts = _careCircle.map((c) {
-        return EmergencyContact(
-          name: c.name,
-          phone: c.contactInfo.contains('@') ? '' : c.contactInfo,
-          email: c.contactInfo.contains('@') ? c.contactInfo : null,
-          relation: c.relation,
-        );
-      }).toList();
+      final contacts = _careCircle
+          .map((c) => EmergencyContact(
+                name: c.name,
+                phone: c.contactInfo.contains('@') ? '' : c.contactInfo,
+                email: c.contactInfo.contains('@') ? c.contactInfo : null,
+                relation: c.relation,
+              ))
+          .toList();
+      // Primary contact first so alerts use it.
+      final primary = _careCircle.indexWhere((c) => c.isPrimary);
+      if (primary > 0) contacts.insert(0, contacts.removeAt(primary));
 
-      // Calculate age from DOB
-      final dob = DateTime.tryParse(_dobController.text.trim());
+      final dob = _dob;
       final today = DateTime.now();
       final age = dob == null
           ? null
           : today.year -
-                dob.year -
-                ((today.month < dob.month ||
-                        (today.month == dob.month && today.day < dob.day))
-                    ? 1
-                    : 0);
+              dob.year -
+              ((today.month < dob.month ||
+                      (today.month == dob.month && today.day < dob.day))
+                  ? 1
+                  : 0);
 
+      final meds = _medsController.text
+          .split(RegExp(r'[,\n]'))
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
+
+      final name = _nameController.text.trim();
       final profile = UserProfile(
-        name: currentUser.displayName ?? 'Patient',
+        name: name.isNotEmpty ? name : (currentUser?.displayName ?? 'Patient'),
         age: age,
         role: 'user',
         phone: _phoneController.text.trim().isNotEmpty
             ? _phoneController.text.trim()
             : null,
-        dob: _dobController.text.trim(),
-        sex: _selectedSex,
-        emergencyContacts: finalContacts,
+        dob: dob == null ? null : '${dob.year}-${_two(dob.month)}-${_two(dob.day)}',
+        sex: _sex,
+        height: double.tryParse(_heightController.text.trim()),
+        weight: double.tryParse(_weightController.text.trim()),
+        bloodType: _bloodType,
+        allergies: List.of(_allergies),
+        preExistingConditions: _conditions.toList(),
+        medications: meds,
+        emergencyContacts: contacts,
       );
 
-      // Save profile to local storage
       await ref.read(userProfileProvider.notifier).updateProfile(profile);
-
-      // Profile is automatically persisted to Firestore by userProfileProvider
-
       if (mounted) context.go('/home');
     } catch (e) {
       if (mounted) context.showSnack('Registration failed: $e');
@@ -230,77 +305,117 @@ class _PatientCompletionScreenState
     }
   }
 
+  // ── UI ──
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: _currentStep == 1
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-                onPressed: () => setState(() => _currentStep = 0),
-              )
-            : null,
-      ),
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: Image.asset(
-              'assets/images/patient_login.jpg',
-              fit: BoxFit.cover,
-            ),
-          ),
-          Positioned.fill(
-            child: Container(color: Colors.black.withOpacity(0.4)),
-          ),
-          SafeArea(
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 600),
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.lg,
-                    vertical: AppSpacing.md,
+    final p = VnPalette.of(context);
+    return PopScope(
+      canPop: _step == 0,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _back();
+      },
+      child: Scaffold(
+        backgroundColor: p.page,
+        body: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 600),
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                    child: _buildHeader(p),
                   ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(24),
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(AppSpacing.xl),
-                        decoration: BoxDecoration(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.surface.withOpacity(0.95),
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.2),
-                          ),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _buildHeader(),
-                            const SizedBox(height: AppSpacing.xl),
-                            _buildCustomStepper(),
-                            const SizedBox(height: AppSpacing.xxl),
-
-                            if (_currentStep == 0) _buildProfileDetailsStep(),
-                            if (_currentStep == 1) _buildCareCircleStep(),
-
-                            const SizedBox(height: AppSpacing.xxl),
-                            _buildBottomActions(),
-                          ],
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 220),
+                        child: KeyedSubtree(
+                          key: ValueKey(_step),
+                          child: switch (_step) {
+                            0 => _buildAboutStep(p),
+                            1 => _buildHealthStep(p),
+                            _ => _buildCareStep(p),
+                          },
                         ),
                       ),
                     ),
                   ),
-                ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+                    child: Row(
+                      children: [
+                        VnOutlineButton(
+                          label: 'Skip',
+                          expand: false,
+                          height: 56,
+                          background: p.surfaceAlt,
+                          borderColor: Colors.transparent,
+                          onPressed: _isLoading ? null : _skip,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: VnButton(
+                            label: _step == 2 ? 'Finish setup' : 'Continue',
+                            loading: _isLoading,
+                            onPressed: _isLoading ? null : _continue,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(VnPalette p) {
+    return SizedBox(
+      height: 48,
+      child: Row(
+        children: [
+          VnIconButton(
+            icon: Icons.chevron_left_rounded,
+            tooltip: 'Back',
+            iconSize: 26,
+            bordered: true,
+            onPressed: _back,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Step ${_step + 1} of 3 · ${_stepNames[_step]}',
+                    style: VnText.body(12, weight: FontWeight.w600, color: p.muted)),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    for (var i = 0; i < 3; i++) ...[
+                      if (i > 0) const SizedBox(width: 6),
+                      Expanded(
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 220),
+                          height: 5,
+                          decoration: BoxDecoration(
+                            color: i <= _step
+                                ? p.brand
+                                : (p.isDark ? const Color(0xFF333333) : const Color(0xFFE2E8F0)),
+                            borderRadius: BorderRadius.circular(5),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
             ),
           ),
         ],
@@ -308,545 +423,458 @@ class _PatientCompletionScreenState
     );
   }
 
-  Widget _buildHeader() {
-    return Row(
-      children: [
-        Icon(
-          Icons.health_and_safety_rounded,
-          color: context.colorScheme.primary,
-          size: 32,
-        ),
-        const SizedBox(width: AppSpacing.md),
-        Text(
-          _currentStep == 0 ? 'Profile Details' : 'Setup Care Circle',
-          style: context.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w900,
-            color: context.colorScheme.onSurface,
+  Widget _intro(VnPalette p, String title, String body) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Semantics(
+            header: true,
+            child: Text(title, style: VnText.heading(26, color: p.ink)),
           ),
-        ),
-      ],
-    );
-  }
+          const SizedBox(height: 6),
+          Text(body, style: VnText.body(15, color: p.muted, height: 1.5)),
+        ],
+      );
 
-  Widget _buildCustomStepper() {
-    return Row(
-      children: [
-        _buildStepIndicator(
-          title: 'Account Type',
-          isActive: true,
-          isCompleted: true,
-        ),
-        _buildStepLine(isCompleted: true),
-        _buildStepIndicator(
-          title: 'Profile Details',
-          isActive: _currentStep >= 0,
-          isCompleted: _currentStep > 0,
-        ),
-        _buildStepLine(isCompleted: _currentStep > 0),
-        _buildStepIndicator(
-          title: 'Care Circle',
-          isActive: _currentStep == 1,
-          isCompleted: false,
-        ),
-      ],
-    );
-  }
+  Widget _label(VnPalette p, String text) =>
+      Text(text, style: VnText.body(13, weight: FontWeight.w600, color: p.ink));
 
-  Widget _buildStepIndicator({
-    required String title,
-    required bool isActive,
-    required bool isCompleted,
-  }) {
-    final color = isCompleted
-        ? context.colorScheme.primary
-        : (isActive
-              ? context.colorScheme.primary
-              : context.colorScheme.onSurfaceVariant.withOpacity(0.5));
-    return Column(
-      children: [
-        Icon(
-          isCompleted
-              ? Icons.check_circle_rounded
-              : (isActive
-                    ? Icons.radio_button_checked_rounded
-                    : Icons.radio_button_unchecked_rounded),
-          color: color,
-          size: 24,
-        ),
-        const SizedBox(height: 4),
-        Text(
-          title,
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-            color: color,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStepLine({required bool isCompleted}) {
-    return Expanded(
-      child: Container(
-        height: 2,
-        color: isCompleted
-            ? context.colorScheme.primary
-            : context.colorScheme.onSurfaceVariant.withOpacity(0.2),
-        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-        alignment: Alignment.topCenter,
-      ),
-    );
-  }
-
-  Widget _buildModernInputField({
-    required TextEditingController controller,
-    required String label,
-    required String hint,
-    IconData? icon,
-    TextInputType? keyboardType,
-    bool isRequired = false,
-    List<TextInputFormatter>? inputFormatters,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        RichText(
-          text: TextSpan(
-            text: label,
-            style: context.textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: context.colorScheme.onSurface,
-            ),
-            children: [
-              if (isRequired)
-                const TextSpan(
-                  text: ' *',
-                  style: TextStyle(color: Colors.red),
-                ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextFormField(
-          controller: controller,
-          keyboardType: keyboardType,
-          inputFormatters: inputFormatters,
-          validator: isRequired
-              ? (val) => val == null || val.isEmpty ? 'Required' : null
-              : null,
-          style: const TextStyle(fontWeight: FontWeight.w600),
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: TextStyle(
-              color: context.colorScheme.onSurfaceVariant.withOpacity(0.5),
-            ),
-            prefixIcon: icon != null
-                ? Icon(icon, color: context.colorScheme.onSurfaceVariant)
-                : null,
-            filled: true,
-            fillColor: context.colorScheme.surfaceContainerHighest.withOpacity(
-              0.3,
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 16,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: context.colorScheme.outlineVariant.withOpacity(0.5),
-              ),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: context.colorScheme.outlineVariant.withOpacity(0.5),
-              ),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: context.colorScheme.primary,
-                width: 2,
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildProfileDetailsStep() {
+  Widget _buildAboutStep(VnPalette p) {
     return Form(
-      key: _profileFormKey,
+      key: _aboutFormKey,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _buildModernInputField(
+          _intro(p, 'Tell us about you',
+              'Your name and number help your care circle and clinicians reach you.'),
+          const SizedBox(height: 20),
+          VnTextField(
+            label: 'Full name',
+            controller: _nameController,
+            hint: 'e.g. Amara Okafor',
+            prefixIcon: Icons.person_outline_rounded,
+            textInputAction: TextInputAction.next,
+            validator: (v) =>
+                (v ?? '').trim().isEmpty ? 'Please enter your name' : null,
+          ),
+          const SizedBox(height: 16),
+          VnTextField(
+            label: 'Phone number',
             controller: _phoneController,
-            label: 'Phone Number',
-            hint: 'e.g. +233 24 123 4567',
+            hint: '+234 801 234 5678',
+            prefixIcon: Icons.phone_outlined,
             keyboardType: TextInputType.phone,
-            isRequired: true,
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          _buildModernInputField(
-            controller: _dobController,
-            label: 'Date of Birth',
-            hint: 'YYYY-MM-DD',
-            keyboardType: TextInputType.number,
-            inputFormatters: [_DateFormatter()],
-            isRequired: true,
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          RichText(
-            text: TextSpan(
-              text: 'Biological Sex',
-              style: context.textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: context.colorScheme.onSurface,
-              ),
-              children: const [
-                TextSpan(
-                  text: ' *',
-                  style: TextStyle(color: Colors.red),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: _sexOptions.map((sex) {
-              final isSelected = _selectedSex == sex;
-              return ChoiceChip(
-                label: Text(
-                  sex,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: isSelected
-                        ? context.colorScheme.onPrimary
-                        : context.colorScheme.onSurface,
-                  ),
-                ),
-                selected: isSelected,
-                onSelected: (selected) {
-                  if (selected) setState(() => _selectedSex = sex);
-                },
-                selectedColor: context.colorScheme.primary,
-                backgroundColor: context.colorScheme.surfaceContainerHighest
-                    .withOpacity(0.5),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                  side: BorderSide(
-                    color: isSelected
-                        ? Colors.transparent
-                        : context.colorScheme.outlineVariant.withOpacity(0.5),
-                  ),
-                ),
-              );
-            }).toList(),
+            validator: (v) {
+              final s = (v ?? '').replaceAll(RegExp(r'[^0-9]'), '');
+              if (s.isEmpty) return 'Please enter your phone number';
+              if (s.length < 7) return 'Enter a valid phone number';
+              return null;
+            },
           ),
         ],
       ),
     );
   }
 
-  Widget _buildCareCircleStep() {
+  Widget _unitField(VnPalette p, String label, TextEditingController c, String unit) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _label(p, label),
+        const SizedBox(height: 6),
+        TextField(
+          controller: c,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
+          style: VnText.body(15, color: p.ink, weight: FontWeight.w500),
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: p.surface,
+            suffixText: unit,
+            suffixStyle: VnText.body(15, color: p.muted, weight: FontWeight.w500),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(color: p.line),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(color: p.brand, width: 2),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHealthStep(VnPalette p) {
+    final dob = _dob;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Container(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          decoration: BoxDecoration(
-            color: context.colorScheme.primaryContainer.withOpacity(0.3),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Text(
-            'If you trigger an SOS or request assistance, it will automatically alert these contacts, starting with your primary contact.',
-            style: context.textTheme.bodySmall?.copyWith(
-              color: context.colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ),
-        const SizedBox(height: AppSpacing.xl),
-
-        Text(
-          'Add Contact Details',
-          style: context.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.md),
-
-        _buildModernInputField(
-          controller: _contactNameController,
-          label: 'Full Name',
-          hint: 'e.g. Jane Doe',
-          isRequired: true,
-        ),
-        const SizedBox(height: AppSpacing.md),
-        _buildModernInputField(
-          controller: _contactInfoController,
-          label: 'Email / Phone Number *',
-          hint: 'e.g. +233... or email@...',
-          isRequired: true,
-        ),
-        const SizedBox(height: AppSpacing.lg),
-
-        RichText(
-          text: TextSpan(
-            text: 'Relationship',
-            style: context.textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: context.colorScheme.onSurface,
-            ),
-            children: const [
-              TextSpan(
-                text: ' *',
-                style: TextStyle(color: Colors.red),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: _relationOptions.map((relation) {
-            final isSelected = _selectedRelation == relation;
-            return ChoiceChip(
-              label: Text(
-                relation,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: isSelected
-                      ? context.colorScheme.onPrimary
-                      : context.colorScheme.onSurface,
-                ),
-              ),
-              selected: isSelected,
-              onSelected: (selected) {
-                if (selected) setState(() => _selectedRelation = relation);
-              },
-              selectedColor: context.colorScheme.primary,
-              backgroundColor: context.colorScheme.surfaceContainerHighest
-                  .withOpacity(0.5),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-                side: BorderSide(
-                  color: isSelected
-                      ? Colors.transparent
-                      : context.colorScheme.outlineVariant.withOpacity(0.5),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-
-        const SizedBox(height: AppSpacing.md),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text(
-            'Set as Primary Contact',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-          subtitle: const Text(
-            'This person will be the first one alerted in an emergency.',
-            style: TextStyle(fontSize: 12),
-          ),
-          value: _isPrimary,
-          onChanged: (val) => setState(() => _isPrimary = val),
-          activeColor: context.colorScheme.primary,
-        ),
-
-        const SizedBox(height: AppSpacing.md),
-        OutlinedButton.icon(
-          onPressed: _addContactToCircle,
-          icon: const Icon(Icons.add_rounded),
-          label: const Text(
-            'Add to Circle',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-          style: OutlinedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            side: BorderSide(color: context.colorScheme.primary, width: 2),
-          ),
-        ),
-
-        if (_careCircle.isNotEmpty) ...[
-          const SizedBox(height: AppSpacing.xxl),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Your Care Circle (${_careCircle.length})',
-                style: context.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              Text(
-                'Tap star to set primary',
-                style: context.textTheme.bodySmall?.copyWith(
-                  color: context.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          ...List.generate(
-            _careCircle.length,
-            (index) => _buildContactCard(index),
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildContactCard(int index) {
-    final contact = _careCircle[index];
-    final initials = contact.name.isNotEmpty
-        ? contact.name.substring(0, 2).toUpperCase()
-        : '??';
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: context.colorScheme.surfaceContainerHighest.withOpacity(0.3),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: contact.isPrimary
-              ? context.colorScheme.primary
-              : context.colorScheme.outlineVariant.withOpacity(0.5),
-          width: contact.isPrimary ? 2 : 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            backgroundColor: Colors.orange.shade100,
-            child: Text(
-              initials,
-              style: TextStyle(
-                color: Colors.orange.shade900,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        contact.name,
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          color: context.colorScheme.onSurface,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.orange.shade50,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        contact.relation,
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Colors.orange.shade900,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                Text(
-                  contact.contactInfo,
-                  style: TextStyle(
-                    color: context.colorScheme.onSurfaceVariant,
-                    fontSize: 13,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            icon: Icon(
-              contact.isPrimary
-                  ? Icons.star_rounded
-                  : Icons.star_outline_rounded,
-              color: contact.isPrimary ? Colors.amber : Colors.grey.shade400,
-            ),
-            onPressed: () => _setPrimary(index),
-          ),
-          IconButton(
-            icon: Icon(
-              Icons.delete_outline_rounded,
-              color: Colors.red.shade400,
-            ),
-            onPressed: () => _removeContact(index),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBottomActions() {
-    if (_isLoading) {
-      return Center(
-        child: Column(
+        _intro(p, 'A few health basics',
+            'VitaNet uses this to tailor advice, like flagging medicines that clash with your allergies.'),
+        const SizedBox(height: 20),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const CircularProgressIndicator(),
-            const SizedBox(height: 8),
-            Text(
-              _loadingText,
-              style: TextStyle(color: Colors.teal, fontWeight: FontWeight.bold),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _label(p, 'Date of birth'),
+                  const SizedBox(height: 6),
+                  Semantics(
+                    button: true,
+                    label: 'Date of birth',
+                    child: Material(
+                      color: p.surface,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: BorderSide(color: p.line),
+                      ),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(16),
+                        onTap: _pickDob,
+                        child: Container(
+                          height: 52,
+                          alignment: Alignment.centerLeft,
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          child: Text(
+                            dob == null
+                                ? 'DD / MM / YYYY'
+                                : '${_two(dob.day)} / ${_two(dob.month)} / ${dob.year}',
+                            style: VnText.body(15,
+                                color: dob == null ? p.faint : p.ink,
+                                weight: FontWeight.w500),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _label(p, 'Sex at birth'),
+                  const SizedBox(height: 6),
+                  VnSegmented(
+                    height: 52,
+                    options: const ['Female', 'Male'],
+                    index: _sex == 'Male' ? 1 : (_sex == 'Female' ? 0 : -1),
+                    onChanged: (i) => setState(() => _sex = i == 0 ? 'Female' : 'Male'),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
-      );
-    }
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Expanded(
-          child: FilledButton(
-            onPressed: _completeRegistration,
-            style: FilledButton.styleFrom(
-              backgroundColor: context.colorScheme.primary,
-              foregroundColor: context.colorScheme.onPrimary,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(child: _unitField(p, 'Height', _heightController, 'cm')),
+            const SizedBox(width: 12),
+            Expanded(child: _unitField(p, 'Weight', _weightController, 'kg')),
+          ],
+        ),
+        const SizedBox(height: 20),
+        _label(p, 'Blood type'),
+        const SizedBox(height: 10),
+        GridView.count(
+          crossAxisCount: 4,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: 8,
+          crossAxisSpacing: 8,
+          childAspectRatio: 1.8,
+          children: [
+            for (final t in _bloodTypes)
+              Semantics(
+                button: true,
+                selected: _bloodType == t,
+                label: 'Blood type $t',
+                excludeSemantics: true,
+                child: Material(
+                  color: _bloodType == t ? p.brand : p.surface,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    side: BorderSide(color: _bloodType == t ? p.brand : p.line),
+                  ),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(14),
+                    onTap: () => setState(() => _bloodType = t),
+                    child: Center(
+                      child: Text(t,
+                          style: VnText.body(15,
+                              weight: FontWeight.w700,
+                              color: _bloodType == t ? p.onBrand : p.ink)),
+                    ),
+                  ),
+                ),
               ),
-            ),
-            child: Text(
-              _currentStep == 0 ? 'NEXT' : 'COMPLETE SETUP',
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        _label(p, 'Allergies'),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final a in _allergies) _AllergyChip(label: a, onRemove: () => setState(() => _allergies.remove(a))),
+            _DashedAddChip(label: 'Add allergy', onTap: _addAllergy),
+          ],
+        ),
+        const SizedBox(height: 20),
+        _label(p, 'Ongoing conditions'),
+        const SizedBox(height: 10),
+        VnListGroup(
+          children: [
+            for (final c in _conditionOptions)
+              InkWell(
+                onTap: () => setState(() =>
+                    _conditions.contains(c) ? _conditions.remove(c) : _conditions.add(c)),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                  child: Row(
+                    children: [
+                      Checkbox(
+                        value: _conditions.contains(c),
+                        activeColor: p.brand,
+                        checkColor: p.onBrand,
+                        side: BorderSide(color: p.faint, width: 1.5),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+                        onChanged: (v) => setState(() =>
+                            v == true ? _conditions.add(c) : _conditions.remove(c)),
+                      ),
+                      const SizedBox(width: 2),
+                      Expanded(child: Text(c, style: VnText.body(15, color: p.ink))),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        VnTextField(
+          label: 'Current medications',
+          controller: _medsController,
+          hint: 'e.g. Salbutamol inhaler 100 mcg, as needed',
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCareStep(VnPalette p) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _intro(p, 'Your care circle',
+            'If a check comes back urgent, these people get notified with your location.'),
+        const SizedBox(height: 20),
+        if (_careCircle.isNotEmpty) ...[
+          VnListGroup(
+            children: [
+              for (var i = 0; i < _careCircle.length; i++)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+                  child: Row(
+                    children: [
+                      VnAvatar(name: _careCircle[i].name, size: 44, fontSize: 14),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(_careCircle[i].name,
+                                style: VnText.body(14, weight: FontWeight.w700, color: p.ink)),
+                            Text(
+                              '${_careCircle[i].relation} · ${_careCircle[i].contactInfo}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: VnText.body(13, color: p.muted),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (_careCircle[i].isPrimary)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: p.brandTint,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text('Primary',
+                              style: VnText.body(12, weight: FontWeight.w700, color: p.brandDeep)),
+                        )
+                      else
+                        VnIconButton(
+                          icon: Icons.star_outline_rounded,
+                          tooltip: 'Make ${_careCircle[i].name} primary',
+                          foreground: p.muted,
+                          onPressed: () => _setPrimary(i),
+                        ),
+                      VnIconButton(
+                        icon: Icons.close_rounded,
+                        tooltip: 'Remove ${_careCircle[i].name}',
+                        foreground: p.muted,
+                        onPressed: () => _removeContact(i),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 20),
+        ],
+        VnCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('Add a contact',
+                  style: VnText.heading(16, weight: FontWeight.w700, color: p.ink)),
+              const SizedBox(height: 14),
+              VnTextField(
+                label: 'Name',
+                controller: _contactNameController,
+                hint: 'e.g. Chidi Okafor',
+                prefixIcon: Icons.person_outline_rounded,
+              ),
+              const SizedBox(height: 14),
+              VnTextField(
+                label: 'Phone or email',
+                controller: _contactInfoController,
+                hint: '+234 801 234 5678',
+                prefixIcon: Icons.call_outlined,
+                keyboardType: TextInputType.emailAddress,
+              ),
+              const SizedBox(height: 14),
+              _label(p, 'Relationship'),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final r in _relationOptions)
+                    VnChip(
+                      label: r,
+                      selected: _selectedRelation == r,
+                      onTap: () => setState(() => _selectedRelation = r),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              VnOutlineButton(
+                label: 'Add to care circle',
+                icon: Icons.add_rounded,
+                foreground: p.brand,
+                borderColor: p.brandBorder,
+                background: p.brandWash,
+                onPressed: _addContactToCircle,
+              ),
+            ],
           ),
         ),
       ],
     );
   }
+}
+
+class _AllergyChip extends StatelessWidget {
+  final String label;
+  final VoidCallback onRemove;
+  const _AllergyChip({required this.label, required this.onRemove});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = VnPalette.of(context);
+    final fg = p.isDark ? const Color(0xFFFCA5A5) : const Color(0xFF991B1B);
+    return Container(
+      height: 36,
+      padding: const EdgeInsets.only(left: 14, right: 2),
+      decoration: BoxDecoration(
+        color: p.dangerTint,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label, style: VnText.body(14, weight: FontWeight.w600, color: fg)),
+          IconButton(
+            tooltip: 'Remove $label',
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            icon: Icon(Icons.close_rounded, size: 16, color: fg),
+            onPressed: onRemove,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DashedAddChip extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  const _DashedAddChip({required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = VnPalette.of(context);
+    return Semantics(
+      button: true,
+      label: label,
+      excludeSemantics: true,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: onTap,
+        child: CustomPaint(
+          painter: _DashedStadiumPainter(p.faint),
+          child: Container(
+            height: 36,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.add_rounded, size: 16, color: p.inkSoft),
+                const SizedBox(width: 6),
+                Text(label, style: VnText.body(14, weight: FontWeight.w600, color: p.inkSoft)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DashedStadiumPainter extends CustomPainter {
+  final Color color;
+  _DashedStadiumPainter(this.color);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rrect = RRect.fromRectAndRadius(
+      Offset.zero & size,
+      Radius.circular(size.height / 2),
+    ).deflate(0.5);
+    final path = Path()..addRRect(rrect);
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    for (final m in path.computeMetrics()) {
+      var d = 0.0;
+      while (d < m.length) {
+        canvas.drawPath(m.extractPath(d, d + 4), paint);
+        d += 7;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashedStadiumPainter old) => old.color != color;
 }

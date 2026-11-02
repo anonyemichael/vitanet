@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import 'package:vitanet/data/models/chat_message.dart';
 import 'package:vitanet/data/models/triage_result.dart';
 import 'package:vitanet/data/models/user_profile.dart';
+import 'package:vitanet/data/services/api_service.dart';
 
 /// Direct Gemini AI service — no backend relay needed.
 /// Builds a rich system prompt from user profile + live vitals.
@@ -475,6 +476,46 @@ User message: "$userMessage"
         primarySymptom: '',
         timestamp: DateTime.now(),
       );
+
+  Future<TriageResult> generateTriageResultFromML({
+    required List<String> symptoms,
+    String? primarySymptom,
+  }) async {
+    final hr = _vitals['heart_rate'] ?? 80.0;
+    final temp = _vitals['temperature'] ?? 37.0;
+    final o2 = _vitals['blood_oxygen'] ?? 98.0;
+    final age = _profile?.age ?? 40;
+    final gender = _profile?.sex ?? 'M';
+
+    final ml = await ApiService().predictTriage(
+      symptoms: symptoms,
+      age: age,
+      gender: gender,
+      heartRate: hr,
+      temperature: temp,
+      bloodOxygen: o2,
+    );
+
+    if (ml != null) {
+      final level = switch (ml.severity) {
+        'urgent' => TriageLevel.emergency,
+        'doctor' => TriageLevel.doctor,
+        _ => TriageLevel.selfCare,
+      };
+
+      return TriageResult(
+        id: _uuid.v4(),
+        level: level,
+        summary: '${ml.disease} (${ml.confidence} confidence): ${ml.recommendation}',
+        recommendations: [ml.recommendation, ...ml.precautions],
+        monitorSymptoms: symptoms,
+        primarySymptom: primarySymptom ?? (symptoms.isNotEmpty ? symptoms.first : ml.disease),
+        timestamp: DateTime.now(),
+      );
+    }
+
+    return generateTriageResult();
+  }
 
   void reset() {
     _questionCount = 0;

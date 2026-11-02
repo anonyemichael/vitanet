@@ -46,6 +46,11 @@ class Medicine {
   final List<MedicineAccordionItem> details;
   final String? relatedVideoId;
   final bool isFdaApproved;
+  final String route;
+  final bool isRx;
+  final bool isHomeopathic;
+  final String? brandName;
+  final String? genericName;
 
   const Medicine({
     required this.id,
@@ -58,6 +63,11 @@ class Medicine {
     required this.details,
     this.relatedVideoId,
     required this.isFdaApproved,
+    this.route = 'ORAL',
+    this.isRx = true,
+    this.isHomeopathic = false,
+    this.brandName,
+    this.genericName,
   });
 
   factory Medicine.fromJson(Map<String, dynamic> json) {
@@ -67,6 +77,12 @@ class Medicine {
           return Icons.medication_liquid_rounded;
         case 'medication_rounded':
           return Icons.medication_rounded;
+        case 'water_drop_rounded':
+          return Icons.water_drop_rounded;
+        case 'vaccines_rounded':
+          return Icons.vaccines_rounded;
+        case 'visibility_rounded':
+          return Icons.visibility_rounded;
         case 'healing_rounded':
           return Icons.healing_rounded;
         case 'air_rounded':
@@ -86,7 +102,7 @@ class Medicine {
         case 'monitor_weight_rounded':
           return Icons.monitor_weight_rounded;
         default:
-          return Icons.local_pharmacy_rounded;
+          return Icons.medication_rounded;
       }
     }
 
@@ -106,6 +122,35 @@ class Medicine {
       details: (json['details'] as List?)?.map((s) => MedicineAccordionItem.fromJson(s)).toList() ?? [],
       relatedVideoId: json['related_video_id'] as String?,
       isFdaApproved: json['is_fda_approved'] as bool? ?? true,
+      route: json['route'] as String? ?? 'ORAL',
+      isRx: json['is_rx'] as bool? ?? true,
+      isHomeopathic: json['is_homeopathic'] as bool? ?? false,
+      brandName: json['brand_name'] as String?,
+      genericName: json['generic_name'] as String?,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'type': type,
+      'description': description,
+      'accent_color': '#${color.toARGB32().toRadixString(16).padLeft(8, '0').substring(2)}',
+      'icon': 'medication_rounded',
+      'hero_image_url': heroImageUrl,
+      'details': details.map((d) => {
+        'title': d.title,
+        'content': d.content,
+        'icon': 'medication_rounded',
+      }).toList(),
+      'related_video_id': relatedVideoId,
+      'is_fda_approved': isFdaApproved,
+      'route': route,
+      'is_rx': isRx,
+      'is_homeopathic': isHomeopathic,
+      'brand_name': brandName,
+      'generic_name': genericName,
+    };
   }
 }

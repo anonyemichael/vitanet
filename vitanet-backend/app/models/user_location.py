@@ -1,7 +1,7 @@
 # app/models/user_location.py
 from datetime import datetime
 from sqlalchemy import Column, Float, DateTime, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Uuid as UUID
 from app.database.base import Base
 
 

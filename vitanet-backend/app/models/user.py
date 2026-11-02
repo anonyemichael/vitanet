@@ -1,7 +1,7 @@
 from uuid import uuid4
 
 from sqlalchemy import Column, String, DateTime, Date, Enum as SQLEnum
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Uuid as UUID
 from sqlalchemy.sql import func
 
 from app.enums import AccountType

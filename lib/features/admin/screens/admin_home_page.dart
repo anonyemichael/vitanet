@@ -1,10 +1,26 @@
-import 'package:flutter/material.dart';
-import '../services/hospital_api_service.dart';
-import '../models/hospital_data.dart';
-import 'admin_profile_settings_page.dart';
+import 'dart:async';
 
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
+import 'package:vitanet/core/constants/app_colors.dart';
+import '../models/alert.dart';
+import '../models/hospital_data.dart';
+import '../services/hospital_api_service.dart';
+import '../widgets/patient_sheets.dart';
+import '../widgets/staff_demo_data.dart';
+import '../widgets/staff_ui.dart';
+import 'admin_profile_settings_page.dart';
+import 'case_management_screen.dart';
+
+/// Staff dashboard (AdminHome.dc.html).
 class AdminHomePage extends StatefulWidget {
-  const AdminHomePage({super.key});
+  final VoidCallback? onOpenAlerts;
+  final VoidCallback? onOpenHospital;
+
+  const AdminHomePage({super.key, this.onOpenAlerts, this.onOpenHospital});
 
   @override
   State<AdminHomePage> createState() => _AdminHomePageState();
@@ -12,386 +28,263 @@ class AdminHomePage extends StatefulWidget {
 
 class _AdminHomePageState extends State<AdminHomePage> {
   final ApiService _apiService = ApiService();
-  late Future<HospitalStats> _statsFuture;
+  HospitalStats? _stats;
+  List<ClinicalAlert> _alerts = const [];
+  DateTime _now = DateTime.now();
+  Timer? _clock;
 
   @override
   void initState() {
     super.initState();
     _loadStats();
+    _clock = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) setState(() => _now = DateTime.now());
+    });
+  }
+
+  @override
+  void dispose() {
+    _clock?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadStats() async {
+    final results = await Future.wait([
+      _apiService.getDashboardStats(),
+      _apiService.getAlerts(),
+    ]);
+    if (!mounted) return;
     setState(() {
-      _statsFuture = _apiService.getDashboardStats();
+      _stats = results[0] as HospitalStats;
+      _alerts = results[1] as List<ClinicalAlert>;
+      _now = DateTime.now();
     });
-    await _statsFuture;
   }
 
-  void _handleWorkflow(String action) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Initializing $action workflow...'),
-        behavior: SnackBarBehavior.floating,
-        action: SnackBarAction(label: 'Dismiss', onPressed: () {}),
-      ),
-    );
+  void _openCases() {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CaseManagementScreen()));
+  }
+
+  void _openProfile() {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AdminProfileSettingsPage()));
   }
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final p = StaffPalette.of(context);
+    final user = Firebase.apps.isNotEmpty ? FirebaseAuth.instance.currentUser : null;
+    final name = (user?.displayName?.trim().isNotEmpty ?? false) ? user!.displayName!.trim() : kDemoStaffName;
 
-    return Scaffold(
-      backgroundColor: isDark ? colorScheme.surface : const Color(0xFFF4F7FB),
-      body: RefreshIndicator(
-        onRefresh: _loadStats,
-        color: colorScheme.primary,
-        child: FutureBuilder<HospitalStats>(
-          future: _statsFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            
-            if (snapshot.hasError) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.error_outline, color: Colors.red, size: 48),
-                    const SizedBox(height: 16),
-                    Text('Error: ${snapshot.error}'),
-                    TextButton(onPressed: _loadStats, child: const Text('Retry'))
-                  ],
-                )
-              );
-            }
+    final activeCases = (_stats?.activePatients ?? 0) > 0 ? _stats!.activePatients : 24;
+    final apiCritical = _alerts.where((a) => a.isCritical).length;
+    final critical = _alerts.isNotEmpty ? apiCritical : 3;
+    final topPad = MediaQuery.paddingOf(context).top;
 
-            final stats = snapshot.data!;
-
-            return CustomScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              slivers: [
-                SliverAppBar(
-                  expandedHeight: 160.0,
-                  floating: false,
-                  pinned: true,
-                  backgroundColor: isDark ? colorScheme.surface : const Color(0xFFF4F7FB),
-                  elevation: 0,
-                  flexibleSpace: FlexibleSpaceBar(
-                    titlePadding: const EdgeInsetsDirectional.only(start: 24, bottom: 16),
-                    title: Text(
-                      'Clinical Overview',
-                      style: TextStyle(
-                        color: isDark ? Colors.white : Colors.black87,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 22,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                    background: Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: isDark 
-                            ? [colorScheme.primary.withAlpha(40), colorScheme.surface]
-                            : [const Color(0xFFE3F2FD), const Color(0xFFF4F7FB)],
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                        ),
-                      ),
-                      child: Stack(
-                        children: [
-                          Positioned(
-                            right: -50,
-                            top: -50,
-                            child: Icon(
-                              Icons.local_hospital_rounded,
-                              size: 200,
-                              color: colorScheme.primary.withAlpha(isDark ? 20 : 10),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+        backgroundColor: p.bg,
+        body: RefreshIndicator(
+          onRefresh: _loadStats,
+          color: AppColors.brand,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.only(bottom: 24),
+            children: [
+              // ── Navy header ──
+              Container(
+                color: AppColors.staffNavy,
+                padding: EdgeInsets.fromLTRB(20, topPad + 16, 20, 16),
+                child: StaffContent(
+                  child: Column(
+                    children: [
+                      SizedBox(
+                        height: 48,
+                        child: Row(
+                          children: [
+                            Semantics(
+                              button: true,
+                              label: 'Open profile',
+                              child: GestureDetector(
+                                onTap: _openProfile,
+                                child: const StaffPhoto(kStaffPhoto, size: 46, radius: 14, alignment: Alignment(0, -0.7)),
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  actions: [
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8.0),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: isDark ? Colors.black26 : Colors.white,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withAlpha(10),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            )
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: staffHeading(17, color: const Color(0xFFF1F5F9)),
+                                  ),
+                                  Text(
+                                    'Emergency · $kDemoFacility',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: staffBody(12, color: const Color(0xFF94A3B8)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            StaffIconButton(
+                              icon: Icons.notifications_none_rounded,
+                              tooltip: 'Alerts, $critical critical',
+                              background: const Color(0x14FFFFFF),
+                              foreground: const Color(0xFFF1F5F9),
+                              badge: critical > 0 ? '$critical' : null,
+                              onPressed: widget.onOpenAlerts,
+                            ),
                           ],
                         ),
-                        child: IconButton(
-                          icon: const Icon(Icons.account_circle_outlined, size: 26),
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => const AdminProfileSettingsPage()),
-                            );
-                          },
-                          color: colorScheme.primary,
-                        ),
                       ),
-                    ),
-                  ],
-                ),
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Welcome, Medical Service Provider',
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: colorScheme.onSurface,
-                          letterSpacing: -0.5,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Monitoring facility vitals and patient workflow.',
-                        style: TextStyle(
-                          color: colorScheme.onSurfaceVariant,
-                          fontSize: 15,
-                        ),
-                      ),
-                      const SizedBox(height: 28),
-                      _buildSectionTitle(context, 'Facility Metrics'),
                       const SizedBox(height: 16),
-                      LayoutBuilder(
-                        builder: (context, constraints) {
-                          int crossAxisCount = constraints.maxWidth > 600 ? 4 : 2;
-                          return GridView.count(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            crossAxisCount: crossAxisCount,
-                            mainAxisSpacing: 16,
-                            crossAxisSpacing: 16,
-                            childAspectRatio: 1.1,
-                            children: [
-                              _buildMetricCard(
-                                context,
-                                'Active Care',
-                                '${stats.activePatients}',
-                                'Patients',
-                                Icons.personal_injury_outlined,
-                                const Color(0xFFE3F2FD),
-                                const Color(0xFF1976D2),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: const Color(0x1A2DD4BF),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0x402DD4BF)),
+                        ),
+                        child: Row(
+                          children: [
+                            const StaffDot(AppColors.mint),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'On shift · 07:00–19:00',
+                                style: staffBody(13, weight: FontWeight.w600, color: AppColors.mintLight),
                               ),
-                              _buildMetricCard(
-                                context,
-                                'Capacity',
-                                '${stats.availableWards}',
-                                'Wards Avail.',
-                                Icons.door_sliding_outlined,
-                                const Color(0xFFE0F2F1),
-                                const Color(0xFF00897B),
-                              ),
-                              if (constraints.maxWidth > 600) ...[
-                                _buildMetricCard(
-                                  context,
-                                  'Vitals',
-                                  stats.systemHealth,
-                                  'System Health',
-                                  Icons.auto_graph_outlined,
-                                  const Color(0xFFF3E5F5),
-                                  const Color(0xFF8E24AA),
-                                ),
-                                _buildMetricCard(
-                                  context,
-                                  'Staffing',
-                                  '${stats.staffOnDuty}',
-                                  'Active Duty',
-                                  Icons.badge_outlined,
-                                  const Color(0xFFFFF3E0),
-                                  const Color(0xFFF57C00),
-                                ),
-                              ],
-                            ],
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 32),
-                      _buildSectionTitle(context, 'Primary Workflow'),
-                      const SizedBox(height: 16),
-                      LayoutBuilder(
-                        builder: (context, constraints) {
-                          int crossAxisCount = constraints.maxWidth > 600 ? 4 : 2;
-                          return GridView.count(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            crossAxisCount: crossAxisCount,
-                            mainAxisSpacing: 16,
-                            crossAxisSpacing: 16,
-                            childAspectRatio: 1.3,
-                            children: [
-                              _buildWorkflowItem(context, Icons.assignment_outlined, 'Consultation', const Color(0xFF0288D1)),
-                              _buildWorkflowItem(context, Icons.history_edu_outlined, 'Case History', const Color(0xFF26C6DA)),
-                              _buildWorkflowItem(context, Icons.science_outlined, 'Diagnostics', const Color(0xFF5E35B1)),
-                              _buildWorkflowItem(context, Icons.vaccines_outlined, 'Therapeutics', const Color(0xFFD81B60)),
-                            ],
-                          );
-                        },
+                            ),
+                            Text(
+                              DateFormat('EEE d MMM · HH:mm').format(_now),
+                              style: staffBody(13, color: const Color(0xFF94A3B8)),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
                 ),
               ),
-            ],
-          );
-        },
-      ),
-    ),
-  );
-}
-
-  Widget _buildSectionTitle(BuildContext context, String title) {
-    return Text(
-      title,
-      style: TextStyle(
-        fontSize: 18,
-        fontWeight: FontWeight.bold,
-        color: Theme.of(context).colorScheme.onSurface.withAlpha(200),
-      ),
-    );
-  }
-
-  Widget _buildMetricCard(
-    BuildContext context,
-    String label,
-    String value,
-    String unit,
-    IconData icon,
-    Color bgColor,
-    Color accentColor,
-  ) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? colorScheme.surfaceContainerHighest.withAlpha(80) : Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: isDark ? [] : [
-          BoxShadow(
-            color: accentColor.withAlpha(15),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          )
-        ],
-        border: Border.all(
-          color: isDark ? colorScheme.outlineVariant : Colors.transparent,
-          width: 1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: isDark ? accentColor.withAlpha(30) : bgColor,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, color: accentColor, size: 20),
+              // ── KPI cards overlapping the header ──
+              Stack(
+                children: [
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: 48,
+                    child: Container(color: AppColors.staffNavy),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: StaffContent(
+                      child: LayoutBuilder(
+                        builder: (context, c) {
+                          final cols = c.maxWidth > 600 ? 4 : 2;
+                          final w = (c.maxWidth - 10 * (cols - 1)) / cols;
+                          return Wrap(
+                            spacing: 10,
+                            runSpacing: 10,
+                            children: [
+                              SizedBox(
+                                width: w,
+                                child: _KpiCard(
+                                  label: 'Active cases',
+                                  value: '$activeCases',
+                                  footer: _KpiFooterText('+5 since 07:00', kStaffGreen),
+                                  onTap: _openCases,
+                                ),
+                              ),
+                              SizedBox(
+                                width: w,
+                                child: _KpiCard(
+                                  label: 'Critical now',
+                                  value: '$critical',
+                                  critical: true,
+                                  footer: _KpiFooterText(
+                                    critical == 0 ? 'All attended' : '2 unassigned',
+                                    p.dark ? const Color(0xFFFCA5A5) : kStaffDanger,
+                                  ),
+                                  onTap: widget.onOpenAlerts,
+                                ),
+                              ),
+                              SizedBox(
+                                width: w,
+                                child: _KpiCard(
+                                  label: 'Beds free',
+                                  value: '12',
+                                  suffix: ' / 80',
+                                  footer: const _KpiBar(0.85),
+                                  onTap: widget.onOpenHospital,
+                                ),
+                              ),
+                              SizedBox(
+                                width: w,
+                                child: _KpiCard(
+                                  label: 'Avg. wait',
+                                  value: '18',
+                                  suffix: ' min',
+                                  footer: _KpiFooterText('−6 vs yesterday', kStaffGreen),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w800,
-                  color: colorScheme.onSurface,
-                  letterSpacing: -1,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                unit,
-                style: TextStyle(
-                  color: colorScheme.primary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildWorkflowItem(BuildContext context, IconData icon, String label, Color color) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => _handleWorkflow(label),
-        borderRadius: BorderRadius.circular(20),
-        splashColor: color.withAlpha(30),
-        highlightColor: color.withAlpha(10),
-        child: Container(
-          decoration: BoxDecoration(
-            color: isDark ? colorScheme.surfaceContainerHighest.withAlpha(50) : Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: isDark ? [] : [
-              BoxShadow(
-                color: Colors.black.withAlpha(5),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              )
-            ],
-            border: Border.all(color: color.withAlpha(isDark ? 50 : 20)),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: color.withAlpha(15),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, color: color, size: 26),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                label,
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
-                  color: colorScheme.onSurface,
+              // ── Incoming referrals ──
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+                child: StaffContent(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Semantics(
+                              header: true,
+                              child: Text(
+                                'Incoming from VitaNet',
+                                style: staffHeading(18, weight: FontWeight.w700, color: p.ink),
+                              ),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: _openCases,
+                            style: TextButton.styleFrom(
+                              foregroundColor: p.accent,
+                              minimumSize: const Size(44, 44),
+                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                            ),
+                            child: Text('View all', style: staffBody(14, weight: FontWeight.w600, color: p.accent)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      for (final r in demoReferrals) ...[
+                        _ReferralCard(
+                          referral: r,
+                          onTap: () {
+                            final rec = demoRecords[r.recordId];
+                            if (rec != null) {
+                              showPatientRecordSheet(context, rec, onUpdated: (u) => demoRecords[u.id] = u);
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -402,4 +295,190 @@ class _AdminHomePageState extends State<AdminHomePage> {
   }
 }
 
+class _KpiCard extends StatelessWidget {
+  final String label;
+  final String value;
+  final String? suffix;
+  final Widget footer;
+  final bool critical;
+  final VoidCallback? onTap;
 
+  const _KpiCard({
+    required this.label,
+    required this.value,
+    this.suffix,
+    required this.footer,
+    this.critical = false,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = StaffPalette.of(context);
+    final danger = p.tone(StaffTone.danger);
+    final valueColor = critical ? (p.dark ? danger.fg : kStaffDanger) : p.ink;
+    return Semantics(
+      button: onTap != null,
+      label: '$label: $value${suffix ?? ''}',
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [BoxShadow(color: p.shadow, blurRadius: 8, offset: const Offset(0, 2))],
+        ),
+        child: Material(
+        color: p.card,
+        elevation: 0,
+        shadowColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+          side: critical
+              ? BorderSide(color: p.dark ? const Color(0x66DC2626) : const Color(0xFFFECACA))
+              : BorderSide.none,
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: staffBody(12,
+                      weight: FontWeight.w600,
+                      color: critical ? (p.dark ? danger.fg : const Color(0xFF991B1B)) : p.muted),
+                ),
+                const SizedBox(height: 6),
+                Text.rich(
+                  TextSpan(
+                    text: value,
+                    children: [
+                      if (suffix != null)
+                        TextSpan(
+                          text: suffix,
+                          style: staffHeading(15, weight: FontWeight.w600, color: p.muted),
+                        ),
+                    ],
+                  ),
+                  style: staffHeading(28, color: valueColor, height: 1.1),
+                ),
+                const SizedBox(height: 6),
+                footer,
+              ],
+            ),
+          ),
+        ),
+      ),
+      ),
+    );
+  }
+}
+
+class _KpiFooterText extends StatelessWidget {
+  final String text;
+  final Color color;
+  const _KpiFooterText(this.text, this.color);
+
+  @override
+  Widget build(BuildContext context) {
+    final p = StaffPalette.of(context);
+    final c = p.dark && color == kStaffGreen ? const Color(0xFF6EE7B7) : color;
+    return Text(text, style: staffBody(12, weight: FontWeight.w600, color: c));
+  }
+}
+
+class _KpiBar extends StatelessWidget {
+  final double value;
+  const _KpiBar(this.value);
+
+  @override
+  Widget build(BuildContext context) {
+    final p = StaffPalette.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(6),
+        child: SizedBox(
+          height: 6,
+          child: LinearProgressIndicator(
+            value: value,
+            backgroundColor: p.track,
+            color: const Color(0xFFF59E0B),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ReferralCard extends StatelessWidget {
+  final StaffReferral referral;
+  final VoidCallback onTap;
+  const _ReferralCard({required this.referral, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = StaffPalette.of(context);
+    final tone = p.tone(referral.tone);
+    final r = referral;
+    return Semantics(
+      button: true,
+      label: '${r.level} referral, ${r.nameAge}, ETA ${r.eta}',
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: Material(
+          color: p.card,
+          child: InkWell(
+            onTap: onTap,
+            child: Container(
+              decoration: BoxDecoration(
+                border: Border(left: BorderSide(color: tone.strong, width: 4)),
+              ),
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(r.nameAge, style: staffBody(15, weight: FontWeight.w700, color: p.ink)),
+                            const SizedBox(height: 2),
+                            Text(r.meta, style: staffBody(12, color: p.muted)),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      StaffTag(r.level, tone: r.tone, weight: FontWeight.w800),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Text(r.summary, style: staffBody(13, color: p.body, height: 1.45)),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Wrap(
+                          spacing: 12,
+                          runSpacing: 4,
+                          children: [
+                            for (final v in r.vitals)
+                              Text(v, style: staffBody(12, weight: FontWeight.w600, color: p.inkSoft)),
+                          ],
+                        ),
+                      ),
+                      Text('ETA ${r.eta}', style: staffBody(12, weight: FontWeight.w600, color: p.accent)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

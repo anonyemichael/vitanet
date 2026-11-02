@@ -1,13 +1,16 @@
-import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:vitanet/core/constants/app_spacing.dart';
-import 'package:vitanet/core/extensions/context_ext.dart';
-import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import 'package:confetti/confetti.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:vitanet/core/utils/launch_helpers.dart';
+import 'package:vitanet/shared/widgets/vn_kit.dart';
+
 import '../models/health_article.dart';
 import '../models/health_video.dart';
+import '../widgets/resource_media.dart';
+import 'general_health_library_screen.dart' show articlePhoto, cleanArticleSource;
 import 'video_player_screen.dart';
+
+/// Reader view for a health library article.
 class HealthArticleDetailScreen extends StatefulWidget {
   final HealthArticle article;
 
@@ -18,635 +21,471 @@ class HealthArticleDetailScreen extends StatefulWidget {
 }
 
 class _HealthArticleDetailScreenState extends State<HealthArticleDetailScreen> {
-  bool _isBookmarked = false;
-  bool _isHelpful = false;
+  final ScrollController _scroll = ScrollController();
+  late final ConfettiController _confettiController;
   final Map<int, int> _selectedQuizOptions = {};
-  final PageController _quizPageController = PageController();
-  late ConfettiController _confettiController;
+  double _progress = 0;
+  double _textScale = 1;
+  bool _isBookmarked = false;
+  bool? _helpful;
+
+  HealthArticle get a => widget.article;
 
   @override
   void initState() {
     super.initState();
     _confettiController = ConfettiController(duration: const Duration(seconds: 3));
+    _scroll.addListener(_onScroll);
   }
 
   @override
   void dispose() {
-    _quizPageController.dispose();
+    _scroll.removeListener(_onScroll);
+    _scroll.dispose();
     _confettiController.dispose();
     super.dispose();
   }
 
+  void _onScroll() {
+    if (!_scroll.hasClients) return;
+    final max = _scroll.position.maxScrollExtent;
+    final value = max <= 0 ? 1.0 : (_scroll.offset / max).clamp(0.0, 1.0);
+    if ((value - _progress).abs() > 0.01) setState(() => _progress = value);
+  }
+
+  void _cycleTextSize() {
+    setState(() => _textScale = _textScale >= 1.3 ? 1 : (_textScale + 0.15));
+  }
+
+  void _toggleBookmark() {
+    setState(() => _isBookmarked = !_isBookmarked);
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text(_isBookmarked ? 'Saved to bookmarks' : 'Removed from bookmarks'),
+        behavior: SnackBarBehavior.floating,
+      ));
+  }
+
+  Future<void> _share() async {
+    final link = a.doi != null && a.doi!.isNotEmpty ? '\nhttps://doi.org/${a.doi}' : '';
+    try {
+      await Share.share('${a.title}\n${cleanArticleSource(a)}$link', subject: a.title);
+    } catch (_) {}
+  }
+
+  void _askAi() {
+    final points = a.keyTakeaways.take(3).join('; ');
+    askVitaNetAi(
+      context,
+      'I am reading "${a.title}" (${cleanArticleSource(a)}). '
+      '${points.isNotEmpty ? 'Key points: $points. ' : ''}'
+      'Can you explain what it means for me in plain language?',
+    );
+  }
+
+  void _openVideo() {
+    final id = a.relatedVideoId!;
+    Navigator.of(context, rootNavigator: true).push(
+      MaterialPageRoute(
+        builder: (_) => VideoPlayerScreen(
+          video: HealthVideo(
+            videoId: id,
+            title: 'Guide: ${a.title}',
+            thumbnailUrl: 'https://img.youtube.com/vi/$id/hqdefault.jpg',
+            duration: '',
+            category: a.category,
+            organization: 'Health Library',
+            summary: a.excerpt,
+            keySteps: a.keyTakeaways.map((t) => VideoKeyStep(time: '•', action: t)).toList(),
+            verificationStatus: 'Verified Resource',
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final p = VnPalette.of(context);
+    final photo = articlePhoto(a);
+    final s = _textScale;
+    final bodyColor = p.isDark ? p.inkSoft : const Color(0xFF1E293B);
+
     return Scaffold(
-      backgroundColor: context.colorScheme.surface,
-      body: Stack(
-        children: [
-          CustomScrollView(
-            slivers: [
-              _buildSliverAppBar(context),
-              SliverPadding(
-                padding: const EdgeInsets.all(AppSpacing.xxl),
-                sliver: SliverList(
-                  delegate: SliverChildListDelegate([
-                    _buildHeaderInfo(context),
-                    const SizedBox(height: AppSpacing.xxl),
-                    _buildBodyContent(context),
-                    if (widget.article.relatedVideoId != null) ...[
-                      const SizedBox(height: AppSpacing.xxxl),
-                      _buildVideoSection(context),
-                    ],
-                    if (widget.article.interactiveQuizzes.isNotEmpty) ...[
-                      const SizedBox(height: AppSpacing.xxxl),
-                      _buildQuizSection(context),
-                    ],
-                    const SizedBox(height: AppSpacing.xxxl),
-                    _buildInteractiveFeedback(context),
-                    const SizedBox(height: 120), // Bottom padding
-                  ]),
-                ),
-              ),
-            ],
-          ),
-          Align(
-            alignment: Alignment.topCenter,
-            child: ConfettiWidget(
-              confettiController: _confettiController,
-              blastDirectionality: BlastDirectionality.explosive, // radial explosion
-              shouldLoop: false,
-              colors: const [Colors.green, Colors.blue, Colors.pink, Colors.orange, Colors.purple], 
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-
-  Widget _buildSliverAppBar(BuildContext context) {
-    return SliverAppBar(
-      expandedHeight: 300.0,
-      pinned: true,
-      backgroundColor: widget.article.color,
-      foregroundColor: Colors.white,
-      actions: [
-        IconButton(
-          icon: Icon(_isBookmarked ? Icons.bookmark_rounded : Icons.bookmark_outline_rounded),
-          onPressed: () {
-            setState(() => _isBookmarked = !_isBookmarked);
-            context.showSnack(_isBookmarked ? 'Saved to bookmarks' : 'Removed from bookmarks');
-          },
-        ),
-      ],
-      flexibleSpace: FlexibleSpaceBar(
-        background: Stack(
-          fit: StackFit.expand,
+      backgroundColor: p.surface,
+      body: SafeArea(
+        bottom: false,
+        child: Stack(
           children: [
-            if (widget.article.imageUrls.isEmpty)
-              Container(
-                color: widget.article.color.withValues(alpha: 0.1),
-                child: Center(
-                  child: Icon(
-                    widget.article.icon,
-                    size: 120,
-                    color: widget.article.color.withValues(alpha: 0.5),
-                  ),
-                ),
-              )
-            else if (widget.article.imageUrls.length == 1)
-              Image.network(
-                widget.article.imageUrls.first,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => Container(
-                  color: widget.article.color.withValues(alpha: 0.1),
-                  child: Center(
-                    child: Icon(
-                      widget.article.icon,
-                      size: 120,
-                      color: widget.article.color.withValues(alpha: 0.5),
-                    ),
-                  ),
-                ),
-              )
-            else
-              PageView.builder(
-                itemCount: widget.article.imageUrls.length,
-                itemBuilder: (context, index) {
-                  return Image.network(
-                    widget.article.imageUrls[index],
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      color: widget.article.color.withValues(alpha: 0.1),
-                      child: Center(
-                        child: Icon(
-                          widget.article.icon,
-                          size: 120,
-                          color: widget.article.color.withValues(alpha: 0.5),
-                        ),
+            Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                  child: Row(
+                    children: [
+                      VnIconButton(
+                        icon: Icons.chevron_left_rounded,
+                        tooltip: 'Back',
+                        iconSize: 26,
+                        onPressed: () => Navigator.of(context).maybePop(),
                       ),
-                    ),
-                  );
-                },
-              ),
-            // Gradient overlay for text readability on the app bar when scrolling up
-            DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withValues(alpha: 0.4),
-                    Colors.transparent,
-                    widget.article.color.withValues(alpha: 0.8),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeaderInfo(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: widget.article.color.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                widget.article.category.toUpperCase(),
-                style: TextStyle(
-                  color: widget.article.color,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.2,
-                ),
-              ),
-            ),
-            const Spacer(),
-            Icon(Icons.schedule_rounded, size: 16, color: context.colorScheme.onSurfaceVariant),
-            const SizedBox(width: 4),
-            Text(
-              widget.article.readTime,
-              style: TextStyle(
-                color: context.colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.xl),
-        Text(
-          widget.article.title,
-          style: GoogleFonts.outfit(
-            fontSize: 32,
-            fontWeight: FontWeight.w700,
-            color: context.colorScheme.onSurface,
-            height: 1.2,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildBodyContent(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          widget.article.excerpt,
-          style: TextStyle(
-            fontSize: 20,
-            height: 1.6,
-            fontWeight: FontWeight.w500,
-            color: context.colorScheme.onSurface,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.xxl),
-        ...widget.article.sections.map((section) => Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.xl),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: widget.article.color.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.notes_rounded, color: widget.article.color, size: 20),
-                        const SizedBox(width: AppSpacing.sm),
-                        Expanded(
-                          child: Text(
-                            section.heading,
-                            style: context.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: widget.article.color,
+                      const Spacer(),
+                      Tooltip(
+                        message: 'Text size',
+                        child: Semantics(
+                          button: true,
+                          label: 'Text size',
+                          excludeSemantics: true,
+                          child: InkWell(
+                            onTap: _cycleTextSize,
+                            borderRadius: BorderRadius.circular(14),
+                            child: SizedBox(
+                              width: 44,
+                              height: 44,
+                              child: Center(child: Text('Aa', style: VnText.body(15, weight: FontWeight.w800, color: p.ink))),
                             ),
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                      VnIconButton(
+                        icon: _isBookmarked ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+                        tooltip: _isBookmarked ? 'Remove bookmark' : 'Save',
+                        foreground: _isBookmarked ? p.brand : p.ink,
+                        onPressed: _toggleBookmark,
+                      ),
+                      VnIconButton(icon: Icons.ios_share_rounded, tooltip: 'Share', onPressed: _share),
+                    ],
                   ),
-                  const SizedBox(height: AppSpacing.md),
-                  Text(
-                    section.content,
-                    style: TextStyle(
-                      fontSize: 16,
-                      height: 1.6,
-                      color: context.colorScheme.onSurface.withValues(alpha: 0.85),
-                    ),
-                  ),
-                ],
-              ),
-            )),
-        if (widget.article.keyTakeaways.isNotEmpty) ...[
-          const SizedBox(height: AppSpacing.xl),
-          Container(
-            padding: const EdgeInsets.all(AppSpacing.xl),
-            decoration: BoxDecoration(
-              color: widget.article.color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.lightbulb_rounded, color: widget.article.color),
-                    const SizedBox(width: AppSpacing.md),
-                    Text(
-                      'Key Takeaways',
-                      style: context.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: widget.article.color,
+                ),
+                Semantics(
+                  label: 'Reading progress ${(_progress * 100).round()} percent',
+                  child: SizedBox(
+                    height: 4,
+                    child: ColoredBox(
+                      color: p.surfaceAlt,
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: FractionallySizedBox(
+                          widthFactor: _progress,
+                          child: ColoredBox(color: p.brand, child: const SizedBox.expand()),
+                        ),
                       ),
                     ),
-                  ],
+                  ),
                 ),
-                const SizedBox(height: AppSpacing.lg),
-                ...widget.article.keyTakeaways.map((takeaway) => Padding(
-                      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                Expanded(
+                  child: ListView(
+                    controller: _scroll,
+                    padding: EdgeInsets.fromLTRB(22, 20, 22, MediaQuery.paddingOf(context).bottom + 120),
+                    children: [
+                      Text(a.category, style: VnText.body(13, weight: FontWeight.w700, color: p.brand)),
+                      const SizedBox(height: 16),
+                      Semantics(
+                        header: true,
+                        child: Text(a.title,
+                            style: VnText.heading(27 * s, color: p.ink, height: 1.25, letterSpacing: -0.3)),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
                         children: [
-                          Text('•', style: TextStyle(fontSize: 20, color: widget.article.color, fontWeight: FontWeight.bold)),
-                          const SizedBox(width: AppSpacing.sm),
+                          ClipOval(
+                            child: SizedBox(
+                              width: 38,
+                              height: 38,
+                              child: VnPhoto(
+                                VnPhotos.clinicianFemale,
+                                alignment: const Alignment(0, -0.5),
+                                cacheWidth: 120,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
                           Expanded(
-                            child: Text(
-                              takeaway,
-                              style: TextStyle(fontSize: 16, height: 1.5, color: context.colorScheme.onSurface),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(cleanArticleSource(a),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: VnText.body(14, weight: FontWeight.w600, color: p.ink)),
+                                Text(
+                                  [
+                                    a.difficultyLevel,
+                                    if (a.publishedDate != null && a.publishedDate!.isNotEmpty) a.publishedDate!,
+                                    a.readTime.replaceAll(' read', ''),
+                                  ].join(' · '),
+                                  style: VnText.body(12, color: p.muted),
+                                ),
+                              ],
                             ),
                           ),
                         ],
                       ),
-                    )),
-              ],
-            ),
-          ),
-        ],
-        if (widget.article.mythVsFact != null) ...[
-          const SizedBox(height: AppSpacing.xxl),
-          Container(
-            padding: const EdgeInsets.all(AppSpacing.xl),
-            decoration: BoxDecoration(
-              color: context.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: context.colorScheme.outlineVariant.withValues(alpha: 0.5)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.compare_arrows_rounded, color: Colors.orange),
-                    const SizedBox(width: AppSpacing.md),
-                    Text(
-                      'Myth vs. Fact',
-                      style: context.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                  ],
+                      const SizedBox(height: 16),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(18),
+                        child: SizedBox(
+                          height: 200,
+                          child: VnNetworkPhoto(
+                            url: photo.url,
+                            fallbackAsset: photo.asset,
+                            alignment: const Alignment(0, -0.2),
+                            cacheWidth: 900,
+                          ),
+                        ),
+                      ),
+                      if (a.keyTakeaways.isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        _KeyPoints(points: a.keyTakeaways, scale: s),
+                      ],
+                      if (a.excerpt.isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        Text(a.excerpt, style: VnText.body(16 * s, color: bodyColor, height: 1.75)),
+                      ],
+                      for (final section in a.sections) ...[
+                        const SizedBox(height: 16),
+                        Semantics(
+                          header: true,
+                          child: Text(section.heading, style: VnText.heading(20 * s, color: p.ink)),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(section.content, style: VnText.body(16 * s, color: bodyColor, height: 1.75)),
+                      ],
+                      if (a.mythVsFact != null) ...[
+                        const SizedBox(height: 16),
+                        _PullQuote(myth: a.mythVsFact!.myth, fact: a.mythVsFact!.fact, scale: s),
+                      ],
+                      if (a.doi != null && a.doi!.isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        VnOutlineButton(
+                          label: 'Read the full study',
+                          icon: Icons.open_in_new_rounded,
+                          foreground: p.brand,
+                          borderColor: p.brand,
+                          onPressed: () => LaunchHelpers.openWeb(context, 'https://doi.org/${a.doi}'),
+                        ),
+                      ],
+                      if (a.relatedVideoId != null) ...[
+                        const SizedBox(height: 20),
+                        VnListGroup(children: [
+                          VnListRow(
+                            leading: const VnIconTile(
+                              icon: Icons.play_arrow_rounded,
+                              bg: Color(0xFFCCFBF1),
+                              fg: Color(0xFF0F766E),
+                            ),
+                            title: 'Watch the video guide',
+                            subtitle: a.category,
+                            onTap: _openVideo,
+                          ),
+                        ]),
+                      ],
+                      if (a.interactiveQuizzes.isNotEmpty) ...[
+                        const SizedBox(height: 20),
+                        _buildQuiz(p),
+                      ],
+                      const SizedBox(height: 20),
+                      _buildFeedback(p),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: AppSpacing.lg),
-                Text('Myth:', style: TextStyle(fontWeight: FontWeight.bold, color: context.colorScheme.error)),
-                Text(widget.article.mythVsFact!.myth, style: const TextStyle(fontStyle: FontStyle.italic)),
-                const SizedBox(height: AppSpacing.md),
-                Text('Fact:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green.shade600)),
-                Text(widget.article.mythVsFact!.fact),
               ],
             ),
-          ),
-        ],
-      ],
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: MediaQuery.paddingOf(context).bottom + 20,
+              child: _AskAiBar(onAsk: _askAi),
+            ),
+            Align(
+              alignment: Alignment.topCenter,
+              child: ConfettiWidget(
+                confettiController: _confettiController,
+                blastDirectionality: BlastDirectionality.explosive,
+                shouldLoop: false,
+                colors: const [Color(0xFF0F766E), Color(0xFF2DD4BF), Color(0xFF6D28D9), Color(0xFFF59E0B)],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
-  Widget _buildQuizSection(BuildContext context) {
-    final quizzes = widget.article.interactiveQuizzes;
-    return Container(
-      height: 520, // Fixed height for the PageView container
-      padding: const EdgeInsets.all(AppSpacing.xl),
-      decoration: BoxDecoration(
-        color: context.colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: widget.article.color.withValues(alpha: 0.3)),
-      ),
+  Widget _buildQuiz(VnPalette p) {
+    final quizzes = a.interactiveQuizzes;
+    return VnCard(
+      radius: 18,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.quiz_rounded, color: widget.article.color),
-              const SizedBox(width: AppSpacing.md),
-              Text(
-                'Test Your Knowledge',
-                style: context.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, color: widget.article.color),
-              ),
+              Icon(Icons.quiz_outlined, size: 18, color: p.brand),
+              const SizedBox(width: 8),
+              Text('Check your understanding', style: VnText.heading(16, weight: FontWeight.w700, color: p.ink)),
             ],
           ),
-          const SizedBox(height: AppSpacing.lg),
-          Expanded(
-            child: PageView.builder(
-              controller: _quizPageController,
-              physics: const NeverScrollableScrollPhysics(), // Only slide on button press
-              itemCount: quizzes.length,
-              itemBuilder: (context, quizIndex) {
-                final quiz = quizzes[quizIndex];
-                final selectedOption = _selectedQuizOptions[quizIndex];
-                return SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Question ${quizIndex + 1} of ${quizzes.length}', style: TextStyle(color: widget.article.color, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: AppSpacing.sm),
-                      Text(quiz.question, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                      const SizedBox(height: AppSpacing.lg),
-                      ...List.generate(quiz.options.length, (index) {
-                        final isSelected = selectedOption == index;
-                        final isCorrect = index == quiz.correctIndex;
-                        final showResult = selectedOption != null;
-                        
-                        Color? bgColor;
-                        Color? borderColor;
-                        
-                        if (showResult) {
-                          if (isCorrect) {
-                            bgColor = Colors.green.withValues(alpha: 0.1);
-                            borderColor = Colors.green;
-                          } else if (isSelected && !isCorrect) {
-                            bgColor = Colors.red.withValues(alpha: 0.1);
-                            borderColor = Colors.red;
+          for (var qi = 0; qi < quizzes.length; qi++) ...[
+            const SizedBox(height: 14),
+            Text(quizzes[qi].question, style: VnText.body(15, weight: FontWeight.w600, color: p.ink, height: 1.4)),
+            const SizedBox(height: 10),
+            for (var oi = 0; oi < quizzes[qi].options.length; oi++)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _QuizOption(
+                  label: quizzes[qi].options[oi],
+                  state: _selectedQuizOptions[qi] == null
+                      ? _OptionState.idle
+                      : oi == quizzes[qi].correctIndex
+                          ? _OptionState.correct
+                          : (_selectedQuizOptions[qi] == oi ? _OptionState.wrong : _OptionState.idle),
+                  onTap: _selectedQuizOptions[qi] != null
+                      ? null
+                      : () {
+                          setState(() => _selectedQuizOptions[qi] = oi);
+                          if (oi == quizzes[qi].correctIndex && qi == quizzes.length - 1) {
+                            _confettiController.play();
                           }
-                        }
-
-                        Widget optionCard = Container(
-                          padding: const EdgeInsets.all(AppSpacing.md),
-                          decoration: BoxDecoration(
-                            color: bgColor ?? (isSelected ? widget.article.color.withValues(alpha: 0.1) : Colors.transparent),
-                            border: Border.all(color: borderColor ?? (isSelected ? widget.article.color : context.colorScheme.outlineVariant)),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(child: Text(quiz.options[index])),
-                              if (showResult && isCorrect)
-                                const Icon(Icons.check_circle_rounded, color: Colors.green),
-                              if (showResult && isSelected && !isCorrect)
-                                const Icon(Icons.cancel_rounded, color: Colors.red),
-                            ],
-                          ),
-                        );
-
-                        if (showResult && isSelected && !isCorrect) {
-                           optionCard = optionCard.animate().shake(duration: 400.ms, hz: 4);
-                        } else if (showResult && isCorrect) {
-                           optionCard = optionCard.animate().scale(duration: 300.ms, curve: Curves.easeOutBack, begin: const Offset(1,1), end: const Offset(1.02, 1.02));
-                        }
-
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                          child: InkWell(
-                            onTap: showResult ? null : () {
-                              setState(() => _selectedQuizOptions[quizIndex] = index);
-                              if (index == quiz.correctIndex) {
-                                // Trigger short confetti or full confetti if last question
-                                if (quizIndex == quizzes.length - 1) {
-                                  _confettiController.play();
-                                }
-                              }
-                            },
-                            borderRadius: BorderRadius.circular(12),
-                            child: optionCard,
-                          ),
-                        );
-                      }),
-                      if (selectedOption != null) ...[
-                        const SizedBox(height: AppSpacing.lg),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(AppSpacing.md),
-                          decoration: BoxDecoration(
-                            color: selectedOption == quiz.correctIndex 
-                                ? Colors.green.withValues(alpha: 0.1)
-                                : Colors.orange.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            quiz.explanation,
-                            style: TextStyle(
-                              color: selectedOption == quiz.correctIndex ? Colors.green.shade700 : Colors.orange.shade700,
-                              fontStyle: FontStyle.italic,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.lg),
-                        if (quizIndex < quizzes.length - 1)
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: FilledButton.icon(
-                              onPressed: () {
-                                _quizPageController.nextPage(
-                                  duration: const Duration(milliseconds: 300),
-                                  curve: Curves.easeInOut,
-                                );
-                              },
-                              icon: const Icon(Icons.arrow_forward_rounded, size: 18),
-                              label: const Text('Next Question'),
-                              style: FilledButton.styleFrom(
-                                backgroundColor: widget.article.color,
-                              ),
-                            ),
-                          )
-                        else
-                          Align(
-                            alignment: Alignment.center,
-                            child: Padding(
-                              padding: const EdgeInsets.only(top: AppSpacing.md),
-                              child: Text(
-                                'Quiz Completed! 🎉',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: widget.article.color,
-                                  fontSize: 18,
-                                ),
-                              ).animate().scale(duration: 500.ms, curve: Curves.easeOutBack).shimmer(delay: 500.ms),
-                            ),
-                          ),
-                      ],
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
+                        },
+                ),
+              ),
+            if (_selectedQuizOptions[qi] != null)
+              Text(quizzes[qi].explanation, style: VnText.body(13, color: p.inkSoft, height: 1.5)),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildVideoSection(BuildContext context) {
-    if (widget.article.relatedVideoId == null) return const SizedBox.shrink();
-    
-    final videoId = widget.article.relatedVideoId!;
-    final thumbnailUrl = 'https://img.youtube.com/vi/$videoId/hqdefault.jpg';
-    
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildFeedback(VnPalette p) {
+    return Row(
       children: [
-        Text(
-          'Related Video Guide',
-          style: context.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: widget.article.color,
-          ),
+        Expanded(child: Text('Was this article helpful?', style: VnText.body(14, weight: FontWeight.w600, color: p.ink))),
+        VnIconButton(
+          icon: _helpful == true ? Icons.thumb_up_rounded : Icons.thumb_up_outlined,
+          tooltip: 'Helpful',
+          foreground: _helpful == true ? p.brand : p.muted,
+          onPressed: () => setState(() => _helpful = true),
         ),
-        const SizedBox(height: AppSpacing.md),
-        Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(24),
-            onTap: () {
-              Navigator.of(context, rootNavigator: true).push(
-                MaterialPageRoute(
-                  builder: (_) => VideoPlayerScreen(
-                    video: HealthVideo(
-                      videoId: videoId,
-                      title: 'Guide: ${widget.article.title}',
-                      thumbnailUrl: thumbnailUrl,
-                      duration: '',
-                      category: widget.article.category,
-                      organization: 'Health Library',
-                      summary: widget.article.excerpt,
-                      keySteps: widget.article.keyTakeaways
-                          .map((t) => VideoKeyStep(time: '•', action: t))
-                          .toList(),
-                      verificationStatus: 'Verified Resource',
-                    ),
-                  ),
-                ),
-              );
-            },
-            child: Ink(
-              height: 220,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
-                image: DecorationImage(
-                  image: NetworkImage(thumbnailUrl),
-                  fit: BoxFit.cover,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    blurRadius: 20,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
-              ),
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(24),
-                  color: Colors.black.withValues(alpha: 0.4),
-                ),
-                child: Center(
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: widget.article.color,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: widget.article.color.withValues(alpha: 0.4),
-                          blurRadius: 12,
-                          spreadRadius: 4,
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.play_arrow_rounded,
-                      color: Colors.white,
-                      size: 48,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
+        VnIconButton(
+          icon: _helpful == false ? Icons.thumb_down_rounded : Icons.thumb_down_outlined,
+          tooltip: 'Not helpful',
+          foreground: _helpful == false ? p.danger : p.muted,
+          onPressed: () => setState(() => _helpful = false),
         ),
       ],
     );
   }
+}
 
-  Widget _buildInteractiveFeedback(BuildContext context) {
+class _KeyPoints extends StatelessWidget {
+  final List<String> points;
+  final double scale;
+  const _KeyPoints({required this.points, required this.scale});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = VnPalette.of(context);
+    final fg = p.isDark ? const Color(0xFFCCFBF1) : const Color(0xFF134E4A);
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.xl),
-      decoration: BoxDecoration(
-        color: widget.article.color.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: widget.article.color.withValues(alpha: 0.2)),
-      ),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: p.brandWash, borderRadius: BorderRadius.circular(18)),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Was this article helpful?',
-            style: context.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: AppSpacing.lg),
           Row(
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              FilledButton.tonalIcon(
-                onPressed: () {
-                  setState(() => _isHelpful = true);
-                  context.showSnack('Thank you for your feedback!');
-                },
-                icon: Icon(_isHelpful ? Icons.thumb_up_alt_rounded : Icons.thumb_up_off_alt_rounded),
-                label: const Text('Yes'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: _isHelpful ? widget.article.color.withValues(alpha: 0.2) : null,
-                  foregroundColor: _isHelpful ? widget.article.color : null,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.lg),
-              FilledButton.tonalIcon(
-                onPressed: () {
-                  setState(() => _isHelpful = false);
-                  context.showSnack('Thank you for your feedback!');
-                },
-                icon: const Icon(Icons.thumb_down_off_alt_rounded),
-                label: const Text('No'),
-              ),
+              Icon(Icons.auto_awesome_rounded, size: 16, color: p.brandDeep),
+              const SizedBox(width: 6),
+              Text('KEY POINTS',
+                  style: VnText.body(12, weight: FontWeight.w800, color: p.brandDeep, letterSpacing: 0.4)),
             ],
+          ),
+          const SizedBox(height: 8),
+          for (final point in points)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: EdgeInsets.only(top: 8 * scale, right: 10, left: 4),
+                    child: Container(width: 5, height: 5, decoration: BoxDecoration(color: fg, shape: BoxShape.circle)),
+                  ),
+                  Expanded(child: Text(point, style: VnText.body(14 * scale, color: fg, height: 1.6))),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PullQuote extends StatelessWidget {
+  final String myth;
+  final String fact;
+  final double scale;
+  const _PullQuote({required this.myth, required this.fact, required this.scale});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = VnPalette.of(context);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 4, 0, 4),
+      decoration: BoxDecoration(border: Border(left: BorderSide(color: p.brand, width: 4))),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Myth: $myth', style: VnText.body(14 * scale, color: p.muted, height: 1.5)),
+          const SizedBox(height: 6),
+          Text('"$fact"', style: VnText.heading(18 * scale, weight: FontWeight.w700, color: p.ink, height: 1.45)),
+        ],
+      ),
+    );
+  }
+}
+
+class _AskAiBar extends StatelessWidget {
+  final VoidCallback onAsk;
+  const _AskAiBar({required this.onAsk});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: const [BoxShadow(color: Color(0x400F172A), blurRadius: 30, offset: Offset(0, 12))],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Questions about this?', style: VnText.body(14, weight: FontWeight.w700, color: Colors.white)),
+                const SizedBox(height: 2),
+                Text('VitaNet AI can explain this article',
+                    style: VnText.body(12, color: const Color(0xFF94A3B8))),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          VnButton(
+            label: 'Ask AI',
+            icon: Icons.auto_awesome_rounded,
+            height: 44,
+            radius: 14,
+            fontSize: 14,
+            expand: false,
+            background: const Color(0xFF2DD4BF),
+            foreground: const Color(0xFF04201D),
+            onPressed: onAsk,
           ),
         ],
       ),
@@ -654,3 +493,42 @@ class _HealthArticleDetailScreenState extends State<HealthArticleDetailScreen> {
   }
 }
 
+enum _OptionState { idle, correct, wrong }
+
+class _QuizOption extends StatelessWidget {
+  final String label;
+  final _OptionState state;
+  final VoidCallback? onTap;
+  const _QuizOption({required this.label, required this.state, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = VnPalette.of(context);
+    final (border, bg, icon) = switch (state) {
+      _OptionState.correct => (const Color(0xFF10B981), p.tintBg(const Color(0xFFD1FAE5), const Color(0xFF047857)),
+          Icons.check_circle_rounded),
+      _OptionState.wrong => (p.danger, p.tintBg(const Color(0xFFFEE2E2), const Color(0xFFB91C1C)), Icons.cancel_rounded),
+      _OptionState.idle => (p.line, p.surface, null),
+    };
+    return Material(
+      color: bg,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: border)),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 44),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              children: [
+                Expanded(child: Text(label, style: VnText.body(14, color: p.ink))),
+                if (icon != null) Icon(icon, size: 20, color: border),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

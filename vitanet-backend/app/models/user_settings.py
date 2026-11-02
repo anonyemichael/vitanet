@@ -1,7 +1,7 @@
 # app/models/user_settings.py
 from datetime import datetime
 from sqlalchemy import Column, String, DateTime, ForeignKey, Enum as SQLEnum
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Uuid as UUID
 from app.database.base import Base
 from app.enums import Language
 

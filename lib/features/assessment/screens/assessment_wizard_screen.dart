@@ -1,375 +1,523 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:vitanet/core/constants/app_spacing.dart';
-import 'package:vitanet/core/extensions/context_ext.dart';
-import 'package:vitanet/shared/widgets/gradient_background.dart';
-import 'package:vitanet/shared/widgets/gradient_icon.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:vitanet/core/providers/shared_state.dart';
+import 'package:vitanet/data/providers/providers.dart';
+import 'package:vitanet/shared/widgets/vn_kit.dart';
 
-class AssessmentWizardScreen extends StatefulWidget {
+/// Five-question guided symptom assessment. On completion the answers are
+/// handed to VitaNet AI chat, which produces the triage result.
+class AssessmentWizardScreen extends ConsumerStatefulWidget {
   const AssessmentWizardScreen({super.key});
 
   @override
-  State<AssessmentWizardScreen> createState() => _AssessmentWizardScreenState();
+  ConsumerState<AssessmentWizardScreen> createState() => _AssessmentWizardScreenState();
 }
 
-class _AssessmentWizardScreenState extends State<AssessmentWizardScreen> {
-  final PageController _pageController = PageController();
-  int _currentPage = 0;
+class _AssessmentWizardScreenState extends ConsumerState<AssessmentWizardScreen> {
+  static const _areas = <(String, IconData)>[
+    ('Head', Icons.psychology_outlined),
+    ('Chest', Icons.favorite_border_rounded),
+    ('Stomach', Icons.lunch_dining_outlined),
+    ('Skin', Icons.water_drop_outlined),
+    ('Muscles & joints', Icons.accessibility_new_rounded),
+    ('Mind & mood', Icons.nightlight_outlined),
+  ];
+  static const _durations = [
+    'Less than 24 hours',
+    '1–3 days',
+    '4–7 days',
+    '1–4 weeks',
+    'More than a month',
+  ];
+  static const _extras = [
+    'Fever', 'Stiff neck', 'Light sensitivity', 'Nausea', 'Vomiting',
+    'Rash', 'Confusion', 'Cough', 'Fatigue', 'Dizziness',
+  ];
+  static const _risks = [
+    'Asthma or lung disease',
+    'Pregnant',
+    'Weakened immune system',
+    'Recent travel abroad',
+    'Over 65 years old',
+  ];
 
-  // State for wizard
-  String? _selectedBodyPart;
-  String? _selectedDuration;
-  double _painLevel = 5;
-  final List<String> _selectedSymptoms = [];
-  final List<String> _selectedRisks = [];
+  int _step = 0;
+  String? _area;
+  String? _duration;
+  double _pain = 5;
+  final Set<String> _symptoms = {};
+  final Set<String> _riskFactors = {};
 
-  void _nextPage() {
-    if (_currentPage < 4) {
-      _pageController.nextPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
+  @override
+  void initState() {
+    super.initState();
+    // Pre-tick risk factors we already know from the profile.
+    final profile = ref.read(userProfileProvider);
+    final conditions = (profile?.preExistingConditions ?? const <String>[])
+        .map((c) => c.toLowerCase())
+        .toList();
+    if (conditions.any((c) => c.contains('asthma') || c.contains('lung') || c.contains('copd'))) {
+      _riskFactors.add('Asthma or lung disease');
+    }
+    if (conditions.any((c) => c.contains('pregnan'))) _riskFactors.add('Pregnant');
+    if ((profile?.age ?? 0) >= 65) _riskFactors.add('Over 65 years old');
+  }
+
+  bool get _canContinue => switch (_step) {
+        0 => _area != null,
+        1 => _duration != null,
+        _ => true,
+      };
+
+  void _next() {
+    HapticFeedback.selectionClick();
+    if (_step < 4) {
+      setState(() => _step += 1);
     } else {
-      // Go to chat screen passing the initial wizard context
-      // For the hackathon, we just navigate to chat
-      context.push('/chat');
+      _finish();
     }
   }
 
-  void _prevPage() {
-    if (_currentPage > 0) {
-      _pageController.previousPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
+  void _back() {
+    if (_step > 0) {
+      setState(() => _step -= 1);
+    } else {
+      Navigator.of(context).maybePop();
     }
+  }
+
+  String _painWord(int v) {
+    if (v == 0) return 'None';
+    if (v <= 3) return 'Mild';
+    if (v <= 6) return 'Moderate';
+    if (v <= 8) return 'Severe';
+    return 'Unbearable';
+  }
+
+  void _openChat({String? prompt}) {
+    final container = ProviderScope.containerOf(context, listen: false);
+    final router = GoRouter.of(context);
+    router.go('/chat');
+    if (prompt != null) {
+      Future.delayed(const Duration(milliseconds: 450), () {
+        container.read(searchActionProvider.notifier).state = prompt;
+      });
+    }
+  }
+
+  Future<void> _finish() async {
+    final pain = _pain.round();
+    final buffer = StringBuffer()
+      ..write('Guided symptom assessment. ')
+      ..write('Main area: $_area. ')
+      ..write('Duration: $_duration. ')
+      ..write('Pain or discomfort: $pain/10 (${_painWord(pain)}). ');
+    if (_symptoms.isNotEmpty) buffer.write('Other symptoms: ${_symptoms.join(", ")}. ');
+    if (_riskFactors.isNotEmpty) buffer.write('Risk factors: ${_riskFactors.join(", ")}. ');
+    buffer.write('Please triage me and tell me what to do next.');
+
+    final allSymptoms = [
+      ?_area,
+      ..._symptoms,
+    ];
+    try {
+      final ai = ref.read(aiServiceProvider);
+      final triage = await ai.generateTriageResultFromML(
+        symptoms: allSymptoms,
+        primarySymptom: _symptoms.isNotEmpty ? _symptoms.first : (_area ?? 'General symptom'),
+      );
+      if (mounted) {
+        ref.read(triageResultProvider.notifier).state = triage;
+        ref.read(triageHistoryProvider.notifier).add(triage);
+      }
+    } catch (_) {
+      // Graceful fallback
+    }
+
+    if (!mounted) return;
+    _openChat(prompt: buffer.toString());
+  }
+
+  Future<void> _call112() async {
+    final uri = Uri.parse('tel:112');
+    if (await canLaunchUrl(uri)) await launchUrl(uri);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Symptom Assessment'),
-        centerTitle: true,
-        leading: _currentPage > 0 
-            ? IconButton(icon: const Icon(Icons.arrow_back), onPressed: _prevPage) 
-            : null,
-        actions: [
-          TextButton(
-            onPressed: () => context.push('/chat'), // Skip wizard
-            child: const Text('Skip'),
-          )
-        ],
-      ),
-      body: GradientBackground(
-        child: Column(
-          children: [
-            // Progress Bar
-            LinearProgressIndicator(
-              value: (_currentPage + 1) / 5,
-              backgroundColor: context.colorScheme.surface.withValues(alpha: 0.5),
-              valueColor: AlwaysStoppedAnimation<Color>(context.colorScheme.primary),
-            ),
-            Expanded(
-              child: PageView(
-                controller: _pageController,
-                physics: const NeverScrollableScrollPhysics(),
-                onPageChanged: (idx) => setState(() => _currentPage = idx),
-                children: [
-                  _buildStep1BodyParts(),
-                  _buildStep2Duration(),
-                  _buildStep3PainScale(),
-                  _buildStep4Symptoms(),
-                  _buildStep5Risks(),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(AppSpacing.xxl),
-              child: Row(
-                children: [
-                  if (_currentPage > 0)
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: _prevPage,
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        ),
-                        child: const Text('Back'),
-                      ),
-                    ),
-                  if (_currentPage > 0) const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    flex: 2,
-                    child: FilledButton(
-                      onPressed: _nextPage,
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      ),
-                      child: Text(_currentPage == 4 ? 'Complete Assessment' : 'Next'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStepCard({required String title, required String subtitle, required Widget child}) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(AppSpacing.xxl),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(title, style: context.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900)),
-          const SizedBox(height: AppSpacing.sm),
-          Text(subtitle, style: context.textTheme.bodyLarge?.copyWith(color: context.colorScheme.onSurfaceVariant)),
-          const SizedBox(height: AppSpacing.xl),
-          child,
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStep1BodyParts() {
-    final parts = [
-      {'icon': Icons.face_rounded, 'name': 'Head & Face'},
-      {'icon': Icons.visibility_rounded, 'name': 'Eyes & Vision'},
-      {'icon': Icons.hearing_rounded, 'name': 'Ears & Hearing'},
-      {'icon': Icons.favorite_rounded, 'name': 'Chest & Heart'},
-      {'icon': Icons.local_dining_rounded, 'name': 'Abdomen'},
-      {'icon': Icons.accessibility_new_rounded, 'name': 'Back & Spine'},
-      {'icon': Icons.do_not_step_rounded, 'name': 'Legs & Feet'},
-      {'icon': Icons.back_hand_rounded, 'name': 'Arms & Hands'},
-      {'icon': Icons.healing_rounded, 'name': 'Skin'},
-      {'icon': Icons.more_horiz_rounded, 'name': 'General / Other'},
-    ];
-
-    return _buildStepCard(
-      title: 'Where is the problem?',
-      subtitle: 'Select the primary area you are experiencing issues with.',
-      child: GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          crossAxisSpacing: AppSpacing.md,
-          mainAxisSpacing: AppSpacing.md,
-          childAspectRatio: 1.2,
-        ),
-        itemCount: parts.length,
-        itemBuilder: (context, index) {
-          final p = parts[index];
-          final isSelected = _selectedBodyPart == p['name'];
-          return InkWell(
-            onTap: () => setState(() => _selectedBodyPart = p['name'] as String),
-            borderRadius: BorderRadius.circular(16),
-            child: Container(
-              decoration: BoxDecoration(
-                color: isSelected ? context.colorScheme.primaryContainer : context.colorScheme.surface.withValues(alpha: 0.5),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: isSelected ? context.colorScheme.primary : context.colorScheme.outline.withValues(alpha: 0.1),
-                  width: 2,
-                ),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(p['icon'] as IconData, size: 32, color: isSelected ? context.colorScheme.primary : context.colorScheme.onSurfaceVariant),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    p['name'] as String,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                      color: isSelected ? context.colorScheme.primary : null,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildStep2Duration() {
-    final durations = ['Just started (Today)', 'Yesterday', 'A few days ago', '1 Week', 'More than a week', 'Ongoing (Chronic)'];
-
-    return _buildStepCard(
-      title: 'How long have you had this?',
-      subtitle: 'Understanding the timeline helps determine urgency.',
-      child: Column(
-        children: durations.map((d) {
-          final isSelected = _selectedDuration == d;
-          return Padding(
-            padding: const EdgeInsets.only(bottom: AppSpacing.md),
-            child: InkWell(
-              onTap: () => setState(() => _selectedDuration = d),
-              borderRadius: BorderRadius.circular(16),
-              child: Container(
-                padding: const EdgeInsets.all(AppSpacing.lg),
-                decoration: BoxDecoration(
-                  color: isSelected ? context.colorScheme.primaryContainer : context.colorScheme.surface.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: isSelected ? context.colorScheme.primary : context.colorScheme.outline.withValues(alpha: 0.1),
-                    width: 2,
-                  ),
-                ),
-                child: Row(
+    final p = VnPalette.of(context);
+    return PopScope(
+      canPop: _step == 0,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _back();
+      },
+      child: Scaffold(
+        backgroundColor: p.page,
+        body: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Icon(
-                      isSelected ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded,
-                      color: isSelected ? context.colorScheme.primary : context.colorScheme.onSurfaceVariant,
+                    SizedBox(
+                      height: 48,
+                      child: Row(
+                        children: [
+                          VnIconButton(
+                            icon: Icons.chevron_left_rounded,
+                            tooltip: 'Back',
+                            iconSize: 26,
+                            onPressed: _back,
+                          ),
+                          Expanded(
+                            child: Text('Symptom assessment',
+                                textAlign: TextAlign.center,
+                                style: VnText.heading(16, weight: FontWeight.w700, color: p.ink)),
+                          ),
+                          VnLink(label: 'Skip', onTap: () => _openChat()),
+                        ],
+                      ),
                     ),
-                    const SizedBox(width: AppSpacing.md),
+                    const SizedBox(height: 22),
+                    Row(
+                      children: [
+                        for (var k = 0; k < 5; k++) ...[
+                          if (k > 0) const SizedBox(width: 6),
+                          Expanded(
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              height: 5,
+                              decoration: BoxDecoration(
+                                color: k <= _step
+                                    ? p.brand
+                                    : (p.isDark ? const Color(0xFF333333) : const Color(0xFFE2E8F0)),
+                                borderRadius: BorderRadius.circular(5),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text('Question ${_step + 1} of 5',
+                        style: VnText.body(12, weight: FontWeight.w600, color: p.muted)),
+                    const SizedBox(height: 22),
                     Expanded(
-                      child: Text(
-                        d,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      child: SingleChildScrollView(
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 220),
+                          child: KeyedSubtree(
+                            key: ValueKey(_step),
+                            child: switch (_step) {
+                              0 => _stepArea(p),
+                              1 => _stepDuration(p),
+                              2 => _stepPain(p),
+                              3 => _stepSymptoms(p),
+                              _ => _stepRisks(p),
+                            },
+                          ),
                         ),
                       ),
+                    ),
+                    const SizedBox(height: 12),
+                    VnButton(
+                      label: _step == 4 ? 'See my result' : 'Continue',
+                      onPressed: _canContinue ? _next : null,
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Flexible(
+                          child: Text('Severe chest pain or trouble breathing? ',
+                              style: VnText.body(12, color: p.muted)),
+                        ),
+                        VnLink(
+                          label: 'Call 112',
+                          fontSize: 12,
+                          weight: FontWeight.w700,
+                          color: p.danger,
+                          onTap: _call112,
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
             ),
-          );
-        }).toList(),
+          ),
+        ),
       ),
     );
   }
 
-  Widget _buildStep3PainScale() {
-    return _buildStepCard(
-      title: 'How severe is the pain/discomfort?',
-      subtitle: 'On a scale from 0 to 10, with 0 being none and 10 being the worst imaginable.',
-      child: Column(
+  Widget _question(VnPalette p, String title, String sub) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: AppSpacing.xxl),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          Semantics(header: true, child: Text(title, style: VnText.heading(24, color: p.ink))),
+          const SizedBox(height: 6),
+          Text(sub, style: VnText.body(15, color: p.muted)),
+          const SizedBox(height: 18),
+        ],
+      );
+
+  /// Spec option styling: selected = 2px brand border on brandWash.
+  Widget _option({
+    required VnPalette p,
+    required bool selected,
+    required VoidCallback onTap,
+    required Widget child,
+    double radius = 16,
+    double? height,
+    EdgeInsetsGeometry padding = EdgeInsets.zero,
+    String? semanticLabel,
+  }) {
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: semanticLabel,
+      child: Material(
+        color: selected ? p.brandWash : p.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(radius),
+          side: BorderSide(color: selected ? p.brand : p.line, width: selected ? 2 : 1),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Container(height: height, padding: padding, child: child),
+        ),
+      ),
+    );
+  }
+
+  Widget _stepArea(VnPalette p) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _question(p, 'Where is the problem?', 'Pick the main area. You can add more later.'),
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            mainAxisExtent: 96,
             children: [
-              Icon(
-                _painLevel < 4 ? Icons.sentiment_satisfied_rounded 
-                : _painLevel < 8 ? Icons.sentiment_dissatisfied_rounded 
-                : Icons.sentiment_very_dissatisfied_rounded,
-                size: 64,
-                color: _painLevel < 4 ? Colors.green 
-                     : _painLevel < 8 ? Colors.orange 
-                     : Colors.red,
-              ),
+              for (final (label, icon) in _areas)
+                _option(
+                  p: p,
+                  radius: 18,
+                  selected: _area == label,
+                  onTap: () => setState(() => _area = label),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(icon, size: 24, color: _area == label ? p.brandDeep : p.ink),
+                      const SizedBox(height: 8),
+                      Text(label,
+                          style: VnText.body(14,
+                              weight: FontWeight.w600,
+                              color: _area == label ? p.brandDeep : p.ink)),
+                    ],
+                  ),
+                ),
             ],
           ),
-          const SizedBox(height: AppSpacing.xxl),
-          Slider(
-            value: _painLevel,
-            min: 0,
-            max: 10,
-            divisions: 10,
-            label: _painLevel.round().toString(),
-            activeColor: _painLevel < 4 ? Colors.green 
-                       : _painLevel < 8 ? Colors.orange 
-                       : Colors.red,
-            onChanged: (val) => setState(() => _painLevel = val),
-          ),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        ],
+      );
+
+  Widget _stepDuration(VnPalette p) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _question(p, 'How long have you had this?', 'The timeline helps us judge urgency.'),
+          for (final d in _durations) ...[
+            _option(
+              p: p,
+              height: 56,
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              selected: _duration == d,
+              onTap: () => setState(() => _duration = d),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(d,
+                        style: VnText.body(15,
+                            weight: FontWeight.w600,
+                            color: _duration == d ? p.brandDeep : p.ink)),
+                  ),
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    width: 20,
+                    height: 20,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: _duration == d ? p.brand : p.switchOff,
+                        width: _duration == d ? 6 : 2,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
+        ],
+      );
+
+  Widget _stepPain(VnPalette p) {
+    final v = _pain.round();
+    final Color ring;
+    final Color fill;
+    final Color text;
+    if (v <= 3) {
+      ring = const Color(0xFF10B981);
+      fill = const Color(0xFFECFDF5);
+      text = const Color(0xFF047857);
+    } else if (v <= 6) {
+      ring = const Color(0xFFF59E0B);
+      fill = const Color(0xFFFFFBEB);
+      text = const Color(0xFFB45309);
+    } else {
+      ring = const Color(0xFFF97316);
+      fill = const Color(0xFFFFF7ED);
+      text = const Color(0xFFC2410C);
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _question(p, 'How bad is the pain or discomfort?',
+            '0 is none, 10 is the worst you can imagine.'),
+        const SizedBox(height: 4),
+        Center(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: 150,
+            height: 150,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: p.isDark ? ring.withValues(alpha: 0.14) : fill,
+              border: Border.all(color: ring, width: 10),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text('0 (None)'),
-                Text('10 (Unbearable)'),
+                Text('$v',
+                    style: VnText.heading(52, color: p.tintFg(text), height: 1)),
+                Text(_painWord(v),
+                    style: VnText.body(13, weight: FontWeight.w700, color: p.tintFg(text))),
               ],
             ),
           ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 22),
+        Text('Pain level', style: VnText.body(13, weight: FontWeight.w600, color: p.ink)),
+        SliderTheme(
+          data: SliderTheme.of(context).copyWith(
+            activeTrackColor: const Color(0xFFEA580C),
+            thumbColor: const Color(0xFFEA580C),
+            inactiveTrackColor: p.switchOff,
+            overlayColor: const Color(0x33EA580C),
+          ),
+          child: Slider(
+            value: _pain,
+            min: 0,
+            max: 10,
+            divisions: 10,
+            label: '$v',
+            semanticFormatterCallback: (val) => '${val.round()} out of 10, ${_painWord(val.round())}',
+            onChanged: (val) => setState(() => _pain = val),
+          ),
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('0 · None', style: VnText.body(12, color: p.muted)),
+            Text('10 · Unbearable', style: VnText.body(12, color: p.muted)),
+          ],
+        ),
+      ],
     );
   }
 
-  Widget _buildStep4Symptoms() {
-    final symptoms = ['Fever', 'Cough', 'Nausea / Vomiting', 'Fatigue / Weakness', 'Shortness of breath', 'Dizziness', 'Chills', 'Sweating'];
-
-    return _buildStepCard(
-      title: 'Any additional symptoms?',
-      subtitle: 'Select any other symptoms that apply. You can choose multiple.',
-      child: Wrap(
-        spacing: AppSpacing.md,
-        runSpacing: AppSpacing.md,
-        children: symptoms.map((s) {
-          final isSelected = _selectedSymptoms.contains(s);
-          return FilterChip(
-            label: Text(s),
-            selected: isSelected,
-            onSelected: (val) {
-              setState(() {
-                if (val) _selectedSymptoms.add(s);
-                else _selectedSymptoms.remove(s);
-              });
-            },
-            selectedColor: context.colorScheme.primaryContainer,
-            checkmarkColor: context.colorScheme.primary,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: BorderSide(
-                color: isSelected ? context.colorScheme.primary : context.colorScheme.outline.withValues(alpha: 0.2),
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  Widget _buildStep5Risks() {
-    final risks = ['Currently pregnant', 'Recent travel abroad', 'Diabetic', 'High blood pressure', 'Immunocompromised', 'Recent surgery', 'None of the above'];
-
-    return _buildStepCard(
-      title: 'Any special risk factors?',
-      subtitle: 'This information helps us safely triage your situation.',
-      child: Column(
-        children: risks.map((r) {
-          final isSelected = _selectedRisks.contains(r);
-          return Padding(
-            padding: const EdgeInsets.only(bottom: AppSpacing.md),
-            child: CheckboxListTile(
-              title: Text(r),
-              value: isSelected,
-              onChanged: (val) {
-                setState(() {
-                  if (r == 'None of the above') {
-                    _selectedRisks.clear();
-                    if (val == true) _selectedRisks.add(r);
-                  } else {
-                    _selectedRisks.remove('None of the above');
-                    if (val == true) _selectedRisks.add(r);
-                    else _selectedRisks.remove(r);
-                  }
-                });
-              },
-              tileColor: context.colorScheme.surface.withValues(alpha: 0.5),
-              selectedTileColor: context.colorScheme.primaryContainer,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: BorderSide(
-                  color: isSelected ? context.colorScheme.primary : context.colorScheme.outline.withValues(alpha: 0.1),
+  Widget _stepSymptoms(VnPalette p) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _question(p, 'Any other symptoms?', 'Select all that apply.'),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final x in _extras)
+                Semantics(
+                  button: true,
+                  selected: _symptoms.contains(x),
+                  child: Material(
+                    color: _symptoms.contains(x) ? p.brandWash : p.surface,
+                    shape: StadiumBorder(
+                      side: BorderSide(
+                        color: _symptoms.contains(x) ? p.brand : p.line,
+                        width: _symptoms.contains(x) ? 2 : 1,
+                      ),
+                    ),
+                    child: InkWell(
+                      customBorder: const StadiumBorder(),
+                      onTap: () => setState(() =>
+                          _symptoms.contains(x) ? _symptoms.remove(x) : _symptoms.add(x)),
+                      child: Container(
+                        height: 44,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        alignment: Alignment.center,
+                        child: Text(x,
+                            style: VnText.body(14,
+                                weight: FontWeight.w600,
+                                color: _symptoms.contains(x) ? p.brandDeep : p.ink)),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
+            ],
+          ),
+        ],
+      );
+
+  Widget _stepRisks(VnPalette p) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _question(p, 'Any special risk factors?', 'This helps us triage you safely.'),
+          VnListGroup(
+            children: [
+              for (final r in _risks)
+                InkWell(
+                  onTap: () => setState(() =>
+                      _riskFactors.contains(r) ? _riskFactors.remove(r) : _riskFactors.add(r)),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                    child: Row(
+                      children: [
+                        Checkbox(
+                          value: _riskFactors.contains(r),
+                          activeColor: p.brand,
+                          checkColor: p.onBrand,
+                          side: BorderSide(color: p.faint, width: 1.5),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+                          onChanged: (v) => setState(() =>
+                              v == true ? _riskFactors.add(r) : _riskFactors.remove(r)),
+                        ),
+                        const SizedBox(width: 2),
+                        Expanded(child: Text(r, style: VnText.body(15, color: p.ink))),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      );
 }

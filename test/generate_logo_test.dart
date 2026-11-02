@@ -22,7 +22,7 @@ void main() {
     canvas.drawRRect(
       bgRect.shift(const Offset(0, 2)),
       Paint()
-        ..color = Colors.black.withOpacity(0.15)
+        ..color = Colors.black.withValues(alpha: 0.15)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.0),
     );
 
@@ -54,7 +54,7 @@ void main() {
       ..strokeJoin = StrokeJoin.round;
 
     final glowPaint = Paint()
-      ..color = const Color(0xFF5EEAD4).withOpacity(0.6)
+      ..color = const Color(0xFF5EEAD4).withValues(alpha: 0.6)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 4.5
       ..strokeCap = StrokeCap.round

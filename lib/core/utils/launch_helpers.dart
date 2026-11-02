@@ -39,4 +39,21 @@ class LaunchHelpers {
       );
     }
   }
+
+  static Future<bool> openUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (!await canLaunchUrl(uri)) return false;
+    return launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  static Future<void> openUrlOrSnack(BuildContext context, String url) async {
+    final ok = await openUrl(url);
+    if (!ok && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not open link: $url')),
+      );
+    }
+  }
+
+  static Future<void> openWeb(BuildContext context, String url) => openUrlOrSnack(context, url);
 }

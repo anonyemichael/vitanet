@@ -1,9 +1,11 @@
-import 'package:flutter/material.dart';
 import 'dart:io';
-import 'package:vitanet/core/constants/app_spacing.dart';
-import 'package:vitanet/core/extensions/context_ext.dart';
-import 'package:vitanet/data/models/chat_message.dart';
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:vitanet/data/models/chat_message.dart';
+import 'package:vitanet/shared/widgets/vn_kit.dart';
+
+/// Right-aligned teal bubble for the user's messages (20/20/6/20 radius).
 class UserMessageBubble extends StatelessWidget {
   final ChatMessage message;
 
@@ -11,47 +13,54 @@ class UserMessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = context.colorScheme;
-    
+    final p = VnPalette.of(context);
     return Padding(
-      padding: const EdgeInsets.only(left: 64, right: 16),
+      padding: const EdgeInsets.only(left: 64),
       child: Align(
         alignment: Alignment.centerRight,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-          decoration: BoxDecoration(
-            color: colorScheme.primary, // Changed to primary
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(24),
-              topRight: Radius.circular(24),
-              bottomLeft: Radius.circular(24),
-              bottomRight: Radius.circular(4), // Flattened bottom right
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: p.isDark ? const Color(0xFF0F766E) : p.brand,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(20),
+                topRight: Radius.circular(20),
+                bottomLeft: Radius.circular(20),
+                bottomRight: Radius.circular(6),
+              ),
             ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              if (message.imagePath != null) ...[
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.file(
-                    File(message.imagePath!),
-                    width: 200,
-                    fit: BoxFit.cover,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                if (message.imagePath != null && !kIsWeb) ...[
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.file(
+                      File(message.imagePath!),
+                      width: 200,
+                      cacheWidth: 400,
+                      fit: BoxFit.cover,
+                      errorBuilder: (c, e, s) => Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.attach_file_rounded, size: 16, color: Colors.white),
+                          const SizedBox(width: 6),
+                          Text('Attachment', style: VnText.body(13, color: Colors.white)),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
-                if (message.text.isNotEmpty) const SizedBox(height: 8),
+                  if (message.text.isNotEmpty) const SizedBox(height: 8),
+                ],
+                if (message.text.isNotEmpty)
+                  SelectableText(
+                    message.text,
+                    style: VnText.body(15, color: Colors.white, height: 1.5),
+                  ),
               ],
-              if (message.text.isNotEmpty)
-                Text(
-                  message.text,
-                  style: context.textTheme.bodyLarge?.copyWith(
-                    color: colorScheme.onPrimary, // Changed to onPrimary
-                    fontWeight: FontWeight.w400,
-                    height: 1.5,
-                  ),
-                ),
-            ],
+            ),
           ),
         ),
       ),

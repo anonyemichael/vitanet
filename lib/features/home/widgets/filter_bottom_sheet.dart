@@ -1,193 +1,208 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:vitanet/core/constants/app_spacing.dart';
-import 'package:vitanet/core/extensions/context_ext.dart';
+import 'package:vitanet/shared/widgets/vn_kit.dart';
+
+/// Content types that search results can be filtered by.
+enum SearchContentType { articles, videos, medicines, firstAid, myChecks }
+
+extension SearchContentTypeLabel on SearchContentType {
+  String get label => switch (this) {
+        SearchContentType.articles => 'Articles',
+        SearchContentType.videos => 'Videos',
+        SearchContentType.medicines => 'Medicines',
+        SearchContentType.firstAid => 'First aid',
+        SearchContentType.myChecks => 'My checks',
+      };
+}
+
+enum SearchSort { relevant, newest, reviewed }
+
+extension SearchSortLabel on SearchSort {
+  String get label => switch (this) {
+        SearchSort.relevant => 'Most relevant',
+        SearchSort.newest => 'Newest first',
+        SearchSort.reviewed => 'Clinician reviewed only',
+      };
+}
+
+/// Filter state shared between the search screen and the sheet.
+class SearchFilters {
+  final Set<SearchContentType> types;
+  final String? bodyArea;
+  final SearchSort sort;
+
+  const SearchFilters({
+    this.types = const {},
+    this.bodyArea,
+    this.sort = SearchSort.relevant,
+  });
+
+  bool get isDefault => types.isEmpty && bodyArea == null && sort == SearchSort.relevant;
+}
+
+/// Opens the filter sheet and resolves with the applied filters
+/// (or null when dismissed).
+Future<SearchFilters?> showFilterBottomSheet(
+  BuildContext context, {
+  required SearchFilters initial,
+  required int Function(SearchFilters) countFor,
+}) {
+  return showVnSheet<SearchFilters>(
+    context,
+    builder: (_) => FilterBottomSheet(initial: initial, countFor: countFor),
+  );
+}
 
 class FilterBottomSheet extends StatefulWidget {
-  const FilterBottomSheet({super.key});
+  final SearchFilters initial;
+  final int Function(SearchFilters)? countFor;
+
+  const FilterBottomSheet({
+    super.key,
+    this.initial = const SearchFilters(),
+    this.countFor,
+  });
 
   @override
   State<FilterBottomSheet> createState() => _FilterBottomSheetState();
 }
 
 class _FilterBottomSheetState extends State<FilterBottomSheet> {
-  String _selectedSort = 'Most Recent';
-  final List<String> _selectedCategories = ['Health Alerts'];
+  static const _areas = ['Head', 'Chest', 'Stomach', 'Skin', 'Joints', 'Mental'];
+
+  late Set<SearchContentType> _types = {...widget.initial.types};
+  late String? _area = widget.initial.bodyArea;
+  late SearchSort _sort = widget.initial.sort;
+
+  SearchFilters get _current => SearchFilters(types: _types, bodyArea: _area, sort: _sort);
 
   @override
   Widget build(BuildContext context) {
-    final isDark = context.isDark;
-    
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl, vertical: AppSpacing.lg),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Handle pill
-              Center(
-                child: Container(
-                  width: 48,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: isDark ? Colors.white24 : Colors.black12,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
+    final p = VnPalette.of(context);
+    final count = widget.countFor?.call(_current);
+    Text label(String s) =>
+        Text(s, style: VnText.body(13, weight: FontWeight.w700, color: p.inkSoft));
+
+    return VnSheet(
+      gap: 20,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Semantics(
+                header: true,
+                child: Text('Filter', style: VnText.heading(20, color: p.ink)),
               ),
-              const SizedBox(height: AppSpacing.xl),
-              
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            ),
+            VnLink(
+              label: 'Reset',
+              weight: FontWeight.w700,
+              onTap: () => setState(() {
+                _types = {};
+                _area = null;
+                _sort = SearchSort.relevant;
+              }),
+            ),
+          ],
+        ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            label('Content type'),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final t in SearchContentType.values)
+                  VnChip(
+                    label: t.label,
+                    height: 38,
+                    selected: _types.contains(t),
+                    icon: _types.contains(t) ? Icons.check_rounded : null,
+                    onTap: () => setState(() =>
+                        _types.contains(t) ? _types.remove(t) : _types.add(t)),
+                  ),
+              ],
+            ),
+          ],
+        ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            label('Body area'),
+            const SizedBox(height: 10),
+            GridView.count(
+              crossAxisCount: 3,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+              mainAxisExtent: 44,
+              children: [
+                for (final a in _areas)
+                  Semantics(
+                    button: true,
+                    selected: _area == a,
+                    child: Material(
+                      color: _area == a ? p.brandTint : p.surface,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(color: _area == a ? p.brand : p.line),
+                      ),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () => setState(() => _area = _area == a ? null : a),
+                        child: Center(
+                          child: Text(a,
+                              style: VnText.body(14,
+                                  weight: _area == a ? FontWeight.w700 : FontWeight.w600,
+                                  color: _area == a ? p.brandDeep : p.ink)),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            label('Sort by'),
+            const SizedBox(height: 4),
+            RadioGroup<SearchSort>(
+              groupValue: _sort,
+              onChanged: (v) => setState(() => _sort = v ?? _sort),
+              child: Column(
                 children: [
-                  Text(
-                    'Filters',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? Colors.white : Colors.black87,
+                  for (final s in SearchSort.values)
+                    InkWell(
+                      onTap: () => setState(() => _sort = s),
+                      borderRadius: BorderRadius.circular(10),
+                      child: SizedBox(
+                        height: 44,
+                        child: Row(
+                          children: [
+                            Radio<SearchSort>(
+                              value: s,
+                              activeColor: p.brand,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(s.label, style: VnText.body(15, color: p.ink)),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      setState(() {
-                        _selectedSort = 'Most Recent';
-                        _selectedCategories.clear();
-                      });
-                    },
-                    style: TextButton.styleFrom(
-                      foregroundColor: const Color(0xFF6366F1),
-                    ),
-                    child: const Text('Reset', style: TextStyle(fontWeight: FontWeight.w600)),
-                  ),
                 ],
               ),
-              const SizedBox(height: AppSpacing.lg),
-              
-              // Sort Options
-              Text(
-                'Sort By',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: isDark ? Colors.white70 : Colors.black54,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: ['Most Recent', 'Highest Severity', 'Type'].map((sort) {
-                  final isSelected = _selectedSort == sort;
-                  return ChoiceChip(
-                    label: Text(sort),
-                    selected: isSelected,
-                    onSelected: (selected) {
-                      if (selected) {
-                        setState(() => _selectedSort = sort);
-                      }
-                    },
-                    selectedColor: const Color(0xFF6366F1).withValues(alpha: 0.15),
-                    backgroundColor: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.05),
-                    labelStyle: TextStyle(
-                      color: isSelected 
-                          ? const Color(0xFF6366F1) 
-                          : (isDark ? Colors.white70 : Colors.black87),
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                    ),
-                    side: BorderSide(
-                      color: isSelected 
-                          ? const Color(0xFF6366F1).withValues(alpha: 0.5) 
-                          : Colors.transparent,
-                    ),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
-                  );
-                }).toList(),
-              ),
-              
-              const SizedBox(height: AppSpacing.xl),
-              
-              // Categories
-              Text(
-                'Categories',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: isDark ? Colors.white70 : Colors.black54,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  'Health Alerts', 'Vitals', 'Medications', 'Devices', 'Insights'
-                ].map((category) {
-                  final isSelected = _selectedCategories.contains(category);
-                  return FilterChip(
-                    label: Text(category),
-                    selected: isSelected,
-                    onSelected: (selected) {
-                      setState(() {
-                        if (selected) {
-                          _selectedCategories.add(category);
-                        } else {
-                          _selectedCategories.remove(category);
-                        }
-                      });
-                    },
-                    selectedColor: const Color(0xFF6366F1).withValues(alpha: 0.15),
-                    backgroundColor: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.05),
-                    checkmarkColor: const Color(0xFF6366F1),
-                    labelStyle: TextStyle(
-                      color: isSelected 
-                          ? const Color(0xFF6366F1) 
-                          : (isDark ? Colors.white70 : Colors.black87),
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                    ),
-                    side: BorderSide(
-                      color: isSelected 
-                          ? const Color(0xFF6366F1).withValues(alpha: 0.5) 
-                          : Colors.transparent,
-                    ),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
-                  );
-                }).toList(),
-              ),
-              
-              const SizedBox(height: AppSpacing.xxl),
-              
-              // Apply Button
-              SizedBox(
-                width: double.infinity,
-                height: 54,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF6366F1),
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  child: const Text(
-                    'Apply Filters',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-            ],
-          ),
+            ),
+          ],
         ),
-      ),
+        VnButton(
+          label: count == null ? 'Show results' : 'Show $count result${count == 1 ? '' : 's'}',
+          onPressed: () => Navigator.of(context).pop(_current),
+        ),
+      ],
     );
   }
 }

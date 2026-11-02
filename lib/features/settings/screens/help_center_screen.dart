@@ -1,150 +1,188 @@
 import 'package:flutter/material.dart';
-import 'package:vitanet/core/constants/app_spacing.dart';
-import 'package:vitanet/core/extensions/context_ext.dart';
+import 'package:go_router/go_router.dart';
+import 'package:vitanet/core/utils/launch_helpers.dart';
+import 'package:vitanet/shared/widgets/vn_kit.dart';
 
-class HelpCenterScreen extends StatelessWidget {
+class HelpCenterScreen extends StatefulWidget {
   const HelpCenterScreen({super.key});
 
   @override
+  State<HelpCenterScreen> createState() => _HelpCenterScreenState();
+}
+
+class _HelpCenterScreenState extends State<HelpCenterScreen> {
+  static const _faqs = <(String, String)>[
+    (
+      'Is VitaNet a replacement for a doctor?',
+      'No. VitaNet helps you decide how urgently to seek care and what to tell a clinician. It cannot diagnose. In an emergency, always call 112.'
+    ),
+    (
+      'How accurate is the AI triage?',
+      'Triage is based on clinical guidelines and checked against your vitals. It errs on the side of caution, so it may recommend a doctor more often than strictly needed.'
+    ),
+    (
+      'Who can see my health data?',
+      'Only you, and the care circle contacts you choose. Data is encrypted and never sold or used to train AI models.'
+    ),
+    (
+      'How do I connect my smartwatch?',
+      'On Home, tap any vital card marked Pair. VitaNet works with Health Connect on Android and Apple Health on iPhone.'
+    ),
+    (
+      'Can I share a result with my doctor?',
+      'Yes. Open a triage result and tap Share, or export a summary of your profile and past checks from Settings, Privacy & data.'
+    ),
+    (
+      'How do I delete my data?',
+      'Settings, then Privacy & data, then Clear triage history removes past checks. To close your account entirely, email support and it is erased within 30 days.'
+    ),
+  ];
+
+  int _open = -1;
+  String _query = '';
+
+  @override
   Widget build(BuildContext context) {
-    final isDark = context.isDark;
-    final bgColor = isDark ? const Color(0xFF121212) : Colors.grey.shade50;
-    final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final borderColor = isDark ? Colors.grey.shade800 : Colors.grey.shade200;
-    final dividerColor = isDark ? Colors.grey.shade800 : const Color(0xFFEEEEEE);
+    final p = VnPalette.of(context);
+    final q = _query.trim().toLowerCase();
+    final faqs = [
+      for (var i = 0; i < _faqs.length; i++)
+        if (q.isEmpty ||
+            _faqs[i].$1.toLowerCase().contains(q) ||
+            _faqs[i].$2.toLowerCase().contains(q))
+          i,
+    ];
+
+    Widget quick(IconData icon, Color bg, Color fg, String label, VoidCallback onTap) => Expanded(
+          child: VnCard(
+            radius: 18,
+            onTap: onTap,
+            semanticLabel: label,
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 14),
+            child: Column(
+              children: [
+                VnIconTile(icon: icon, bg: bg, fg: fg, size: 42, radius: 14),
+                const SizedBox(height: 8),
+                Text(label,
+                    textAlign: TextAlign.center,
+                    style: VnText.body(13, weight: FontWeight.w600, color: p.ink)),
+              ],
+            ),
+          ),
+        );
 
     return Scaffold(
-      backgroundColor: bgColor,
-      appBar: AppBar(
-        title: const Text('Help Center'),
-        elevation: 0,
-        backgroundColor: bgColor,
-        iconTheme: IconThemeData(color: isDark ? Colors.white : Colors.black87),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        child: Container(
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: cardColor,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: borderColor, width: 1.5),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(AppSpacing.xl),
-                child: Row(
+      backgroundColor: p.page,
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 720),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+              children: [
+                const VnTopBar(title: 'Help center'),
+                const SizedBox(height: 18),
+                VnTextField(
+                  hint: 'How can we help?',
+                  prefixIcon: Icons.search_rounded,
+                  onChanged: (v) => setState(() => _query = v),
+                ),
+                const SizedBox(height: 18),
+                Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: context.colorScheme.primaryContainer.withValues(alpha: 0.5),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Icon(Icons.support_agent_rounded, color: context.colorScheme.primary, size: 28),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'How can we help?',
-                            style: context.textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: isDark ? Colors.white : Colors.black87,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Find answers or reach out to support',
-                            style: context.textTheme.bodyMedium?.copyWith(
-                              color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    quick(Icons.chat_bubble_outline_rounded, const Color(0xFFCCFBF1),
+                        const Color(0xFF0F766E), 'Live chat', () => context.go('/chat')),
+                    const SizedBox(width: 10),
+                    quick(Icons.mail_outline_rounded, const Color(0xFFE0F2FE),
+                        const Color(0xFF0369A1), 'Email us',
+                        () => LaunchHelpers.openUrlOrSnack(context, 'mailto:support@vitanet.health')),
+                    const SizedBox(width: 10),
+                    quick(Icons.play_arrow_outlined, const Color(0xFFF5F3FF),
+                        const Color(0xFF6D28D9), 'Video guides', () => context.push('/resources/videos')),
                   ],
                 ),
-              ),
-              Divider(height: 1, color: dividerColor),
-              _buildFaqItem(
-                context,
-                isDark,
-                question: 'How do I use the triage feature?',
-                answer: 'Simply navigate to the Home tab and tap the large "Start Assessment" button. Follow the wizard to enter your symptoms, and our AI will provide an immediate recommendation on whether to manage at home, see a pharmacist, or seek urgent care.',
-              ),
-              Divider(height: 1, color: dividerColor),
-              _buildFaqItem(
-                context,
-                isDark,
-                question: 'Is my medical data secure?',
-                answer: 'Yes. We use industry-standard encryption for all your data. Your history and personal info are safely synced to the cloud and can only be accessed by you and authorized healthcare providers if you choose to escalate your case.',
-              ),
-              Divider(height: 1, color: dividerColor),
-              _buildFaqItem(
-                context,
-                isDark,
-                question: 'How do I update my medical profile?',
-                answer: 'Go to the Profile tab and tap "Update Medical Info". From there, you can adjust your height, weight, allergies, and chronic conditions.',
-              ),
-              Divider(height: 1, color: dividerColor),
-              Padding(
-                padding: const EdgeInsets.all(AppSpacing.xl),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: () => context.showSnack('Contact Support form coming soon'),
-                    icon: const Icon(Icons.email_rounded, size: 18),
-                    label: const Text('Contact Support'),
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    ),
+                const SizedBox(height: 18),
+                Text('Common questions',
+                    style: VnText.heading(17, weight: FontWeight.w700, color: p.ink)),
+                const SizedBox(height: 18),
+                if (faqs.isEmpty)
+                  Text('No answers match "$_query". Try Live chat or email us.',
+                      style: VnText.body(14, color: p.muted)),
+                for (final i in faqs) ...[
+                  _FaqTile(
+                    q: _faqs[i].$1,
+                    a: _faqs[i].$2,
+                    open: _open == i,
+                    onTap: () => setState(() => _open = _open == i ? -1 : i),
                   ),
-                ),
-              ),
-            ],
+                  const SizedBox(height: 8),
+                ],
+                const SizedBox(height: 18),
+                Text('Support hours: Mon–Sat, 8:00–20:00 WAT',
+                    textAlign: TextAlign.center, style: VnText.body(13, color: p.muted)),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
+}
 
-  Widget _buildFaqItem(BuildContext context, bool isDark, {required String question, required String answer}) {
-    return Theme(
-      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-      child: ExpansionTile(
-        title: Text(
-          question,
-          style: context.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-            color: isDark ? Colors.white : Colors.black87,
-          ),
-        ),
-        iconColor: context.colorScheme.primary,
-        collapsedIconColor: isDark ? Colors.grey.shade600 : Colors.grey.shade400,
-        childrenPadding: const EdgeInsets.only(left: 16, right: 16, bottom: 20),
-        children: [
-          Text(
-            answer,
-            style: context.textTheme.bodyMedium?.copyWith(
-              color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
-              height: 1.5,
+class _FaqTile extends StatelessWidget {
+  final String q;
+  final String a;
+  final bool open;
+  final VoidCallback onTap;
+  const _FaqTile({required this.q, required this.a, required this.open, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = VnPalette.of(context);
+    return Material(
+      color: p.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: p.line),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: AnimatedSize(
+        duration: const Duration(milliseconds: 200),
+        alignment: Alignment.topCenter,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Semantics(
+              button: true,
+              expanded: open,
+              child: InkWell(
+                onTap: onTap,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(q,
+                            style: VnText.body(15, weight: FontWeight.w600, color: p.ink)),
+                      ),
+                      const SizedBox(width: 12),
+                      AnimatedRotation(
+                        turns: open ? 0.5 : 0,
+                        duration: const Duration(milliseconds: 200),
+                        child: Icon(Icons.expand_more_rounded, color: p.muted),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
-          ),
-        ],
+            if (open)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: Text(a, style: VnText.body(14, color: p.inkSoft, height: 1.6)),
+              ),
+          ],
+        ),
       ),
     );
   }

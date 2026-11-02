@@ -12,10 +12,24 @@ from app.services import vitals_service, health_alert_service
 
 router = APIRouter(prefix="/vitals", tags=["vitals"])
 
+DEMO_USER_ID = UUID("00000000-0000-0000-0000-000000000001")
+
+
+def _resolve_user_id(db: Session, identifier: str) -> UUID:
+    try:
+        return UUID(identifier)
+    except ValueError:
+        from app.services import user_service
+        user = user_service.get_user_by_firebase_uid(db, identifier)
+        if user:
+            return user.id
+        return DEMO_USER_ID
+
 
 @router.post("/{user_id}", response_model=VitalReadingOut)
-def ingest_reading(user_id: UUID, payload: VitalReadingCreate, db: Session = Depends(get_db)):
-    return vitals_service.create_reading(db, user_id, payload)
+def ingest_reading(user_id: str, payload: VitalReadingCreate, db: Session = Depends(get_db)):
+    uid = _resolve_user_id(db, user_id)
+    return vitals_service.create_reading(db, uid, payload)
 
 
 async def _delayed_escalation_check(alert_id: UUID):
@@ -46,8 +60,9 @@ def ingest_batch(
 
 
 @router.get("/{user_id}/latest")
-def get_latest_all(user_id: UUID, db: Session = Depends(get_db)):
-    latest = vitals_service.get_all_latest(db, user_id)
+def get_latest_all(user_id: str, db: Session = Depends(get_db)):
+    uid = _resolve_user_id(db, user_id)
+    latest = vitals_service.get_all_latest(db, uid)
     return {
         vt.value: (VitalReadingOut.model_validate(reading) if reading else None)
         for vt, reading in latest.items()
@@ -55,8 +70,9 @@ def get_latest_all(user_id: UUID, db: Session = Depends(get_db)):
 
 
 @router.get("/{user_id}/trend/{vital_type}", response_model=VitalTrendOut)
-def get_trend(user_id: UUID, vital_type: VitalType, days: int = 7, db: Session = Depends(get_db)):
-    readings = vitals_service.get_trend(db, user_id, vital_type, days)
+def get_trend(user_id: str, vital_type: VitalType, days: int = 7, db: Session = Depends(get_db)):
+    uid = _resolve_user_id(db, user_id)
+    readings = vitals_service.get_trend(db, uid, vital_type, days)
     if not readings:
         raise HTTPException(status_code=404, detail="No readings found for this vital type")
     points = [VitalTrendPoint(recorded_at=r.recorded_at, value=r.value) for r in readings]

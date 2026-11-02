@@ -1,447 +1,180 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:vitanet/core/constants/app_spacing.dart';
-import 'package:vitanet/core/constants/app_strings.dart';
-import 'package:vitanet/core/extensions/context_ext.dart';
-import 'package:vitanet/data/providers/providers.dart';
 import 'package:go_router/go_router.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:vitanet/core/constants/app_strings.dart';
+import 'package:vitanet/data/models/triage_result.dart';
+import 'package:vitanet/data/models/user_profile.dart';
+import 'package:vitanet/data/providers/providers.dart';
+import 'package:vitanet/features/settings/settings_providers.dart';
+import 'package:vitanet/features/settings/widgets/settings_dialogs.dart';
+import 'package:vitanet/shared/widgets/vn_kit.dart';
 
-class SettingsScreen extends ConsumerStatefulWidget {
+class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
-  @override
-  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
-}
+  static const _toggles = <(String, String, String)>[
+    ('urgent_alerts', 'Urgent health alerts', 'Low SpO2, heart rate spikes'),
+    ('medication_reminders', 'Medication reminders', 'At the times you set'),
+    ('weekly_summary', 'Weekly wellness summary', 'Sunday mornings'),
+    ('care_circle_activity', 'Care circle activity', 'When contacts accept or respond'),
+  ];
 
-class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  int _selectedDesktopIndex = 0;
+  String _themeLabel(ThemeMode mode) => switch (mode) {
+        ThemeMode.light => 'Light',
+        ThemeMode.dark => 'Dark',
+        ThemeMode.system => 'System default',
+      };
+
+  void _exportData(UserProfile? profile, List<TriageResult> history) {
+    final b = StringBuffer('VitaNet health summary\n\n');
+    if (profile != null) {
+      b.writeln('Name: ${profile.name}');
+      if (profile.age != null) b.writeln('Age: ${profile.age}');
+      if (profile.sex != null) b.writeln('Sex: ${profile.sex}');
+      if (profile.bloodType != null) b.writeln('Blood type: ${profile.bloodType}');
+      if (profile.height != null) b.writeln('Height: ${profile.height} cm');
+      if (profile.weight != null) b.writeln('Weight: ${profile.weight} kg');
+      if (profile.allergies.isNotEmpty) b.writeln('Allergies: ${profile.allergies.join(', ')}');
+      if (profile.preExistingConditions.isNotEmpty) {
+        b.writeln('Conditions: ${profile.preExistingConditions.join(', ')}');
+      }
+      if (profile.medications.isNotEmpty) b.writeln('Medications: ${profile.medications.join(', ')}');
+      b.writeln();
+    }
+    b.writeln('Past checks (${history.length}):');
+    for (final h in history) {
+      final d = h.timestamp;
+      b.writeln('- ${d.day}/${d.month}/${d.year}: ${h.primarySymptom} (${h.level.name})');
+    }
+    b
+      ..writeln()
+      ..writeln(AppStrings.disclaimer);
+    Share.share(b.toString(), subject: 'VitaNet health summary');
+  }
 
   @override
-  Widget build(BuildContext context) {
-    final isDark = context.isDark;
-    final bgColor = isDark ? const Color(0xFF121212) : Colors.grey.shade50;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final p = VnPalette.of(context);
+    final currentTheme = ref.watch(themeModeProvider);
+    final textScale = ref.watch(textScaleProvider);
+    final notif = ref.watch(notificationPrefsProvider);
 
     return Scaffold(
-      backgroundColor: bgColor,
-      appBar: AppBar(
-        title: const Text('Settings'),
-        elevation: 0,
-        backgroundColor: bgColor,
-        iconTheme: IconThemeData(color: isDark ? Colors.white : Colors.black87),
-      ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          if (constraints.maxWidth < 800) {
-            return _buildMobileLayout(context, ref, isDark);
-          } else {
-            return _buildDesktopLayout(context, ref, isDark);
-          }
-        },
-      ),
-    );
-  }
-
-  Widget _buildMobileLayout(BuildContext context, WidgetRef ref, bool isDark) {
-    return ListView(
-      padding: const EdgeInsets.all(AppSpacing.xl),
-      children: [
-        _buildAppearanceSection(context, ref, isDark),
-        _buildDataSection(context, ref, isDark),
-        _buildSupportSection(context, ref, isDark),
-      ],
-    );
-  }
-
-  Widget _buildDesktopLayout(BuildContext context, WidgetRef ref, bool isDark) {
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 1000),
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.xl),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Sidebar Navigation
-              Container(
-                width: 260,
-                padding: const EdgeInsets.all(AppSpacing.lg),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildDesktopNavItem(0, 'Appearance', Icons.palette_rounded, isDark),
-                    _buildDesktopNavItem(1, 'Data & Privacy', Icons.security_rounded, isDark),
-                    _buildDesktopNavItem(2, 'Support & About', Icons.info_outline_rounded, isDark),
-                  ],
-                ),
-              ),
-              const SizedBox(width: AppSpacing.xl),
-              Expanded(
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 300),
-                  child: SingleChildScrollView(
-                    child: _buildDesktopContent(context, ref, isDark),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDesktopNavItem(int index, String title, IconData icon, bool isDark) {
-    final isSelected = _selectedDesktopIndex == index;
-    final unselectedColor = isDark ? Colors.grey.shade500 : context.colorScheme.onSurfaceVariant;
-    return InkWell(
-      onTap: () => setState(() => _selectedDesktopIndex = index),
-      borderRadius: BorderRadius.circular(16),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
-        margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-        decoration: BoxDecoration(
-          color: isSelected ? context.colorScheme.primaryContainer : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              color: isSelected ? context.colorScheme.onPrimaryContainer : unselectedColor,
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Text(
-              title,
-              style: context.textTheme.titleMedium?.copyWith(
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected ? context.colorScheme.onPrimaryContainer : unselectedColor,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDesktopContent(BuildContext context, WidgetRef ref, bool isDark) {
-    switch (_selectedDesktopIndex) {
-      case 0:
-        return _buildAppearanceSection(context, ref, isDark);
-      case 1:
-        return _buildDataSection(context, ref, isDark);
-      case 2:
-        return _buildSupportSection(context, ref, isDark);
-      default:
-        return const SizedBox.shrink();
-    }
-  }
-
-  // --- Sections ---
-
-  Widget _buildAppearanceSection(BuildContext context, WidgetRef ref, bool isDark) {
-    final currentTheme = ref.watch(themeModeProvider);
-    return _buildSectionCard(
-      context,
-      title: 'Appearance',
-      icon: Icons.palette_rounded,
-      isDark: isDark,
-      children: [
-        _buildSettingsTile(
-          context,
-          icon: Icons.palette_rounded,
-          title: 'Theme',
-          subtitle: _themeLabel(currentTheme),
-          onTap: () => _showThemePicker(context, ref, currentTheme, isDark),
-          isDark: isDark,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDataSection(BuildContext context, WidgetRef ref, bool isDark) {
-    return _buildSectionCard(
-      context,
-      title: 'Data & Privacy',
-      icon: Icons.security_rounded,
-      isDark: isDark,
-      children: [
-        _buildSettingsTile(
-          context,
-          icon: Icons.delete_outline_rounded,
-          title: 'Clear Triage History',
-          subtitle: 'Permanently delete all past sessions',
-          onTap: () => _confirmClearHistory(context, ref),
-          isDark: isDark,
-          isDestructive: true,
-          showChevron: false,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSupportSection(BuildContext context, WidgetRef ref, bool isDark) {
-    final dividerColor = isDark ? Colors.grey.shade800 : const Color(0xFFEEEEEE);
-    return _buildSectionCard(
-      context,
-      title: 'Support & About',
-      icon: Icons.info_outline_rounded,
-      isDark: isDark,
-      children: [
-        _buildSettingsTile(
-          context,
-          icon: Icons.info_outline_rounded,
-          title: 'About VitaNet',
-          subtitle: 'Version 1.0.0',
-          onTap: () => context.push('/about'),
-          isDark: isDark,
-        ),
-        Divider(height: 1, color: dividerColor),
-        _buildSettingsTile(
-          context,
-          icon: Icons.gavel_rounded,
-          title: 'Medical Disclaimer',
-          subtitle: 'Important safety information',
-          onTap: () => context.push('/disclaimer'),
-          isDark: isDark,
-        ),
-        Divider(height: 1, color: dividerColor),
-        _buildSettingsTile(
-          context,
-          icon: Icons.privacy_tip_outlined,
-          title: 'Privacy Policy',
-          subtitle: 'How we handle your data',
-          onTap: () => context.push('/privacy'),
-          isDark: isDark,
-        ),
-      ],
-    );
-  }
-
-  // --- Widgets ---
-
-  Widget _buildSectionCard(BuildContext context, {required String title, required IconData icon, required bool isDark, required List<Widget> children}) {
-    final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final borderColor = isDark ? Colors.grey.shade800 : Colors.grey.shade200;
-    final dividerColor = isDark ? Colors.grey.shade800 : const Color(0xFFEEEEEE);
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: AppSpacing.xl),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: borderColor, width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            child: Row(
+      backgroundColor: p.page,
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 720),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
               children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: context.colorScheme.primaryContainer.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(icon, color: context.colorScheme.primary, size: 20),
+                VnTopBar(
+                  title: 'Settings',
+                  onBack: () => context.canPop() ? context.pop() : context.go('/profile'),
                 ),
-                const SizedBox(width: 12),
-                Text(
-                  title,
-                  style: context.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : Colors.black87,
+                const SizedBox(height: 18),
+                const VnSectionLabel('Appearance'),
+                const SizedBox(height: 8),
+                VnListGroup(children: [
+                  VnListRow(
+                    leading: const VnIconTile(
+                        icon: Icons.dark_mode_outlined, bg: Color(0xFFE0E7FF), fg: Color(0xFF4338CA)),
+                    title: 'Theme',
+                    value: _themeLabel(currentTheme),
+                    onTap: () => showThemeSheet(context),
                   ),
-                ),
+                  VnListRow(
+                    leading: Container(
+                      width: 38,
+                      height: 38,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: p.surfaceAlt,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text('Aa',
+                          style: VnText.body(14, weight: FontWeight.w800, color: p.inkSoft)),
+                    ),
+                    title: 'Text size',
+                    value: TextScaleNotifier.labelFor(textScale),
+                    onTap: () => showTextSizeSheet(context),
+                  ),
+                  const VnListRow(
+                    leading: VnIconTile(
+                        icon: Icons.language_rounded, bg: Color(0xFFD1FAE5), fg: Color(0xFF047857)),
+                    title: 'Language',
+                    value: 'English',
+                    chevron: false,
+                  ),
+                ]),
+                const SizedBox(height: 18),
+                const VnSectionLabel('Notifications'),
+                const SizedBox(height: 8),
+                VnListGroup(children: [
+                  for (final (key, title, sub) in _toggles)
+                    VnListRow(
+                      title: title,
+                      subtitle: sub,
+                      chevron: false,
+                      padding: const EdgeInsets.fromLTRB(16, 8, 12, 8),
+                      onTap: () => ref
+                          .read(notificationPrefsProvider.notifier)
+                          .toggle(key, !(notif[key] ?? false)),
+                      trailing: VnSwitch(
+                        value: notif[key] ?? false,
+                        semanticLabel: title,
+                        onChanged: (v) =>
+                            ref.read(notificationPrefsProvider.notifier).toggle(key, v),
+                      ),
+                    ),
+                ]),
+                const SizedBox(height: 18),
+                const VnSectionLabel('Privacy & data'),
+                const SizedBox(height: 8),
+                VnListGroup(children: [
+                  VnListRow(
+                    leading: const VnIconTile(
+                        icon: Icons.download_rounded, bg: Color(0xFFE0F2FE), fg: Color(0xFF0369A1)),
+                    title: 'Export my health data',
+                    subtitle: 'Summary to share with your doctor',
+                    onTap: () => _exportData(
+                        ref.read(userProfileProvider), ref.read(triageHistoryProvider)),
+                  ),
+                  VnListRow(
+                    leading: const VnIconTile(
+                        icon: Icons.delete_outline_rounded,
+                        bg: Color(0xFFFEE2E2),
+                        fg: Color(0xFFB91C1C)),
+                    title: 'Clear triage history',
+                    titleColor: p.danger,
+                    subtitle: 'Permanently delete past AI checks',
+                    onTap: () => showClearHistoryDialog(context),
+                  ),
+                  VnListRow(
+                    leading: VnIconTile(
+                        icon: Icons.shield_outlined, bg: const Color(0xFFF1F5F9), fg: p.isDark ? p.inkSoft : const Color(0xFF334155)),
+                    title: 'Privacy policy',
+                    subtitle: 'HIPAA and GDPR-aligned handling',
+                    onTap: () => context.push('/privacy'),
+                  ),
+                ]),
+                const SizedBox(height: 18),
+                const VnSectionLabel('About'),
+                const SizedBox(height: 8),
+                VnListGroup(children: [
+                  VnListRow(title: 'About VitaNet', onTap: () => context.push('/about')),
+                  VnListRow(title: 'Medical disclaimer', onTap: () => context.push('/disclaimer')),
+                  VnListRow(title: 'Help center', onTap: () => context.push('/help-center')),
+                ]),
+                const SizedBox(height: 18),
+                Text('VitaNet 1.0.0',
+                    textAlign: TextAlign.center, style: VnText.body(12, color: p.muted)),
               ],
             ),
           ),
-          Divider(height: 1, color: dividerColor),
-          ...children,
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSettingsTile(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-    required bool isDark,
-    bool isDestructive = false,
-    Widget? trailing,
-    bool showChevron = true,
-  }) {
-    final color = isDestructive ? Colors.red.shade400 : (isDark ? Colors.white : Colors.black87);
-    final iconColor = isDestructive ? Colors.red.shade400 : (isDark ? Colors.blueGrey.shade200 : Colors.blueGrey.shade700);
-    final iconBgColor = isDestructive ? Colors.red.withValues(alpha: 0.1) : (isDark ? Colors.grey.shade800 : Colors.blueGrey.shade50);
-
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: iconBgColor,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, color: iconColor, size: 20),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    title,
-                    style: context.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: color,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: context.textTheme.bodySmall?.copyWith(
-                      color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (trailing != null) trailing,
-            if (trailing == null && showChevron)
-              Icon(
-                Icons.chevron_right_rounded,
-                size: 16,
-                color: isDark ? Colors.grey.shade600 : Colors.grey.shade400,
-              ),
-          ],
         ),
       ),
     );
   }
-
-  // --- Logic & Dialogs ---
-
-  String _themeLabel(ThemeMode mode) {
-    switch (mode) {
-      case ThemeMode.light:
-        return 'Light';
-      case ThemeMode.dark:
-        return 'Dark';
-      case ThemeMode.system:
-        return 'System Default';
-    }
-  }
-
-  void _showThemePicker(BuildContext context, WidgetRef ref, ThemeMode current, bool isDark) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.grey.shade700 : Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xl),
-            Text(
-              'Choose Theme',
-              style: context.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white : Colors.black87,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: AppSpacing.xl),
-            SegmentedButton<ThemeMode>(
-              segments: const [
-                ButtonSegment(
-                  value: ThemeMode.light,
-                  label: Text('Light'),
-                  icon: Icon(Icons.light_mode_rounded),
-                ),
-                ButtonSegment(
-                  value: ThemeMode.dark,
-                  label: Text('Dark'),
-                  icon: Icon(Icons.dark_mode_rounded),
-                ),
-                ButtonSegment(
-                  value: ThemeMode.system,
-                  label: Text('System'),
-                  icon: Icon(Icons.settings_suggest_rounded),
-                ),
-              ],
-              selected: {current},
-              onSelectionChanged: (Set<ThemeMode> newSelection) {
-                ref.read(themeModeProvider.notifier).setTheme(newSelection.first);
-                Navigator.pop(ctx);
-              },
-            ),
-            const SizedBox(height: AppSpacing.xxl),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _confirmClearHistory(BuildContext context, WidgetRef ref) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Clear History'),
-        content: const Text(
-          'This will permanently delete all triage history. This action cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              ref.read(triageHistoryProvider.notifier).clearAll();
-              Navigator.pop(ctx);
-              context.showSnack('History cleared');
-            },
-            child: Text(
-              'Clear',
-              style: TextStyle(color: context.colorScheme.error),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
 }

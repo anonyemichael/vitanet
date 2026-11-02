@@ -8,6 +8,7 @@ extension ContextExtension on BuildContext {
   MediaQueryData get mq => MediaQuery.of(this);
   double get screenWidth => mq.size.width;
   double get screenHeight => mq.size.height;
+  bool get isDesktop => screenWidth >= 800;
   bool get isDark => theme.brightness == Brightness.dark;
 
   void showSnack(String message) {

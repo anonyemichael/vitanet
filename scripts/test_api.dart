@@ -1,7 +1,8 @@
+// ignore_for_file: avoid_print
 import 'package:dio/dio.dart';
 
 void main() async {
-  final _openRouterDio = Dio(BaseOptions(
+  final openRouterDio = Dio(BaseOptions(
     baseUrl: 'https://openrouter.ai/api/v1/',
     headers: {
       'Content-Type': 'application/json',
@@ -10,7 +11,7 @@ void main() async {
   
   try {
     print("Testing OpenRouter...");
-    final response = await _openRouterDio.post('chat/completions', 
+    final response = await openRouterDio.post('chat/completions', 
       data: {
         "model": "google/gemini-2.0-flash-exp:free", 
         "messages": [{"role": "user", "content": "hello"}],

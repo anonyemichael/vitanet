@@ -1,3 +1,4 @@
+// ignore_for_file: avoid_print
 import 'dart:convert';
 import 'dart:io';
 
@@ -14,12 +15,12 @@ void main() async {
       v['video_id'] = 'j8Zm-c0oX7Q'; // Replace dead video
     }
     
-    if (v['thumbnail_url'].contains('\$ytId') || v['thumbnail_url'].contains('\\\$ytId')) {
-      v['thumbnail_url'] = 'https://img.youtube.com/vi/\${v["video_id"]}/hqdefault.jpg';
+    if (v['thumbnail_url'].contains(r'$ytId') || v['thumbnail_url'].contains(r'\$ytId')) {
+      v['thumbnail_url'] = 'https://img.youtube.com/vi/${v["video_id"]}/hqdefault.jpg';
     }
     
-    if (v['title'].contains('\${item')) {
-      v['title'] = 'Deep Dive: \${v["category"]}';
+    if (v['title'].contains(r'${item')) {
+      v['title'] = 'Deep Dive: ${v["category"]}';
     }
     
     if (v['duration'].contains('%')) {
@@ -41,8 +42,8 @@ void main() async {
       a['related_video_id'] = 'j8Zm-c0oX7Q';
     }
     
-    if (a['id'].contains('\$')) {
-      a['id'] = 'article_\${a["category"].replaceAll(" ", "_").toLowerCase()}_\$count';
+    if (a['id'].contains(r'$')) {
+      a['id'] = 'article_${a["category"].replaceAll(" ", "_").toLowerCase()}_$count';
     }
     
     if (a['read_time'].contains('%')) {

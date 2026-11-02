@@ -1,15 +1,16 @@
-import 'dart:ui';
+import 'package:file_picker/file_picker.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:flutter_animate/flutter_animate.dart';
-import 'package:vitanet/core/constants/app_spacing.dart';
-import 'package:vitanet/core/extensions/context_ext.dart';
+import 'package:vitanet/core/constants/app_colors.dart';
 import 'package:vitanet/data/models/user_profile.dart';
 import 'package:vitanet/data/providers/providers.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:vitanet/shared/widgets/gradient_background.dart';
+import 'package:vitanet/features/admin/widgets/staff_ui.dart';
 
+/// Hospital staff sign-up / sign-in (StaffRegister.dc.html).
 class RegistrationFormScreen extends ConsumerStatefulWidget {
   const RegistrationFormScreen({super.key});
 
@@ -18,339 +19,143 @@ class RegistrationFormScreen extends ConsumerStatefulWidget {
 }
 
 class _RegistrationFormScreenState extends ConsumerState<RegistrationFormScreen> {
-  bool _isSignIn = true;
+  bool _isSignIn = false;
+
+  void _back() {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/login');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final isWide = MediaQuery.sizeOf(context).width > 800;
+    final p = StaffPalette.of(context);
+    final topPad = MediaQuery.paddingOf(context).top;
 
-    Widget content = Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Container(
-          height: 54,
-          padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            color: context.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-            borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
-            border: Border.all(
-              color: context.colorScheme.outlineVariant.withValues(alpha: 0.5),
-              width: 1,
-            ),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => setState(() => _isSignIn = true),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: _isSignIn ? context.colorScheme.primary : Colors.transparent,
-                      borderRadius: BorderRadius.circular(AppSpacing.radiusXl - 4),
-                      boxShadow: _isSignIn ? [
-                        BoxShadow(
-                          color: context.colorScheme.primary.withValues(alpha: 0.3),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
-                        ),
-                      ] : null,
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      'Sign In',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 16,
-                        color: _isSignIn ? context.colorScheme.onPrimary : context.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => setState(() => _isSignIn = false),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: !_isSignIn ? context.colorScheme.primary : Colors.transparent,
-                      borderRadius: BorderRadius.circular(AppSpacing.radiusXl - 4),
-                      boxShadow: !_isSignIn ? [
-                        BoxShadow(
-                          color: context.colorScheme.primary.withValues(alpha: 0.3),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
-                        ),
-                      ] : null,
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      'Sign Up',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 16,
-                        color: !_isSignIn ? context.colorScheme.onPrimary : context.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ).animate().fadeIn(duration: 400.ms, curve: Curves.easeOut).slideY(begin: 0.2, curve: Curves.easeOut),
-        const SizedBox(height: AppSpacing.xxl),
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 300),
-          switchInCurve: Curves.easeOut,
-          switchOutCurve: Curves.easeIn,
-          child: _isSignIn 
-              ? const _SignInTab(key: ValueKey('signin')) 
-              : const _SignUpTab(key: ValueKey('signup')),
-        ),
-      ],
-    );
-
-    if (isWide) {
-      return Scaffold(
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_rounded),
-            onPressed: () => context.pop(),
-          ),
-        ),
-        extendBodyBehindAppBar: true,
-        body: GradientBackground(
-          child: Row(
-            children: [
-              Expanded(
-                flex: 5,
-                child: Stack(
-                  fit: StackFit.expand,
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+        backgroundColor: p.dark ? p.bg : AppColors.pageBg,
+        body: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            // ── Navy header ──
+            Container(
+              color: AppColors.staffNavy,
+              padding: EdgeInsets.fromLTRB(20, topPad + 16, 20, 28),
+              child: StaffContent(
+                maxWidth: 480,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    ShaderMask(
-                      shaderCallback: (rect) {
-                        return LinearGradient(
-                          begin: Alignment.centerLeft,
-                          end: Alignment.centerRight,
-                          colors: [
-                            Colors.black,
-                            Colors.black.withValues(alpha: 0.8),
-                            Colors.transparent,
-                          ],
-                          stops: const [0.0, 0.7, 1.0],
-                        ).createShader(rect);
-                      },
-                      blendMode: BlendMode.dstIn,
-                      child: Image.asset(
-                        'assets/images/staff_login.jpg',
-                        fit: BoxFit.cover,
-                        cacheWidth: 600,
-                        height: double.infinity,
-                        alignment: Alignment.centerLeft,
-                        errorBuilder: (c, e, s) => Container(color: context.colorScheme.primaryContainer),
+                    Row(
+                      children: [
+                        StaffIconButton(
+                          icon: Icons.chevron_left_rounded,
+                          iconSize: 26,
+                          tooltip: 'Back',
+                          background: const Color(0x14FFFFFF),
+                          foreground: const Color(0xFFF1F5F9),
+                          onPressed: _back,
+                        ),
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0x1F2DD4BF),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.shield_outlined, size: 14, color: AppColors.mintLight),
+                              const SizedBox(width: 6),
+                              Text('Verified access',
+                                  style: staffBody(12, weight: FontWeight.w600, color: AppColors.mintLight)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+                    Semantics(
+                      header: true,
+                      child: Text(
+                        _isSignIn ? 'Clinical staff sign-in' : 'Clinical staff sign-up',
+                        style: staffHeading(26, color: const Color(0xFFF1F5F9)),
                       ),
                     ),
-                    Positioned(
-                      left: AppSpacing.xxl * 2,
-                      bottom: AppSpacing.xxl * 3,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: context.colorScheme.primaryContainer.withValues(alpha: 0.8),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.health_and_safety_rounded, color: context.colorScheme.primary, size: 20),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'FOR PROVIDERS',
-                                  style: context.textTheme.labelLarge?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: 1.2,
-                                    color: context.colorScheme.primary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ).animate().fadeIn(duration: 600.ms, delay: 200.ms).slideX(begin: -0.1),
-                          const SizedBox(height: AppSpacing.xl),
-                          Text(
-                            'Empowering\nHealthcare.',
-                            style: context.textTheme.displayMedium?.copyWith(
-                              fontWeight: FontWeight.w900,
-                              height: 1.1,
-                              color: Colors.white,
-                              shadows: [
-                                Shadow(
-                                  color: Colors.black.withValues(alpha: 0.5),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 4),
-                                )
-                              ]
-                            ),
-                          ).animate().fadeIn(duration: 600.ms, delay: 300.ms).slideX(begin: -0.1),
-                          const SizedBox(height: AppSpacing.md),
-                          Text(
-                            'Manage triage, view patient history, and\nprovide better care with AI-driven insights.',
-                            style: context.textTheme.titleLarge?.copyWith(
-                              color: Colors.white.withValues(alpha: 0.9),
-                              fontWeight: FontWeight.w400,
-                            ),
-                          ).animate().fadeIn(duration: 600.ms, delay: 400.ms).slideX(begin: -0.1),
-                        ],
-                      ),
+                    const SizedBox(height: 6),
+                    Text(
+                      _isSignIn
+                          ? 'Use the work email your facility administrator approved.'
+                          : 'Your facility administrator approves new accounts, usually within one working day.',
+                      style: staffBody(14, color: const Color(0xFF94A3B8), height: 1.5),
                     ),
                   ],
                 ),
               ),
-              Expanded(
-                flex: 4,
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 480, maxHeight: 800),
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxl),
-                      child: content,
-                    ),
-                  ),
+            ),
+            // ── Form ──
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
+              child: StaffContent(
+                maxWidth: 480,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 250),
+                  child: _isSignIn
+                      ? _SignInTab(
+                          key: const ValueKey('signin'),
+                          onSwitch: () => setState(() => _isSignIn = false),
+                        )
+                      : _SignUpTab(
+                          key: const ValueKey('signup'),
+                          onSwitch: () => setState(() => _isSignIn = true),
+                        ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
-      );
-    }
-
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.3),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 20),
-          ),
-          onPressed: () => context.pop(),
-        ),
-      ),
-      body: Stack(
-        children: [
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: MediaQuery.sizeOf(context).height * 0.45,
-            child: ShaderMask(
-              shaderCallback: (rect) {
-                return LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black,
-                    Colors.black.withValues(alpha: 0.8),
-                    Colors.transparent,
-                  ],
-                  stops: const [0.0, 0.6, 1.0],
-                ).createShader(rect);
-              },
-              blendMode: BlendMode.dstIn,
-              child: Image.asset(
-                'assets/images/staff_login.jpg',
-                fit: BoxFit.cover,
-                cacheWidth: 600,
-                alignment: Alignment.topCenter,
-                errorBuilder: (c, e, s) => Container(color: context.colorScheme.primaryContainer),
-              ),
-            ),
-          ),
-          Positioned(
-            top: MediaQuery.sizeOf(context).height * 0.12,
-            left: AppSpacing.xxl,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.4),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.local_hospital_rounded, color: Colors.white, size: 16),
-                      const SizedBox(width: 8),
-                      Text(
-                        'FOR PROVIDERS',
-                        style: context.textTheme.labelMedium?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1.1,
-                        ),
-                      ),
-                    ],
-                  ),
-                ).animate().fadeIn(duration: 500.ms).slideY(begin: 0.2),
-              ],
-            ),
-          ),
-          Positioned.fill(
-            top: MediaQuery.sizeOf(context).height * 0.28,
-            child: ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).brightness == Brightness.dark 
-                        ? const Color(0xFF061017).withValues(alpha: 0.7)
-                        : Colors.white.withValues(alpha: 0.8),
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-                    border: Border(
-                      top: BorderSide(
-                        color: Colors.white.withValues(alpha: 0.3),
-                        width: 1.5,
-                      ),
-                    ),
-                  ),
-                  child: SafeArea(
-                    top: false,
-                    child: Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 600),
-                        child: SingleChildScrollView(
-                          padding: const EdgeInsets.all(AppSpacing.xxl),
-                          child: content,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ).animate().fadeIn(duration: 500.ms, curve: Curves.easeOut).slideY(begin: 0.1, curve: Curves.easeOut),
-          ),
-        ],
       ),
     );
   }
 }
 
+// ─── Shared pieces ───
+
+InputDecoration _fieldDecoration(BuildContext context, {String? hint, Widget? suffix, Widget? prefix}) =>
+    staffInputDecoration(
+      context,
+      hint: hint,
+      radius: 16,
+      prefixIcon: prefix,
+      suffixIcon: suffix,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+    );
+
+Widget _footerLink(BuildContext context, String lead, String action, VoidCallback onTap) {
+  final p = StaffPalette.of(context);
+  return Row(
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: [
+      Text(lead, style: staffBody(14, color: p.muted)),
+      TextButton(
+        onPressed: onTap,
+        style: TextButton.styleFrom(minimumSize: const Size(44, 44), padding: const EdgeInsets.symmetric(horizontal: 6)),
+        child: Text(action, style: staffBody(14, weight: FontWeight.w700, color: p.accent)),
+      ),
+    ],
+  );
+}
+
 // ─── Sign In Tab ───
 
 class _SignInTab extends ConsumerStatefulWidget {
-  const _SignInTab({super.key});
+  final VoidCallback onSwitch;
+  const _SignInTab({super.key, required this.onSwitch});
 
   @override
   ConsumerState<_SignInTab> createState() => _SignInTabState();
@@ -371,17 +176,17 @@ class _SignInTabState extends ConsumerState<_SignInTab> {
 
   Future<void> _signIn() async {
     if (_emailCtrl.text.isEmpty || _passCtrl.text.isEmpty) {
-      context.showSnack('Please enter both email and password.');
+      showStaffSnack(context, 'Please enter both email and password.');
       return;
     }
-    
+
     setState(() => _isLoading = true);
     try {
       await ref.read(authProvider.notifier).signInWithEmail(
-        _emailCtrl.text.trim(),
-        _passCtrl.text,
-      );
-      
+            _emailCtrl.text.trim(),
+            _passCtrl.text,
+          );
+
       final authState = ref.read(authProvider);
       if (authState.status == AuthStatus.error) {
         throw Exception(authState.errorMessage);
@@ -391,86 +196,101 @@ class _SignInTabState extends ConsumerState<_SignInTab> {
         final backendUser = await ref.read(firestoreServiceProvider).getUserProfile(authState.user!.uid);
         if (backendUser != null) {
           final accountType = backendUser.role;
-          
+
           if (accountType == 'personal_user' || accountType == 'patient' || accountType == 'user') {
             await ref.read(authProvider.notifier).signOut();
             if (mounted) {
-              context.showSnack('This account belongs to a Personal User. Please use the Patient login.');
+              showStaffSnack(context, 'This account belongs to a Personal User. Please use the Patient login.');
               setState(() => _isLoading = false);
             }
             return;
           }
 
-          final role = (accountType == 'healthcare_professional' || accountType == 'admin') ? 'admin' : 'user';
           ref.read(userProfileProvider.notifier).updateProfile(backendUser);
         } else {
           // Fallback if backend fetch fails or no user found
           ref.read(userProfileProvider.notifier).updateProfile(
-            UserProfile(name: 'Provider', role: 'admin'),
-          );
+                UserProfile(name: 'Provider', role: 'admin'),
+              );
         }
       }
 
       if (mounted) context.go('/admin');
     } catch (e) {
-      if (mounted) context.showSnack('Sign In failed: $e');
+      if (mounted) showStaffSnack(context, 'Sign in failed: $e');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
+  Future<void> _resetPassword() async {
+    final email = _emailCtrl.text.trim();
+    if (email.isEmpty) {
+      showStaffSnack(context, 'Enter your work email first, then tap "Forgot password?".');
+      return;
+    }
+    if (Firebase.apps.isEmpty) {
+      showStaffSnack(context, 'Password reset is currently unavailable in offline mode.');
+      return;
+    }
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      if (mounted) showStaffSnack(context, 'Reset link sent to $email.');
+    } on FirebaseAuthException catch (e) {
+      if (mounted) showStaffSnack(context, e.message ?? 'Could not send reset link.');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const SizedBox(height: AppSpacing.md),
-          _buildTextField(
-            context: context,
+    final p = StaffPalette.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        StaffField(
+          label: 'Work email',
+          child: TextField(
             controller: _emailCtrl,
-            label: 'Hospital Email',
-            icon: Icons.email_rounded,
             keyboardType: TextInputType.emailAddress,
-          ).animate().fadeIn(delay: 100.ms).slideY(begin: 0.1),
-          const SizedBox(height: AppSpacing.lg),
-          _buildTextField(
-            context: context,
+            autofillHints: const [AutofillHints.email],
+            style: staffBody(15, color: p.ink),
+            decoration: _fieldDecoration(context, hint: 'k.mensah@korlebu.gov.gh'),
+          ),
+        ),
+        const SizedBox(height: 16),
+        StaffField(
+          label: 'Password',
+          child: TextField(
             controller: _passCtrl,
-            label: 'Password',
-            icon: Icons.lock_rounded,
             obscureText: _obscurePassword,
-            suffixIcon: IconButton(
-              icon: Icon(_obscurePassword ? Icons.visibility_rounded : Icons.visibility_off_rounded, color: context.colorScheme.onSurfaceVariant),
-              onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-            ),
-          ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.1),
-          const SizedBox(height: AppSpacing.md),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
-              onPressed: () {
-                context.showSnack('Password reset not implemented yet.');
-              },
-              child: const Text('Forgot Password?', style: TextStyle(fontWeight: FontWeight.w600)),
-            ),
-          ).animate().fadeIn(delay: 300.ms),
-          const SizedBox(height: AppSpacing.xl),
-          if (_isLoading)
-            const Center(child: CircularProgressIndicator())
-          else
-            FilledButton(
-              onPressed: _signIn,
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 18),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                elevation: 4,
-                shadowColor: context.colorScheme.primary.withValues(alpha: 0.4),
+            autofillHints: const [AutofillHints.password],
+            onSubmitted: (_) => _signIn(),
+            style: staffBody(15, color: p.ink),
+            decoration: _fieldDecoration(
+              context,
+              suffix: IconButton(
+                tooltip: _obscurePassword ? 'Show password' : 'Hide password',
+                icon: Icon(_obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                    color: p.muted, size: 20),
+                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
               ),
-              child: const Text('Sign In Securely', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
-            ).animate().fadeIn(delay: 400.ms).scale(begin: const Offset(0.95, 0.95)),
-        ],
-      ),
+            ),
+          ),
+        ),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton(
+            onPressed: _resetPassword,
+            style: TextButton.styleFrom(minimumSize: const Size(44, 44)),
+            child: Text('Forgot password?', style: staffBody(13, weight: FontWeight.w600, color: p.accent)),
+          ),
+        ),
+        const SizedBox(height: 12),
+        StaffButton('Sign in', height: 56, radius: 16, fontSize: 16, loading: _isLoading, onPressed: _signIn),
+
+        const SizedBox(height: 12),
+        _footerLink(context, 'New to VitaNet?', 'Request access', widget.onSwitch),
+      ],
     );
   }
 }
@@ -478,17 +298,31 @@ class _SignInTabState extends ConsumerState<_SignInTab> {
 // ─── Sign Up Tab ───
 
 class _SignUpTab extends ConsumerStatefulWidget {
-  const _SignUpTab({super.key});
+  final VoidCallback onSwitch;
+  const _SignUpTab({super.key, required this.onSwitch});
 
   @override
   ConsumerState<_SignUpTab> createState() => _SignUpTabState();
 }
 
 class _SignUpTabState extends ConsumerState<_SignUpTab> {
+  static const _roles = ['Doctor', 'Nurse', 'Admin'];
+  static const _facilities = [
+    'Korle Bu Teaching Hospital',
+    'Ridge Hospital',
+    'Komfo Anokye Teaching Hospital',
+    '37 Military Hospital',
+    'Tamale Teaching Hospital',
+  ];
+
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
-  final _phoneController = TextEditingController();
+  final _departmentController = TextEditingController();
+  final _licenseController = TextEditingController();
   final _passwordController = TextEditingController();
+  String _role = _roles.first;
+  String _facility = _facilities.first;
+  PlatformFile? _staffId;
   bool _isLoading = false;
   bool _obscurePassword = true;
 
@@ -496,19 +330,37 @@ class _SignUpTabState extends ConsumerState<_SignUpTab> {
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
-    _phoneController.dispose();
+    _departmentController.dispose();
+    _licenseController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickStaffId() async {
+    try {
+      final result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf'],
+      );
+      if (result != null && result.files.isNotEmpty && mounted) {
+        setState(() => _staffId = result.files.single);
+      }
+    } catch (e) {
+      if (mounted) showStaffSnack(context, 'Could not open files: $e');
+    }
   }
 
   Future<void> _register() async {
     final name = _nameController.text.trim();
     final email = _emailController.text.trim();
-    final phone = _phoneController.text.trim();
     final password = _passwordController.text;
 
-    if (name.isEmpty || email.isEmpty || phone.isEmpty || password.isEmpty) {
-      context.showSnack('Please fill in all fields.');
+    if (name.isEmpty ||
+        email.isEmpty ||
+        password.isEmpty ||
+        _departmentController.text.trim().isEmpty ||
+        _licenseController.text.trim().isEmpty) {
+      showStaffSnack(context, 'Please fill in all fields.');
       return;
     }
 
@@ -516,35 +368,27 @@ class _SignUpTabState extends ConsumerState<_SignUpTab> {
 
     try {
       await ref.read(authProvider.notifier).signUpWithEmail(email, password);
-      
+
       final authState = ref.read(authProvider);
       if (authState.status == AuthStatus.error) {
         throw Exception(authState.errorMessage);
       }
-      
-      final currentUser = FirebaseAuth.instance.currentUser;
-      if (currentUser == null) throw Exception('Firebase failed to return user.');
+
+      final currentUser =
+          Firebase.apps.isNotEmpty ? FirebaseAuth.instance.currentUser : null;
+      if (currentUser != null) {
+        try {
+          await currentUser.updateDisplayName(name);
+        } catch (_) {}
+      }
 
       ref.read(userProfileProvider.notifier).updateProfile(
-        UserProfile(name: name, role: 'health_worker'),
-      );
-
-      final payload = {
-        "user": {
-          "account_type": "healthcare_professional",
-          "full_name": name,
-          "email": email,
-          "phone_number": phone,
-          "firebase_uid": currentUser.uid,
-        },
-        "care_circle": [],
-      };
-
-      // Removed Render API registerUser payload
+            UserProfile(name: name, role: _role == 'Admin' ? 'admin' : 'health_worker'),
+          );
 
       if (mounted) context.go('/admin');
     } catch (e) {
-      if (mounted) context.showSnack('Registration failed: $e');
+      if (mounted) showStaffSnack(context, 'Registration failed: $e');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -552,93 +396,299 @@ class _SignUpTabState extends ConsumerState<_SignUpTab> {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const SizedBox(height: AppSpacing.md),
-          _buildTextField(
-            context: context,
+    final p = StaffPalette.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        StaffField(
+          label: 'Full name',
+          child: TextField(
             controller: _nameController,
-            label: 'Full Name',
-            icon: Icons.person_rounded,
-          ).animate().fadeIn(delay: 100.ms).slideY(begin: 0.1),
-          const SizedBox(height: AppSpacing.md),
-          _buildTextField(
-            context: context,
+            textCapitalization: TextCapitalization.words,
+            autofillHints: const [AutofillHints.name],
+            style: staffBody(15, color: p.ink),
+            decoration: _fieldDecoration(context, hint: 'Dr. Kwame Mensah'),
+          ),
+        ),
+        const SizedBox(height: 16),
+        StaffField(
+          label: 'Work email',
+          child: TextField(
             controller: _emailController,
-            label: 'Hospital Email',
-            icon: Icons.email_rounded,
             keyboardType: TextInputType.emailAddress,
-          ).animate().fadeIn(delay: 150.ms).slideY(begin: 0.1),
-          const SizedBox(height: AppSpacing.md),
-          _buildTextField(
-            context: context,
-            controller: _phoneController,
-            label: 'Phone Number',
-            icon: Icons.phone_rounded,
-            keyboardType: TextInputType.phone,
-          ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.1),
-          const SizedBox(height: AppSpacing.md),
-          _buildTextField(
-            context: context,
-            controller: _passwordController,
-            label: 'Password',
-            icon: Icons.lock_rounded,
-            obscureText: _obscurePassword,
-            suffixIcon: IconButton(
-              icon: Icon(_obscurePassword ? Icons.visibility_rounded : Icons.visibility_off_rounded, color: context.colorScheme.onSurfaceVariant),
-              onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-            ),
-          ).animate().fadeIn(delay: 250.ms).slideY(begin: 0.1),
-          const SizedBox(height: AppSpacing.xl),
-          if (_isLoading)
-            const Center(child: CircularProgressIndicator())
-          else
-            FilledButton(
-              onPressed: _register,
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 18),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                elevation: 4,
-                shadowColor: context.colorScheme.primary.withValues(alpha: 0.4),
+            autofillHints: const [AutofillHints.email],
+            style: staffBody(15, color: p.ink),
+            decoration: _fieldDecoration(context, hint: 'k.mensah@korlebu.gov.gh'),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text('Role', style: staffBody(13, weight: FontWeight.w600, color: p.ink)),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            for (var i = 0; i < _roles.length; i++) ...[
+              if (i > 0) const SizedBox(width: 8),
+              Expanded(child: _roleButton(_roles[i], p)),
+            ],
+          ],
+        ),
+        const SizedBox(height: 16),
+        StaffField(
+          label: 'Facility',
+          child: StaffSelect<String>(
+            value: _facility,
+            items: _facilities,
+            labelOf: (f) => f,
+            icon: Icons.local_hospital_outlined,
+            height: 52,
+            radius: 16,
+            onChanged: (f) => setState(() => _facility = f),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: StaffField(
+                label: 'Department',
+                child: TextField(
+                  controller: _departmentController,
+                  textCapitalization: TextCapitalization.words,
+                  style: staffBody(15, color: p.ink),
+                  decoration: _fieldDecoration(context, hint: 'Emergency'),
+                ),
               ),
-              child: const Text('Create Provider Account', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
-            ).animate().fadeIn(delay: 350.ms).scale(begin: const Offset(0.95, 0.95)),
-          const SizedBox(height: AppSpacing.xxxl),
-        ],
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: StaffField(
+                label: 'License no.',
+                child: TextField(
+                  controller: _licenseController,
+                  textCapitalization: TextCapitalization.characters,
+                  style: staffBody(15, color: p.ink),
+                  decoration: _fieldDecoration(context, hint: 'MDC/RN/04712'),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _IdUploadRow(file: _staffId, onTap: _pickStaffId),
+        const SizedBox(height: 16),
+        StaffField(
+          label: 'Create password',
+          helper: ListenableBuilder(
+            listenable: _passwordController,
+            builder: (context, _) => _StrengthMeter(password: _passwordController.text),
+          ),
+          child: TextField(
+            controller: _passwordController,
+            obscureText: _obscurePassword,
+            autofillHints: const [AutofillHints.newPassword],
+            style: staffBody(15, color: p.ink),
+            decoration: _fieldDecoration(
+              context,
+              suffix: IconButton(
+                tooltip: _obscurePassword ? 'Show password' : 'Hide password',
+                icon: Icon(_obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                    color: p.muted, size: 20),
+                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
+        StaffButton('Request access', height: 56, radius: 16, fontSize: 16, loading: _isLoading, onPressed: _register),
+        const SizedBox(height: 12),
+        _footerLink(context, 'Already approved?', 'Sign in', widget.onSwitch),
+      ],
+    );
+  }
+
+  Widget _roleButton(String role, StaffPalette p) {
+    final sel = _role == role;
+    final brand = p.tone(StaffTone.brand);
+    return Semantics(
+      selected: sel,
+      button: true,
+      child: Material(
+        color: sel ? brand.bg : p.card,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(color: sel ? brand.strong : p.line),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => setState(() => _role = role),
+          child: SizedBox(
+            height: 44,
+            child: Center(
+              child: Text(
+                role,
+                style: staffBody(14, weight: sel ? FontWeight.w700 : FontWeight.w600, color: sel ? brand.fg : p.ink),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
 }
 
-// ─── Helpers ───
+class _IdUploadRow extends StatelessWidget {
+  final PlatformFile? file;
+  final VoidCallback onTap;
+  const _IdUploadRow({required this.file, required this.onTap});
 
-Widget _buildTextField({
-  required BuildContext context,
-  required TextEditingController controller,
-  required String label,
-  required IconData icon,
-  bool obscureText = false,
-  TextInputType? keyboardType,
-  Widget? suffixIcon,
-}) {
-  return TextField(
-    controller: controller,
-    obscureText: obscureText,
-    keyboardType: keyboardType,
-    style: const TextStyle(fontWeight: FontWeight.w600),
-    decoration: InputDecoration(
-      labelText: label,
-      prefixIcon: Icon(icon, color: context.colorScheme.primary),
-      suffixIcon: suffixIcon,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide.none,
+  String _size(int bytes) {
+    if (bytes >= 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    return '${(bytes / 1024).ceil()} KB';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = StaffPalette.of(context);
+    final f = file;
+    return Semantics(
+      button: true,
+      label: f == null ? 'Upload staff ID card' : 'Staff ID card uploaded, ${f.name}. Tap to replace',
+      excludeSemantics: true,
+      child: Material(
+        color: p.card,
+        borderRadius: BorderRadius.circular(20),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: CustomPaint(
+            painter: _DashedBorderPainter(color: p.faint, radius: 20),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(14)),
+                    child: Icon(Icons.file_upload_outlined, size: 20, color: p.accent),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Staff ID card', style: staffBody(14, weight: FontWeight.w600, color: p.ink)),
+                        const SizedBox(height: 2),
+                        Text(
+                          f == null ? 'Upload the front · JPG, PNG or PDF' : '${f.name} · ${_size(f.size)}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: staffBody(12, color: p.muted),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (f != null)
+                    Container(
+                      width: 28,
+                      height: 28,
+                      decoration: const BoxDecoration(color: Color(0xFF059669), shape: BoxShape.circle),
+                      child: const Icon(Icons.check_rounded, size: 16, color: Colors.white),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
-      filled: true,
-      fillColor: context.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-    ),
-  );
+    );
+  }
+}
+
+class _DashedBorderPainter extends CustomPainter {
+  final Color color;
+  final double radius;
+  _DashedBorderPainter({required this.color, required this.radius});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    final rrect = RRect.fromRectAndRadius(
+      Offset.zero & size,
+      Radius.circular(radius),
+    ).deflate(0.5);
+    final path = Path()..addRRect(rrect);
+    for (final metric in path.computeMetrics()) {
+      double d = 0;
+      while (d < metric.length) {
+        canvas.drawPath(metric.extractPath(d, d + 5), paint);
+        d += 9;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashedBorderPainter old) => old.color != color || old.radius != radius;
+}
+
+class _StrengthMeter extends StatelessWidget {
+  final String password;
+  const _StrengthMeter({required this.password});
+
+  int get _score {
+    if (password.isEmpty) return 0;
+    var s = 0;
+    if (password.length >= 8) s++;
+    if (password.length >= 12) s++;
+    if ((RegExp(r'[A-Z]').hasMatch(password) && RegExp(r'[a-z]').hasMatch(password)) ||
+        RegExp(r'\d').hasMatch(password)) {
+      s++;
+    }
+    if (RegExp(r'[^A-Za-z0-9]').hasMatch(password)) s++;
+    if (s == 0) s = 1;
+    return s;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = StaffPalette.of(context);
+    final score = _score;
+    final (label, color, textColor) = switch (score) {
+      0 => ('At least 8 characters', p.track, p.muted),
+      1 => ('Weak password', const Color(0xFFDC2626), p.tone(StaffTone.danger).fg),
+      2 => ('Fair password', const Color(0xFFF59E0B), p.dark ? p.tone(StaffTone.amber).fg : kStaffAmber),
+      _ => ('Strong password', const Color(0xFF059669), p.dark ? const Color(0xFF6EE7B7) : kStaffGreen),
+    };
+    return Semantics(
+      label: label,
+      excludeSemantics: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              for (var i = 0; i < 4; i++) ...[
+                if (i > 0) const SizedBox(width: 4),
+                Expanded(
+                  child: Container(
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: i < score ? color : p.track,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(label, style: staffBody(12, weight: FontWeight.w500, color: textColor)),
+        ],
+      ),
+    );
+  }
 }

@@ -1,11 +1,11 @@
 [
   {
     "id": "med_001",
-    "name": "Paracetamol",
-    "type": "Pain Reliever",
-    "description": "A common painkiller used to treat aches and pain. It can also be used to reduce a high temperature (fever).",
-    "accent_color": "#3B82F6",
-    "icon": "medication_liquid_rounded",
+    "name": "Acetaminophen (Paracetamol)",
+    "type": "Pain Reliever & Antipyretic",
+    "description": "First-line analgesic and antipyretic medication indicated for mild-to-moderate pain and fever reduction.",
+    "accent_color": "#0D9488",
+    "icon": "medication_rounded",
     "hero_image_url": "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?q=80&w=1000&auto=format&fit=crop",
     "is_fda_approved": true,
     "related_video_id": "vid_first_aid_001",
@@ -13,25 +13,25 @@
       {
         "title": "Typical Dosage",
         "icon": "medication_rounded",
-        "content": "Adults: Take 1-2 tablets (500mg each) every 4 to 6 hours as needed.\nDo not exceed 8 tablets (4,000mg) in 24 hours.\nTake with a full glass of water. Can be taken with or without food."
+        "content": "Adults: 500 mg to 1,000 mg every 4 to 6 hours as needed. Maximum daily dose must not exceed 4,000 mg in 24 hours to prevent hepatotoxicity."
       },
       {
         "title": "Common Side Effects",
         "icon": "warning_amber_rounded",
-        "content": "Paracetamol rarely causes side effects if taken at the right dosage. Rarely, it may cause an allergic reaction (rash, swelling) or liver damage if taken in overdose."
+        "content": "Rare at therapeutic doses. Nausea, rash, or allergic reactions. Acute hepatic failure may occur with overdose."
       },
       {
         "title": "Interactions & Warnings",
         "icon": "gpp_maybe_rounded",
-        "content": "Avoid drinking excessive amounts of alcohol while taking this medicine. Do not combine with other cold or cough medicines that already contain paracetamol to avoid overdose."
+        "content": "Avoid concurrent alcohol intake. Never combine with other multi-symptom OTC medicines containing acetaminophen."
       }
     ]
   },
   {
     "id": "med_002",
     "name": "Ibuprofen",
-    "type": "NSAID",
-    "description": "An everyday painkiller for a range of aches and pains, including back pain, period pain, toothache, and it reduces inflammation.",
+    "type": "NSAID (Non-Steroidal Anti-Inflammatory)",
+    "description": "Nonsteroidal anti-inflammatory drug used for relief of acute pain, swelling, fever, and musculoskeletal inflammation.",
     "accent_color": "#F97316",
     "icon": "medication_rounded",
     "hero_image_url": "https://images.unsplash.com/photo-1550572017-edb7994c4897?q=80&w=1000&auto=format&fit=crop",
@@ -41,25 +41,25 @@
       {
         "title": "Typical Dosage",
         "icon": "medication_rounded",
-        "content": "Adults: Take 1-2 tablets (200mg each) every 4 to 6 hours as needed.\nDo not exceed 1,200mg in 24 hours without consulting a doctor.\nBest taken with food or a glass of milk to reduce stomach upset."
+        "content": "Adults: 200 mg to 400 mg orally every 4 to 6 hours with food. Do not exceed 1,200 mg daily for OTC use without physician supervision."
       },
       {
         "title": "Common Side Effects",
         "icon": "warning_amber_rounded",
-        "content": "• Nausea or vomiting\n• Mild stomach pain\n• Heartburn\n• Dizziness"
+        "content": "Dyspepsia, heartburn, stomach pain, dizziness, fluid retention."
       },
       {
         "title": "Interactions & Warnings",
         "icon": "gpp_maybe_rounded",
-        "content": "Do not take if you have a history of stomach ulcers, severe heart failure, or are highly allergic to aspirin. May interact with blood thinners."
+        "content": "Contraindicated in active peptic ulcer disease or third trimester of pregnancy. Increases bleeding risk with anticoagulants."
       }
     ]
   },
   {
     "id": "med_003",
     "name": "Amoxicillin",
-    "type": "Antibiotic",
-    "description": "A penicillin antibiotic used to treat a wide variety of bacterial infections, such as middle ear infections, strep throat, and pneumonia.",
+    "type": "Penicillin Antibacterial",
+    "description": "Broad-spectrum beta-lactam antibiotic indicated for respiratory tract, ear, nose, and bacterial urinary infections.",
     "accent_color": "#10B981",
     "icon": "healing_rounded",
     "hero_image_url": "https://images.unsplash.com/photo-1628771065518-0d82f1938462?q=80&w=1000&auto=format&fit=crop",
@@ -68,25 +68,25 @@
       {
         "title": "Typical Dosage",
         "icon": "medication_rounded",
-        "content": "Dosage is prescribed by a doctor based on the infection. Typically 250mg to 500mg every 8 hours, or 500mg to 875mg every 12 hours.\nYou must complete the entire course of medication even if you feel better."
+        "content": "Adults: 250 mg to 500 mg every 8 hours or 875 mg every 12 hours depending on infection severity. Complete full prescribed regimen."
       },
       {
         "title": "Common Side Effects",
         "icon": "warning_amber_rounded",
-        "content": "• Nausea or vomiting\n• Diarrhea\n• Mild skin rash"
+        "content": "Diarrhea, nausea, vomiting, erythematous maculopapular rash."
       },
       {
         "title": "Interactions & Warnings",
         "icon": "gpp_maybe_rounded",
-        "content": "Do not use if you are allergic to penicillin. Seek immediate emergency medical help if you have signs of an allergic reaction: hives, difficult breathing, swelling of your face."
+        "content": "Contraindicated in severe penicillin allergy (risk of anaphylaxis). May reduce oral contraceptive efficacy."
       }
     ]
   },
   {
     "id": "med_004",
     "name": "Loratadine",
-    "type": "Antihistamine",
-    "description": "Used to treat symptoms of allergies, such as sneezing, watery eyes, and runny nose. It is non-drowsy for most people.",
+    "type": "Second-Generation Antihistamine",
+    "description": "Non-sedating selective peripheral H1 receptor antagonist for seasonal allergic rhinitis, sneezing, and urticaria.",
     "accent_color": "#8B5CF6",
     "icon": "air_rounded",
     "hero_image_url": "https://images.unsplash.com/photo-1584017911766-d451b3d0e843?q=80&w=1000&auto=format&fit=crop",
@@ -95,26 +95,26 @@
       {
         "title": "Typical Dosage",
         "icon": "medication_rounded",
-        "content": "Adults: Take 1 tablet (10mg) once daily.\nDo not take more than 1 tablet in 24 hours."
+        "content": "Adults and children 6 years and older: 10 mg orally once daily. Do not exceed 10 mg in 24 hours."
       },
       {
         "title": "Common Side Effects",
         "icon": "warning_amber_rounded",
-        "content": "• Headache\n• Dry mouth\n• Feeling tired or drowsy (rare, but possible)"
+        "content": "Headache, dry mouth, drowsiness (rare at therapeutic doses), fatigue."
       },
       {
         "title": "Interactions & Warnings",
         "icon": "gpp_maybe_rounded",
-        "content": "Check with your doctor before taking if you have liver or kidney disease. Safe for use during pregnancy only if clearly needed."
+        "content": "Dose adjustment required in severe renal or hepatic impairment. Avoid combination with sedative antihistamines."
       }
     ]
   },
   {
     "id": "med_005",
     "name": "Omeprazole",
-    "type": "Antacid",
-    "description": "A proton pump inhibitor (PPI) that decreases the amount of acid produced in the stomach. Treats acid reflux and ulcers.",
-    "accent_color": "#14B8A6",
+    "type": "Proton Pump Inhibitor (PPI)",
+    "description": "Suppresses gastric acid secretion by specific inhibition of the H+/K+-ATPase proton pump for GERD and peptic ulcers.",
+    "accent_color": "#06B6D4",
     "icon": "local_pharmacy_rounded",
     "hero_image_url": "https://images.unsplash.com/photo-1631549916768-4119b2e5f926?q=80&w=1000&auto=format&fit=crop",
     "is_fda_approved": true,
@@ -122,17 +122,422 @@
       {
         "title": "Typical Dosage",
         "icon": "medication_rounded",
-        "content": "Adults: Take 1 capsule (20mg) once daily before a meal, usually in the morning.\nSwallow whole; do not crush or chew."
+        "content": "Adults: 20 mg to 40 mg once daily, taken 30 to 60 minutes before breakfast. Swallow capsule whole without chewing."
       },
       {
         "title": "Common Side Effects",
         "icon": "warning_amber_rounded",
-        "content": "• Headache\n• Stomach pain, nausea, vomiting, or diarrhea\n• Gas"
+        "content": "Headache, abdominal pain, flatulence, nausea, diarrhea or constipation."
       },
       {
         "title": "Interactions & Warnings",
         "icon": "gpp_maybe_rounded",
-        "content": "Long-term use may increase the risk of bone fractures and vitamin B12 deficiency. May interact with blood thinners or methotrexate."
+        "content": "Prolonged therapy may reduce hypomagnesemia and vitamin B12 absorption. May interact with clopidogrel and methotrexate."
+      }
+    ]
+  },
+  {
+    "id": "med_006",
+    "name": "Naproxen",
+    "type": "NSAID (Pain & Fever)",
+    "description": "Long-acting nonsteroidal anti-inflammatory analgesic indicated for arthritis, musculoskeletal pain, and dysmenorrhea.",
+    "accent_color": "#F97316",
+    "icon": "medication_rounded",
+    "hero_image_url": "https://images.unsplash.com/photo-1550572017-edb7994c4897?q=80&w=1000&auto=format&fit=crop",
+    "is_fda_approved": true,
+    "details": [
+      {
+        "title": "Typical Dosage",
+        "icon": "medication_rounded",
+        "content": "Adults: 220 mg to 500 mg orally twice daily with meals or a full glass of water. Maximum 1,500 mg/day under medical supervision."
+      },
+      {
+        "title": "Common Side Effects",
+        "icon": "warning_amber_rounded",
+        "content": "Stomach upset, heartburn, nausea, constipation, dizziness, peripheral edema."
+      },
+      {
+        "title": "Interactions & Warnings",
+        "icon": "gpp_maybe_rounded",
+        "content": "Black box warning for cardiovascular thrombotic events and gastrointestinal ulceration/bleeding."
+      }
+    ]
+  },
+  {
+    "id": "med_007",
+    "name": "Aspirin (Acetylsalicylic Acid)",
+    "type": "Antiplatelet & Analgesic (Pain & Cardio)",
+    "description": "Irreversible cyclooxygenase inhibitor used for cardiovascular prophylaxis (low-dose) and mild pain/inflammation relief.",
+    "accent_color": "#EF4444",
+    "icon": "monitor_heart_rounded",
+    "hero_image_url": "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?q=80&w=1000&auto=format&fit=crop",
+    "is_fda_approved": true,
+    "details": [
+      {
+        "title": "Typical Dosage",
+        "icon": "medication_rounded",
+        "content": "Cardioprotection: 81 mg to 100 mg orally once daily. Acute analgesic dose: 325 mg to 650 mg every 4 hours as needed."
+      },
+      {
+        "title": "Common Side Effects",
+        "icon": "warning_amber_rounded",
+        "content": "Gastric irritation, occult bleeding, tinnitus at elevated doses, bruising."
+      },
+      {
+        "title": "Interactions & Warnings",
+        "icon": "gpp_maybe_rounded",
+        "content": "Never administer to children or adolescents recovering from viral illness due to risk of Reye syndrome."
+      }
+    ]
+  },
+  {
+    "id": "med_008",
+    "name": "Azithromycin",
+    "type": "Macrolide Antibiotic",
+    "description": "Broad-spectrum macrolide antibiotic indicated for community-acquired pneumonia, strep pharyngitis, and skin infections.",
+    "accent_color": "#10B981",
+    "icon": "healing_rounded",
+    "hero_image_url": "https://images.unsplash.com/photo-1628771065518-0d82f1938462?q=80&w=1000&auto=format&fit=crop",
+    "is_fda_approved": true,
+    "details": [
+      {
+        "title": "Typical Dosage",
+        "icon": "medication_rounded",
+        "content": "Adults: 500 mg single dose on day 1, followed by 250 mg once daily on days 2 through 5 (Z-Pak regimen)."
+      },
+      {
+        "title": "Common Side Effects",
+        "icon": "warning_amber_rounded",
+        "content": "Gastrointestinal cramping, diarrhea, nausea, transient transaminase elevations."
+      },
+      {
+        "title": "Interactions & Warnings",
+        "icon": "gpp_maybe_rounded",
+        "content": "Use caution in patients with baseline prolonged QT interval or proarrhythmic cardiac conditions."
+      }
+    ]
+  },
+  {
+    "id": "med_009",
+    "name": "Ciprofloxacin",
+    "type": "Fluoroquinolone Antibacterial",
+    "description": "Potent bactericidal fluoroquinolone targeting bacterial DNA gyrase; indicated for complicated UTI and bone infections.",
+    "accent_color": "#10B981",
+    "icon": "healing_rounded",
+    "hero_image_url": "https://images.unsplash.com/photo-1628771065518-0d82f1938462?q=80&w=1000&auto=format&fit=crop",
+    "is_fda_approved": true,
+    "details": [
+      {
+        "title": "Typical Dosage",
+        "icon": "medication_rounded",
+        "content": "Adults: 250 mg to 750 mg orally every 12 hours depending on infection site and microbiological severity."
+      },
+      {
+        "title": "Common Side Effects",
+        "icon": "warning_amber_rounded",
+        "content": "Nausea, diarrhea, headache, photosensitivity, restlessness."
+      },
+      {
+        "title": "Interactions & Warnings",
+        "icon": "gpp_maybe_rounded",
+        "content": "Black box warning for tendinitis and tendon rupture, peripheral neuropathy, and CNS toxicities. Avoid dairy/antacids during dosing."
+      }
+    ]
+  },
+  {
+    "id": "med_010",
+    "name": "Doxycycline",
+    "type": "Tetracycline Antibiotic",
+    "description": "Broad-spectrum tetracycline antibiotic indicated for atypical pneumonia, Lyme disease, acne vulgaris, and rickettsial diseases.",
+    "accent_color": "#10B981",
+    "icon": "healing_rounded",
+    "hero_image_url": "https://images.unsplash.com/photo-1628771065518-0d82f1938462?q=80&w=1000&auto=format&fit=crop",
+    "is_fda_approved": true,
+    "details": [
+      {
+        "title": "Typical Dosage",
+        "icon": "medication_rounded",
+        "content": "Adults: 100 mg orally every 12 hours on day 1, followed by 100 mg once or twice daily. Take with full glass of water sitting upright."
+      },
+      {
+        "title": "Common Side Effects",
+        "icon": "warning_amber_rounded",
+        "content": "Esophageal irritation, nausea, cutaneous photosensitivity, tooth discoloration in pediatrics."
+      },
+      {
+        "title": "Interactions & Warnings",
+        "icon": "gpp_maybe_rounded",
+        "content": "Contraindicated in pregnancy and children under 8 years. Chelation occurs with iron, calcium, and antacids."
+      }
+    ]
+  },
+  {
+    "id": "med_011",
+    "name": "Lisinopril",
+    "type": "ACE Inhibitor (Cardiovascular)",
+    "description": "Angiotensin-converting enzyme (ACE) inhibitor indicated for essential hypertension, congestive heart failure, and post-MI recovery.",
+    "accent_color": "#EF4444",
+    "icon": "monitor_heart_rounded",
+    "hero_image_url": "https://images.unsplash.com/photo-1505751172876-fa1923c5c528?q=80&w=1000&auto=format&fit=crop",
+    "is_fda_approved": true,
+    "details": [
+      {
+        "title": "Typical Dosage",
+        "icon": "medication_rounded",
+        "content": "Adults: Initial 10 mg orally once daily; titrated up to 20 mg to 40 mg daily based on target blood pressure."
+      },
+      {
+        "title": "Common Side Effects",
+        "icon": "warning_amber_rounded",
+        "content": "Dry persistent cough, dizziness, hypotension, hyperkalemia, elevated creatinine."
+      },
+      {
+        "title": "Interactions & Warnings",
+        "icon": "gpp_maybe_rounded",
+        "content": "Black box warning for fetal toxicity in pregnancy. Monitor serum potassium and renal panel periodically."
+      }
+    ]
+  },
+  {
+    "id": "med_012",
+    "name": "Amlodipine",
+    "type": "Calcium Channel Blocker (Cardiovascular)",
+    "description": "Dihydropyridine calcium channel blocker promoting peripheral vascular vasodilation for hypertension and chronic stable angina.",
+    "accent_color": "#EF4444",
+    "icon": "monitor_heart_rounded",
+    "hero_image_url": "https://images.unsplash.com/photo-1505751172876-fa1923c5c528?q=80&w=1000&auto=format&fit=crop",
+    "is_fda_approved": true,
+    "details": [
+      {
+        "title": "Typical Dosage",
+        "icon": "medication_rounded",
+        "content": "Adults: 5 mg orally once daily; maximum dose 10 mg once daily. May be taken with or without food."
+      },
+      {
+        "title": "Common Side Effects",
+        "icon": "warning_amber_rounded",
+        "content": "Peripheral edema (ankle swelling), flushing, dizziness, palpitations, fatigue."
+      },
+      {
+        "title": "Interactions & Warnings",
+        "icon": "gpp_maybe_rounded",
+        "content": "Use caution in severe aortic stenosis or severe hepatic impairment. Limit simvastatin dosage when co-administered."
+      }
+    ]
+  },
+  {
+    "id": "med_013",
+    "name": "Atorvastatin",
+    "type": "HMG-CoA Reductase Inhibitor (Cardiovascular)",
+    "description": "Statin lipid-lowering agent indicated for primary hypercholesterolemia and secondary prevention of cardiovascular atherosclerotic events.",
+    "accent_color": "#EF4444",
+    "icon": "monitor_heart_rounded",
+    "hero_image_url": "https://images.unsplash.com/photo-1505751172876-fa1923c5c528?q=80&w=1000&auto=format&fit=crop",
+    "is_fda_approved": true,
+    "details": [
+      {
+        "title": "Typical Dosage",
+        "icon": "medication_rounded",
+        "content": "Adults: 10 mg to 80 mg orally once daily, taken at any time of day with or without food."
+      },
+      {
+        "title": "Common Side Effects",
+        "icon": "warning_amber_rounded",
+        "content": "Myalgia, arthralgia, diarrhea, nasopharyngitis, dyspepsia."
+      },
+      {
+        "title": "Interactions & Warnings",
+        "icon": "gpp_maybe_rounded",
+        "content": "Contraindicated in active liver disease and pregnancy. Report unexplained muscle tenderness or dark tea-colored urine promptly."
+      }
+    ]
+  },
+  {
+    "id": "med_014",
+    "name": "Metoprolol",
+    "type": "Beta-1 Selective Blocker (Cardiovascular)",
+    "description": "Cardioselective beta-adrenergic blocker indicated for hypertension, angina pectoris, hemodynamically stable heart failure, and post-MI.",
+    "accent_color": "#EF4444",
+    "icon": "monitor_heart_rounded",
+    "hero_image_url": "https://images.unsplash.com/photo-1505751172876-fa1923c5c528?q=80&w=1000&auto=format&fit=crop",
+    "is_fda_approved": true,
+    "details": [
+      {
+        "title": "Typical Dosage",
+        "icon": "medication_rounded",
+        "content": "Metoprolol Tartrate: 25 mg to 100 mg twice daily. Metoprolol Succinate ER: 25 mg to 200 mg once daily with or immediately after a meal."
+      },
+      {
+        "title": "Common Side Effects",
+        "icon": "warning_amber_rounded",
+        "content": "Bradycardia, fatigue, dizziness, hypotension, cold extremities, bronchospasm."
+      },
+      {
+        "title": "Interactions & Warnings",
+        "icon": "gpp_maybe_rounded",
+        "content": "Do not abruptly discontinue; taper over 1 to 2 weeks to prevent rebound angina or myocardial infarction."
+      }
+    ]
+  },
+  {
+    "id": "med_015",
+    "name": "Metformin",
+    "type": "Biguanide Antidiabetic (Metabolic)",
+    "description": "First-line oral antidiabetic biguanide that decreases hepatic glucose production and enhances peripheral insulin sensitivity.",
+    "accent_color": "#0D9488",
+    "icon": "medication_rounded",
+    "hero_image_url": "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?q=80&w=1000&auto=format&fit=crop",
+    "is_fda_approved": true,
+    "details": [
+      {
+        "title": "Typical Dosage",
+        "icon": "medication_rounded",
+        "content": "Adults: Initial 500 mg twice daily or 850 mg once daily with meals; titrated to maximum 2,000 mg to 2,550 mg daily."
+      },
+      {
+        "title": "Common Side Effects",
+        "icon": "warning_amber_rounded",
+        "content": "Diarrhea, nausea, vomiting, abdominal bloating, metallic taste, vitamin B12 depletion."
+      },
+      {
+        "title": "Interactions & Warnings",
+        "icon": "gpp_maybe_rounded",
+        "content": "Black box warning for lactic acidosis. Contraindicated in severe renal impairment (eGFR < 30 mL/min/1.73 m²)."
+      }
+    ]
+  },
+  {
+    "id": "med_016",
+    "name": "Pantoprazole",
+    "type": "Proton Pump Inhibitor (Gastrointestinal)",
+    "description": "Substituted benzimidazole proton pump inhibitor indicated for healing of erosive esophagitis and pathological hypersecretory states.",
+    "accent_color": "#06B6D4",
+    "icon": "local_pharmacy_rounded",
+    "hero_image_url": "https://images.unsplash.com/photo-1631549916768-4119b2e5f926?q=80&w=1000&auto=format&fit=crop",
+    "is_fda_approved": true,
+    "details": [
+      {
+        "title": "Typical Dosage",
+        "icon": "medication_rounded",
+        "content": "Adults: 40 mg orally once daily for up to 8 weeks. Take approximately 30 minutes before breakfast."
+      },
+      {
+        "title": "Common Side Effects",
+        "icon": "warning_amber_rounded",
+        "content": "Headache, diarrhea, nausea, abdominal discomfort, flatulence."
+      },
+      {
+        "title": "Interactions & Warnings",
+        "icon": "gpp_maybe_rounded",
+        "content": "Long-term usage associated with Clostridioides difficile diarrhea, hypomagnesemia, and bone fracture risk."
+      }
+    ]
+  },
+  {
+    "id": "med_017",
+    "name": "Cetirizine",
+    "type": "Second-Generation Antihistamine (Respiratory)",
+    "description": "Potent peripheral H1 receptor antagonist for symptomatic management of allergic rhinitis, perennial allergies, and chronic urticaria.",
+    "accent_color": "#8B5CF6",
+    "icon": "air_rounded",
+    "hero_image_url": "https://images.unsplash.com/photo-1584017911766-d451b3d0e843?q=80&w=1000&auto=format&fit=crop",
+    "is_fda_approved": true,
+    "details": [
+      {
+        "title": "Typical Dosage",
+        "icon": "medication_rounded",
+        "content": "Adults and adolescents 12+: 5 mg to 10 mg orally once daily depending on symptom severity."
+      },
+      {
+        "title": "Common Side Effects",
+        "icon": "warning_amber_rounded",
+        "content": "Somnolence, fatigue, dry mouth, pharyngitis, dizziness."
+      },
+      {
+        "title": "Interactions & Warnings",
+        "icon": "gpp_maybe_rounded",
+        "content": "Avoid concurrent alcohol or CNS depressants. Dose adjustment indicated in moderate-to-severe renal impairment."
+      }
+    ]
+  },
+  {
+    "id": "med_018",
+    "name": "Albuterol (Salbutamol)",
+    "type": "Beta-2 Agonist Bronchodilator (Respiratory)",
+    "description": "Short-acting beta-2 adrenergic agonist (SABA) providing rapid relief of acute bronchospasm and exercise-induced asthma.",
+    "accent_color": "#06B6D4",
+    "icon": "air_rounded",
+    "hero_image_url": "https://images.unsplash.com/photo-1584017911766-d451b3d0e843?q=80&w=1000&auto=format&fit=crop",
+    "is_fda_approved": true,
+    "details": [
+      {
+        "title": "Typical Dosage",
+        "icon": "medication_rounded",
+        "content": "Inhalation aerosol: 1 to 2 inhalations (90 mcg/actuation) every 4 to 6 hours as needed for acute wheezing. For exercise prophylaxis: 2 puffs 15 minutes before exertion."
+      },
+      {
+        "title": "Common Side Effects",
+        "icon": "warning_amber_rounded",
+        "content": "Tremor, nervousness, tachycardia, palpitations, headache, throat irritation."
+      },
+      {
+        "title": "Interactions & Warnings",
+        "icon": "gpp_maybe_rounded",
+        "content": "Beta-blockers can antagonize bronchodilatory effect and provoke severe bronchospasm in asthmatic individuals."
+      }
+    ]
+  },
+  {
+    "id": "med_019",
+    "name": "Sertraline",
+    "type": "SSRI Antidepressant (Mental Health)",
+    "description": "Selective serotonin reuptake inhibitor (SSRI) indicated for major depressive disorder, obsessive-compulsive disorder, and PTSD.",
+    "accent_color": "#8B5CF6",
+    "icon": "psychology_rounded",
+    "hero_image_url": "https://images.unsplash.com/photo-1506126613408-eca07ce68773?q=80&w=1000&auto=format&fit=crop",
+    "is_fda_approved": true,
+    "details": [
+      {
+        "title": "Typical Dosage",
+        "icon": "medication_rounded",
+        "content": "Adults: Initial 50 mg orally once daily in the morning or evening; titrated up to maximum 200 mg daily at weekly intervals."
+      },
+      {
+        "title": "Common Side Effects",
+        "icon": "warning_amber_rounded",
+        "content": "Nausea, insomnia, diarrhea, dizziness, dry mouth, sexual dysfunction, tremor."
+      },
+      {
+        "title": "Interactions & Warnings",
+        "icon": "gpp_maybe_rounded",
+        "content": "Black box warning for suicidal thoughts in young adults. Contraindicated with monoamine oxidase inhibitors (MAOIs)."
+      }
+    ]
+  },
+  {
+    "id": "med_020",
+    "name": "Escitalopram",
+    "type": "SSRI Antidepressant (Mental Health)",
+    "description": "Highly selective pure serotonin reuptake inhibitor indicated for acute and maintenance treatment of generalized anxiety disorder and major depression.",
+    "accent_color": "#8B5CF6",
+    "icon": "psychology_rounded",
+    "hero_image_url": "https://images.unsplash.com/photo-1506126613408-eca07ce68773?q=80&w=1000&auto=format&fit=crop",
+    "is_fda_approved": true,
+    "details": [
+      {
+        "title": "Typical Dosage",
+        "icon": "medication_rounded",
+        "content": "Adults: Initial 10 mg orally once daily; can be increased to 20 mg daily after a minimum of one week of therapy."
+      },
+      {
+        "title": "Common Side Effects",
+        "icon": "warning_amber_rounded",
+        "content": "Insomnia, somnolence, increased sweating, nausea, fatigue, decreased libido."
+      },
+      {
+        "title": "Interactions & Warnings",
+        "icon": "gpp_maybe_rounded",
+        "content": "Contraindicated with MAOIs or pimozide. Risk of serotonin syndrome when combined with triptans or tramadol."
       }
     ]
   }

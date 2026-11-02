@@ -1,401 +1,163 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:vitanet/core/constants/app_spacing.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:vitanet/core/extensions/context_ext.dart';
-import 'package:vitanet/features/home/widgets/animated_section.dart';
+import 'package:vitanet/data/providers/providers.dart';
+import 'package:vitanet/features/notifications/screens/notifications_screen.dart';
+import 'package:vitanet/shared/widgets/vn_kit.dart';
 
-class AiHealthAlertsSection extends StatefulWidget {
-  const AiHealthAlertsSection({super.key});
+/// "AI health insights" horizontal card rail.
+///
+/// Insights are personalised from the profile (medications, conditions) and
+/// the latest triage result where available.
+class AiHealthAlertsSection extends ConsumerStatefulWidget {
+  final EdgeInsetsGeometry? padding;
+  const AiHealthAlertsSection({super.key, this.padding});
 
   @override
-  State<AiHealthAlertsSection> createState() => _AiHealthAlertsSectionState();
+  ConsumerState<AiHealthAlertsSection> createState() =>
+      _AiHealthAlertsSectionState();
 }
 
-class _AiHealthAlertsSectionState extends State<AiHealthAlertsSection> {
-  final List<AlertData> _activeAlerts = [
-    AlertData(
-      id: 'alert_1',
-      icon: Icons.trending_up_rounded,
-      iconColor: const Color(0xFFF59E0B),
-      title: 'Blood Pressure Trend',
-      description: 'Your blood pressure has been slightly higher than your usual range over the past 7 days.',
-      actionText: 'View Insights',
-      actionColor: const Color(0xFFF59E0B),
-      showDot: true,
-    ),
-    AlertData(
-      id: 'alert_2',
-      icon: Icons.medication_rounded,
-      iconColor: const Color(0xFF6366F1),
-      title: 'Medication Reminder',
-      description: 'You missed your morning Lisinopril dose. Would you like to log it now or reschedule?',
-      actionText: 'Log Medication',
-      actionColor: const Color(0xFF6366F1),
-    ),
-  ];
-
-  final List<AlertData> _hiddenQueue = [
-    AlertData(
-      id: 'alert_3',
-      icon: Icons.water_drop_rounded,
-      iconColor: const Color(0xFF06B6D4),
-      title: 'Hydration Goal',
-      description: 'You\'ve only logged 2 glasses of water today. Stay hydrated to maintain your energy levels!',
-      actionText: 'Log Water',
-      actionColor: const Color(0xFF06B6D4),
-    ),
-    AlertData(
-      id: 'alert_4',
-      icon: Icons.bed_rounded,
-      iconColor: const Color(0xFF8B5CF6),
-      title: 'Sleep Analysis',
-      description: 'Your sleep quality was 85% last night. Your deep sleep increased by 15 minutes.',
-      actionText: 'View Sleep Data',
-      actionColor: const Color(0xFF8B5CF6),
-    ),
-    AlertData(
-      id: 'alert_5',
-      icon: Icons.directions_run_rounded,
-      iconColor: const Color(0xFF10B981),
-      title: 'Activity Goal Met',
-      description: 'Great job! You have reached your daily step goal of 10,000 steps.',
-      actionText: 'View Summary',
-      actionColor: const Color(0xFF10B981),
-      showDot: true,
-    ),
-    AlertData(
-      id: 'alert_6',
-      icon: Icons.restaurant_rounded,
-      iconColor: const Color(0xFFF97316),
-      title: 'Dietary Insight',
-      description: 'You have consistently eaten your dinner later than usual. Eating earlier can improve sleep quality.',
-      actionText: 'Review Meals',
-      actionColor: const Color(0xFFF97316),
-    ),
-    AlertData(
-      id: 'alert_7',
-      icon: Icons.monitor_heart_rounded,
-      iconColor: const Color(0xFFEF4444),
-      title: 'Heart Rate Spike',
-      description: 'Your heart rate briefly spiked to 120 bpm at 2:30 PM. Did you do a light workout?',
-      actionText: 'Log Activity',
-      actionColor: const Color(0xFFEF4444),
-      showDot: true,
-    ),
-    AlertData(
-      id: 'alert_8',
-      icon: Icons.self_improvement_rounded,
-      iconColor: const Color(0xFFEC4899),
-      title: 'Mental Wellbeing',
-      description: 'It\'s been 3 days since you last logged a mindfulness session. Take 5 minutes to breathe.',
-      actionText: 'Start Session',
-      actionColor: const Color(0xFFEC4899),
-    ),
-  ];
-
-  void _onDismissed(int index) {
-    setState(() {
-      _activeAlerts.removeAt(index);
-      
-      // Infinitely generate a new alert when one is dismissed
-      final random = Random();
-      final newAlert = _hiddenQueue[random.nextInt(_hiddenQueue.length)];
-      
-      // Ensure it has a unique ID by appending a timestamp
-      _activeAlerts.add(
-        AlertData(
-          id: 'alert_${DateTime.now().millisecondsSinceEpoch}',
-          icon: newAlert.icon,
-          iconColor: newAlert.iconColor,
-          title: newAlert.title,
-          description: newAlert.description,
-          actionText: newAlert.actionText,
-          actionColor: newAlert.actionColor,
-          showDot: random.nextBool(),
-        ),
-      );
-    });
-  }
+class _AiHealthAlertsSectionState extends ConsumerState<AiHealthAlertsSection> {
+  bool _doseLogged = false;
 
   @override
   Widget build(BuildContext context) {
-    if (_activeAlerts.isEmpty) {
-      return const SizedBox.shrink(); // Hide section if no alerts
-    }
+    final profile = ref.watch(userProfileProvider);
+    final history = ref.watch(triageHistoryProvider);
+    final meds = profile?.medications ?? const <String>[];
+    final conditions = profile?.preExistingConditions ?? const <String>[];
+
+    final insights = <_Insight>[
+      _Insight(
+        icon: Icons.show_chart_rounded,
+        color: const Color(0xFFB45309),
+        title: conditions.any((c) => c.toLowerCase().contains('hypert'))
+            ? 'Blood pressure trend'
+            : 'Heart rate trend',
+        body: conditions.any((c) => c.toLowerCase().contains('hypert'))
+            ? 'Track your evening readings this week. A steady rise is worth raising with your doctor.'
+            : 'Your resting heart rate is a good early signal of stress, illness or poor sleep. Check how it has moved this week.',
+        action: 'View insights',
+        onTap: () => context.push('/health-trends/heart_rate'),
+      ),
+      _Insight(
+        icon: Icons.medication_outlined,
+        color: const Color(0xFF6D28D9),
+        title: 'Medication reminder',
+        body: meds.isNotEmpty
+            ? '${meds.first} is on your list. ${_doseLogged ? "Today's dose is logged." : "You haven't logged today's dose."}'
+            : 'Add your medicines so VitaNet can remind you and check for interactions.',
+        action: meds.isNotEmpty ? (_doseLogged ? 'Logged' : 'Log dose') : 'Add medicines',
+        onTap: meds.isNotEmpty
+            ? (_doseLogged
+                ? null
+                : () {
+                    setState(() => _doseLogged = true);
+                    context.showSnack('Dose logged for today');
+                  })
+            : () => context.push('/edit-profile', extra: 'medical'),
+      ),
+      if (history.isNotEmpty)
+        _Insight(
+          icon: Icons.history_rounded,
+          color: const Color(0xFF0F766E),
+          title: 'Last check',
+          body: history.first.summary.isNotEmpty
+              ? history.first.summary
+              : 'Review the advice from your most recent symptom check.',
+          action: 'View history',
+          onTap: () => context.push('/history'),
+        ),
+    ];
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'AI Health Alerts',
-                style: TextStyle(
-                  color: context.isDark ? Colors.white : Colors.black87,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              TextButton(
-                onPressed: () {},
-                style: TextButton.styleFrom(
-                  foregroundColor: const Color(0xFF6366F1),
-                  padding: EdgeInsets.zero,
-                  minimumSize: const Size(0, 0),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: const Text(
-                  'See All',
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-              ),
-            ],
+        VnSectionHeader(
+          title: 'AI health insights',
+          action: 'See all',
+          onAction: () => Navigator.of(context, rootNavigator: true).push(
+            MaterialPageRoute(builder: (_) => const NotificationsScreen()),
           ),
         ),
-        const SizedBox(height: AppSpacing.md),
-        AnimatedSize(
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOutCubic,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-            child: Column(
-              children: List.generate(_activeAlerts.length, (index) {
-                final alert = _activeAlerts[index];
-                return AnimatedSection(
-                  key: ValueKey(alert.id),
-                  delay: index,
-                  child: Padding(
-                    padding: EdgeInsets.only(bottom: index == _activeAlerts.length - 1 ? 0 : AppSpacing.md),
-                    child: Dismissible(
-                      key: ValueKey('dismiss_${alert.id}'),
-                      direction: DismissDirection.horizontal,
-                      dismissThresholds: const {
-                        DismissDirection.horizontal: 0.4,
-                      },
-                      movementDuration: const Duration(milliseconds: 300),
-                      onDismissed: (direction) => _onDismissed(index),
-                      background: Container(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEF4444).withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        alignment: Alignment.centerLeft,
-                        padding: const EdgeInsets.only(left: AppSpacing.xl),
-                        child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444)),
-                      ),
-                      secondaryBackground: Container(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEF4444).withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        alignment: Alignment.centerRight,
-                        padding: const EdgeInsets.only(right: AppSpacing.xl),
-                        child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444)),
-                      ),
-                      child: AlertTile(
-                        icon: alert.icon,
-                        iconColor: alert.iconColor,
-                        title: alert.title,
-                        description: alert.description,
-                        actionText: alert.actionText,
-                        actionColor: alert.actionColor,
-                        showDot: alert.showDot,
-                        dotColor: alert.showDot ? alert.iconColor : null,
-                      ),
-                    ),
-                  ),
-                );
-              }),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 168,
+          child: LayoutBuilder(builder: (context, box) => OverflowBox(
+            maxWidth: box.maxWidth + 40,
+            minWidth: box.maxWidth + 40,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
+              itemCount: insights.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 12),
+              itemBuilder: (context, i) => SizedBox(width: 260, child: _InsightCard(insights[i])),
             ),
-          ),
+          )),
         ),
       ],
     );
   }
 }
 
-class AlertData {
-  final String id;
+class _Insight {
   final IconData icon;
-  final Color iconColor;
+  final Color color;
   final String title;
-  final String description;
-  final String actionText;
-  final Color actionColor;
-  final bool showDot;
+  final String body;
+  final String action;
+  final VoidCallback? onTap;
 
-  AlertData({
-    required this.id,
+  const _Insight({
     required this.icon,
-    required this.iconColor,
+    required this.color,
     required this.title,
-    required this.description,
-    required this.actionText,
-    required this.actionColor,
-    this.showDot = false,
+    required this.body,
+    required this.action,
+    this.onTap,
   });
 }
 
-class AlertTile extends StatelessWidget {
-  final IconData icon;
-  final Color iconColor;
-  final String title;
-  final String description;
-  final String actionText;
-  final Color actionColor;
-  final bool showDot;
-  final Color? dotColor;
-  final String? timestamp;
-  final VoidCallback? onActionTap;
-
-  const AlertTile({
-    super.key,
-    required this.icon,
-    required this.iconColor,
-    required this.title,
-    required this.description,
-    required this.actionText,
-    required this.actionColor,
-    this.showDot = false,
-    this.dotColor,
-    this.timestamp,
-    this.onActionTap,
-  });
+class _InsightCard extends StatelessWidget {
+  final _Insight insight;
+  const _InsightCard(this.insight);
 
   @override
   Widget build(BuildContext context) {
-    final isDark = context.isDark;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark 
-            ? const Color(0xFF1A2232)
-            : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isDark 
-              ? Colors.white.withValues(alpha: 0.05) 
-              : const Color(0xFFE8ECF0),
-          width: 1.5,
-        ),
-        boxShadow: [
-          if (!isDark)
-            BoxShadow(
-              color: iconColor.withValues(alpha: 0.08),
-              blurRadius: 16,
-              offset: const Offset(0, 8),
-            ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: Row(
-          children: [
-            // Left Accent Bar
-            Container(
-              width: 4,
-              height: 120,
-              color: iconColor,
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: iconColor.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Icon(icon, color: iconColor, size: 20),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            title,
-                            style: TextStyle(
-                              color: isDark ? Colors.white : Colors.black87,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -0.3,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        if (showDot) ...[
-                          const SizedBox(width: 8),
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              color: dotColor,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        ],
-                        if (timestamp != null) ...[
-                          const SizedBox(width: 8),
-                          Text(
-                            timestamp!,
-                            style: TextStyle(
-                              color: isDark ? Colors.white54 : Colors.black45,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ]
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      description,
-                      style: TextStyle(
-                        color: isDark ? Colors.white70 : Colors.black87.withValues(alpha: 0.7),
-                        fontSize: 14,
-                        height: 1.4,
-                        letterSpacing: -0.1,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    GestureDetector(
-                      onTap: onActionTap,
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: actionColor.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: actionColor.withValues(alpha: 0.2),
-                          ),
-                        ),
-                        child: Text(
-                          actionText,
-                          style: TextStyle(
-                            color: actionColor,
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.2,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+    final p = VnPalette.of(context);
+    final c = p.tintFg(insight.color);
+    return VnCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(insight.icon, size: 16, color: c),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(insight.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: VnText.body(12, weight: FontWeight.w700, color: c)),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Expanded(
+            child: Text(insight.body,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: VnText.body(14, color: p.ink, height: 1.45)),
+          ),
+          VnLink(
+            label: insight.action,
+            weight: FontWeight.w700,
+            color: insight.onTap == null ? p.muted : null,
+            onTap: insight.onTap,
+          ),
+        ],
       ),
     );
   }

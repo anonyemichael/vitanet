@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+
 enum AuthStatus {
   initial,
   loading,
@@ -39,58 +41,96 @@ class AuthState {
 class AuthNotifier extends StateNotifier<AuthState> {
   FirebaseAuth? _auth;
   GoogleSignIn? _googleSignIn;
+  StreamSubscription<User?>? _authSubscription;
 
   AuthNotifier() : super(AuthState(status: AuthStatus.initial)) {
     _init();
   }
 
+  FirebaseAuth? get _safeAuth {
+    if (_auth != null) return _auth;
+    if (Firebase.apps.isNotEmpty) {
+      try {
+        _auth = FirebaseAuth.instance;
+        _listenToAuth();
+      } catch (e) {
+        debugPrint('FirebaseAuth initialization error: $e');
+      }
+    }
+    return _auth;
+  }
+
   void _init() {
     try {
+      if (!kIsWeb) {
+        _googleSignIn = GoogleSignIn();
+      }
       if (Firebase.apps.isNotEmpty) {
         _auth = FirebaseAuth.instance;
-        _auth!.authStateChanges().listen((User? user) {
-          if (user == null) {
-            state = state.copyWith(status: AuthStatus.unauthenticated, user: null);
-          } else {
-            state = state.copyWith(
-              status: user.isAnonymous
-                  ? AuthStatus.anonymous
-                  : AuthStatus.authenticated,
-              user: user,
-            );
-          }
-        });
+        _listenToAuth();
       } else {
-        // Firebase not initialized
-        state = state.copyWith(
-          status: AuthStatus.error,
-          errorMessage: 'Firebase not configured',
-        );
+        state = state.copyWith(status: AuthStatus.unauthenticated);
       }
     } catch (e) {
-      state = state.copyWith(
-        status: AuthStatus.error,
-        errorMessage: 'Auth init error: $e',
-      );
+      debugPrint('AuthNotifier init error: $e');
+      state = state.copyWith(status: AuthStatus.unauthenticated);
     }
   }
 
+  void _listenToAuth() {
+    if (_auth == null) return;
+    _authSubscription?.cancel();
+    _authSubscription = _auth!.authStateChanges().listen((User? user) {
+      if (user == null) {
+        if (state.status != AuthStatus.initial && state.status != AuthStatus.loading) {
+          state = state.copyWith(
+            status: AuthStatus.unauthenticated,
+            user: null,
+            errorMessage: null,
+          );
+        }
+      } else {
+        state = state.copyWith(
+          status: user.isAnonymous ? AuthStatus.anonymous : AuthStatus.authenticated,
+          user: user,
+          errorMessage: null,
+        );
+      }
+    }, onError: (err) {
+      debugPrint('Auth state listener error: $err');
+      state = state.copyWith(
+        status: AuthStatus.error,
+        errorMessage: err.toString(),
+      );
+    });
+  }
+
+  void reinitialize() {
+    _init();
+  }
+
   Future<void> signInAnonymously() async {
-    if (_auth == null) {
-      state = state.copyWith(status: AuthStatus.error, errorMessage: 'Firebase not configured.');
+    final auth = _safeAuth;
+    if (auth == null) {
+      state = state.copyWith(
+        status: AuthStatus.error,
+        errorMessage: 'Firebase not configured.',
+      );
       return;
     }
     try {
       state = state.copyWith(status: AuthStatus.loading);
-      await _auth!.signInAnonymously();
+      final cred = await auth.signInAnonymously();
       state = state.copyWith(
         status: AuthStatus.anonymous,
-        user: _auth!.currentUser,
+        user: cred.user ?? auth.currentUser,
+        errorMessage: null,
       );
     } on FirebaseAuthException catch (e) {
+      debugPrint('Firebase anonymous sign in error: ${e.code} - ${e.message}');
       state = state.copyWith(
         status: AuthStatus.error,
-        errorMessage: e.message ?? 'Failed to sign in anonymously',
+        errorMessage: e.message ?? 'Failed to sign in anonymously (${e.code})',
       );
     } catch (e) {
       state = state.copyWith(
@@ -101,21 +141,30 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> signUpWithEmail(String email, String password) async {
-    if (_auth == null) {
-      state = state.copyWith(status: AuthStatus.error, errorMessage: 'Firebase not configured.');
+    final auth = _safeAuth;
+    if (auth == null) {
+      state = state.copyWith(
+        status: AuthStatus.error,
+        errorMessage: 'Firebase not configured.',
+      );
       return;
     }
     try {
       state = state.copyWith(status: AuthStatus.loading);
-      await _auth!.createUserWithEmailAndPassword(email: email, password: password);
+      final cred = await auth.createUserWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
       state = state.copyWith(
         status: AuthStatus.authenticated,
-        user: _auth!.currentUser,
+        user: cred.user ?? auth.currentUser,
+        errorMessage: null,
       );
     } on FirebaseAuthException catch (e) {
+      debugPrint('Firebase sign up error: ${e.code} - ${e.message}');
       state = state.copyWith(
         status: AuthStatus.error,
-        errorMessage: e.message ?? 'Failed to sign up',
+        errorMessage: e.message ?? 'Failed to sign up (${e.code})',
       );
     } catch (e) {
       state = state.copyWith(
@@ -126,21 +175,38 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> signInWithEmail(String email, String password) async {
-    if (_auth == null) {
-      state = state.copyWith(status: AuthStatus.error, errorMessage: 'Firebase not configured.');
+    final auth = _safeAuth;
+    if (auth == null) {
+      state = state.copyWith(
+        status: AuthStatus.error,
+        errorMessage: 'Firebase not configured.',
+      );
       return;
     }
     try {
       state = state.copyWith(status: AuthStatus.loading);
-      await _auth!.signInWithEmailAndPassword(email: email, password: password);
+      final cred = await auth.signInWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
       state = state.copyWith(
         status: AuthStatus.authenticated,
-        user: _auth!.currentUser,
+        user: cred.user ?? auth.currentUser,
+        errorMessage: null,
       );
     } on FirebaseAuthException catch (e) {
+      debugPrint('Firebase sign in error: ${e.code} - ${e.message}');
+      String msg = e.message ?? 'Failed to sign in (${e.code})';
+      if (e.code == 'user-not-found' || e.code == 'wrong-password' || e.code == 'invalid-credential') {
+        msg = 'Invalid email or password. Please verify and try again.';
+      } else if (e.code == 'user-disabled') {
+        msg = 'This account has been disabled. Please contact support.';
+      } else if (e.code == 'too-many-requests') {
+        msg = 'Too many attempts. Please try again later.';
+      }
       state = state.copyWith(
         status: AuthStatus.error,
-        errorMessage: e.message ?? 'Failed to sign in',
+        errorMessage: msg,
       );
     } catch (e) {
       state = state.copyWith(
@@ -151,8 +217,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> linkGoogleAccount() async {
-    if (_auth == null) {
-      state = state.copyWith(status: AuthStatus.error, errorMessage: 'Firebase not configured.');
+    final auth = _safeAuth;
+    if (auth == null) {
+      state = state.copyWith(
+        status: AuthStatus.error,
+        errorMessage: 'Firebase not configured.',
+      );
       return;
     }
     try {
@@ -160,55 +230,81 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       if (kIsWeb) {
         final googleProvider = GoogleAuthProvider();
-        if (_auth!.currentUser != null && _auth!.currentUser!.isAnonymous) {
-          await _auth!.currentUser!.linkWithPopup(googleProvider);
+        googleProvider.addScope('email');
+        googleProvider.addScope('profile');
+        if (auth.currentUser != null && auth.currentUser!.isAnonymous) {
+          final cred = await auth.currentUser!.linkWithPopup(googleProvider);
+          state = state.copyWith(
+            status: AuthStatus.authenticated,
+            user: cred.user ?? auth.currentUser,
+            errorMessage: null,
+          );
         } else {
-          await _auth!.signInWithPopup(googleProvider);
+          final cred = await auth.signInWithPopup(googleProvider);
+          state = state.copyWith(
+            status: AuthStatus.authenticated,
+            user: cred.user ?? auth.currentUser,
+            errorMessage: null,
+          );
         }
       } else {
-        // Trigger the authentication flow for mobile
-        // Do not pass a dummy client ID, as it breaks Android authentication.
-        // The plugin will read the correct ID from google-services.json / GoogleService-Info.plist
         _googleSignIn ??= GoogleSignIn();
         final GoogleSignInAccount? googleUser = await _googleSignIn!.signIn();
         if (googleUser == null) {
-          // The user canceled the sign-in
           state = state.copyWith(
-            status: _auth!.currentUser?.isAnonymous == true
-                ? AuthStatus.anonymous
-                : (_auth!.currentUser != null ? AuthStatus.authenticated : AuthStatus.initial),
+            status: auth.currentUser != null
+                ? (auth.currentUser!.isAnonymous ? AuthStatus.anonymous : AuthStatus.authenticated)
+                : AuthStatus.unauthenticated,
+            user: auth.currentUser,
+            errorMessage: null,
           );
           return;
         }
 
-        // Obtain the auth details from the request
         final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-
-        // Create a new credential
         final credential = GoogleAuthProvider.credential(
           accessToken: googleAuth.accessToken,
           idToken: googleAuth.idToken,
         );
 
-        // Link credential to the current anonymous user, or just sign in
-        if (_auth!.currentUser != null && _auth!.currentUser!.isAnonymous) {
-          await _auth!.currentUser!.linkWithCredential(credential);
+        if (auth.currentUser != null && auth.currentUser!.isAnonymous) {
+          final cred = await auth.currentUser!.linkWithCredential(credential);
+          state = state.copyWith(
+            status: AuthStatus.authenticated,
+            user: cred.user ?? auth.currentUser,
+            errorMessage: null,
+          );
         } else {
-          await _auth!.signInWithCredential(credential);
+          final cred = await auth.signInWithCredential(credential);
+          state = state.copyWith(
+            status: AuthStatus.authenticated,
+            user: cred.user ?? auth.currentUser,
+            errorMessage: null,
+          );
         }
       }
-
-      state = state.copyWith(
-        status: AuthStatus.authenticated,
-        user: _auth!.currentUser,
-      );
-
     } on FirebaseAuthException catch (e) {
+      debugPrint('Firebase Google Auth error: ${e.code} - ${e.message}');
+      if (e.code == 'popup-closed-by-user') {
+        state = state.copyWith(
+          status: auth.currentUser != null
+              ? (auth.currentUser!.isAnonymous ? AuthStatus.anonymous : AuthStatus.authenticated)
+              : AuthStatus.unauthenticated,
+          user: auth.currentUser,
+          errorMessage: null,
+        );
+        return;
+      }
+      String msg = e.message ?? 'Failed to sign in with Google (${e.code})';
+      if (e.code == 'account-exists-with-different-credential' || e.code == 'credential-already-in-use') {
+        msg = 'An account already exists with this Google email.';
+      }
       state = state.copyWith(
         status: AuthStatus.error,
-        errorMessage: e.message ?? 'Failed to sign in with Google',
+        errorMessage: msg,
       );
     } catch (e) {
+      debugPrint('General error during Google sign-in: $e');
       state = state.copyWith(
         status: AuthStatus.error,
         errorMessage: e.toString(),
@@ -217,21 +313,32 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> signOut() async {
-    if (_auth == null) return;
     try {
       state = state.copyWith(status: AuthStatus.loading);
       if (_googleSignIn != null) {
-        await _googleSignIn!.signOut();
+        try {
+          await _googleSignIn!.signOut();
+        } catch (_) {}
       }
-      await _auth!.signOut();
-      // authStateChanges listener will set state to unauthenticated,
-      // which the splash/router will redirect to /login.
-    } catch (e) {
+      final auth = _safeAuth;
+      if (auth != null) {
+        try {
+          await auth.signOut();
+        } catch (_) {}
+      }
+    } finally {
       state = state.copyWith(
-        status: AuthStatus.error,
-        errorMessage: e.toString(),
+        status: AuthStatus.unauthenticated,
+        user: null,
+        errorMessage: null,
       );
     }
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
   }
 }
 

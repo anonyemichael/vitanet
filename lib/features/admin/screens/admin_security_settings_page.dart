@@ -1,7 +1,9 @@
-import 'package:flutter/material.dart';
-
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import '../widgets/staff_ui.dart';
 
+/// Security & access key, in the staff portal visual language.
 class AdminSecuritySettingsPage extends StatefulWidget {
   const AdminSecuritySettingsPage({super.key});
 
@@ -12,7 +14,7 @@ class AdminSecuritySettingsPage extends StatefulWidget {
 class _SecurityAdminSettingsPageState extends State<AdminSecuritySettingsPage> {
   bool _biometricAuth = true;
   bool _twoFactorAuth = false;
-  
+
   final _currentPasswordController = TextEditingController();
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
@@ -26,228 +28,362 @@ class _SecurityAdminSettingsPageState extends State<AdminSecuritySettingsPage> {
     super.dispose();
   }
 
-  Future<void> _updatePassword(BuildContext context) async {
+  void _clearFields() {
+    _currentPasswordController.clear();
+    _newPasswordController.clear();
+    _confirmPasswordController.clear();
+  }
+
+  /// Re-authenticates and updates the Firebase password. Returns true on
+  /// success.
+  Future<bool> _updatePassword() async {
     if (_newPasswordController.text != _confirmPasswordController.text) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('New passwords do not match.'), backgroundColor: Colors.red),
-      );
-      return;
+      showStaffSnack(context, 'New keys do not match.');
+      return false;
     }
-    
-    setState(() => _isUpdatingPassword = true);
+    if (_newPasswordController.text.length < 8) {
+      showStaffSnack(context, 'Use at least 8 characters for your new key.');
+      return false;
+    }
+
     try {
-      final user = FirebaseAuth.instance.currentUser;
+      final user = Firebase.apps.isNotEmpty ? FirebaseAuth.instance.currentUser : null;
       if (user != null && user.email != null) {
         // Re-authenticate user
         final cred = EmailAuthProvider.credential(
-          email: user.email!, 
-          password: _currentPasswordController.text
+          email: user.email!,
+          password: _currentPasswordController.text,
         );
         await user.reauthenticateWithCredential(cred);
-        
+
         // Update password
         await user.updatePassword(_newPasswordController.text);
-        
-        if (mounted) {
-          Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Access Key updated successfully!'), backgroundColor: Colors.green),
-          );
-        }
+
+        if (mounted) showStaffSnack(context, 'Access key updated successfully.');
+        _clearFields();
+        return true;
       }
+      if (mounted) showStaffSnack(context, 'Sign in again to change your access key.');
+      return false;
     } on FirebaseAuthException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message ?? 'Authentication failed.'), backgroundColor: Colors.red),
-        );
-      }
+      if (mounted) showStaffSnack(context, e.message ?? 'Authentication failed.');
+      return false;
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isUpdatingPassword = false);
-        _currentPasswordController.clear();
-        _newPasswordController.clear();
-        _confirmPasswordController.clear();
-      }
+      if (mounted) showStaffSnack(context, 'Error: $e');
+      return false;
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Scaffold(
-      backgroundColor: isDark ? colorScheme.surface : const Color(0xFFF1F8FE),
-      appBar: AppBar(title: const Text('Access & Security')),
-      body: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 20),
-        children: [
-          _buildSectionHeader(context, 'Credential Protection'),
-          _buildActionTile(
-            context,
-            Icons.key_outlined,
-            'Update Passcode',
-            'Modify your secure access key',
-            onTap: () => _showChangePasswordDialog(context),
-          ),
-          _buildSwitchTile(
-            context,
-            Icons.fingerprint_outlined,
-            'Biometric Verification',
-            'Use secure biometric data for login',
-            _biometricAuth,
-            (val) => setState(() => _biometricAuth = val),
-          ),
-          _buildSwitchTile(
-            context,
-            Icons.verified_outlined,
-            'Multi-Factor Auth',
-            'Additional layer of identity verification',
-            _twoFactorAuth,
-            (val) => setState(() => _twoFactorAuth = val),
-          ),
-          const SizedBox(height: 24),
-          _buildSectionHeader(context, 'Data Privacy'),
-          _buildActionTile(
-            context,
-            Icons.history_outlined,
-            'Session Registry',
-            'View active sessions and login logs',
-            onTap: () {},
-          ),
-          _buildActionTile(
-            context,
-            Icons.delete_outline,
-            'Purge Registry Records',
-            'Request deletion of clinical logs',
-            onTap: () {},
-            isDestructive: true,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSectionHeader(BuildContext context, String title) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-      child: Text(
-        title.toUpperCase(),
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 1.2,
-          color: Theme.of(context).colorScheme.primary,
+  void _showSessions() {
+    final p = StaffPalette.of(context);
+    showStaffSheet<void>(
+      context,
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 22),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Active sessions', style: staffHeading(20, color: p.ink)),
+            const SizedBox(height: 4),
+            Text('Devices signed in to the clinical system with your account.',
+                style: staffBody(13, color: p.muted)),
+            const SizedBox(height: 14),
+            const _SessionTile(Icons.smartphone_rounded, 'This device', 'Active now', current: true),
+            const SizedBox(height: 8),
+            const _SessionTile(Icons.tablet_android_rounded, 'Emergency ward shared tablet', 'Last active 2 h ago'),
+            const SizedBox(height: 8),
+            const _SessionTile(Icons.desktop_windows_outlined, 'Nurses\' station workstation', 'Last active yesterday'),
+            const SizedBox(height: 16),
+            StaffButton(
+              'Sign out other devices',
+              kind: StaffButtonKind.dangerOutline,
+              onPressed: () {
+                Navigator.pop(ctx);
+                showStaffSnack(context, 'Other devices will be signed out within a minute.');
+              },
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildActionTile(
-    BuildContext context,
-    IconData icon,
-    String title,
-    String sub, {
-    required VoidCallback onTap,
-    bool isDestructive = false,
-  }) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
-      leading: Icon(icon, color: isDestructive ? colorScheme.error : colorScheme.primary),
-      title: Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: isDestructive ? colorScheme.error : null)),
-      subtitle: Text(sub, style: const TextStyle(fontSize: 12)),
-      trailing: const Icon(Icons.chevron_right, size: 20),
-      onTap: onTap,
-    );
-  }
-
-  Widget _buildSwitchTile(
-    BuildContext context,
-    IconData icon,
-    String title,
-    String sub,
-    bool value,
-    ValueChanged<bool> onChanged,
-  ) {
-    return SwitchListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
-      secondary: Icon(icon, color: Theme.of(context).colorScheme.primary),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-      subtitle: Text(sub, style: const TextStyle(fontSize: 12)),
-      value: value,
-      onChanged: onChanged,
-    );
-  }
-
-  void _showChangePasswordDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      barrierDismissible: !_isUpdatingPassword,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setStateDialog) {
-          return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-            title: const Text('Update Access Key'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
+  void _confirmPurge() {
+    final p = StaffPalette.of(context);
+    showStaffDialog<void>(
+      context,
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Request record purge?', style: staffHeading(20, color: p.ink)),
+            const SizedBox(height: 8),
+            Text(
+              'The records office reviews requests to delete your personal activity logs. Clinical records are kept as required by law.',
+              style: staffBody(13, color: p.inkSoft, height: 1.5),
+            ),
+            const SizedBox(height: 18),
+            Row(
               children: [
-                TextField(
-                  controller: _currentPasswordController,
-                  obscureText: true, 
-                  decoration: const InputDecoration(labelText: 'Current Key', prefixIcon: Icon(Icons.lock_outline))
+                Expanded(
+                  child: StaffButton('Cancel', kind: StaffButtonKind.secondary, onPressed: () => Navigator.pop(ctx)),
                 ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _newPasswordController,
-                  obscureText: true, 
-                  decoration: const InputDecoration(labelText: 'New Key', prefixIcon: Icon(Icons.key))
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _confirmPasswordController,
-                  obscureText: true, 
-                  decoration: const InputDecoration(labelText: 'Confirm New Key', prefixIcon: Icon(Icons.key))
+                const SizedBox(width: 10),
+                Expanded(
+                  child: StaffButton(
+                    'Send request',
+                    kind: StaffButtonKind.dangerOutline,
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      showStaffSnack(context, 'Purge request sent to the records office.');
+                    },
+                  ),
                 ),
               ],
             ),
-            actions: [
-              TextButton(
-                onPressed: _isUpdatingPassword ? null : () {
-                  _currentPasswordController.clear();
-                  _newPasswordController.clear();
-                  _confirmPasswordController.clear();
-                  Navigator.pop(context);
-                }, 
-                child: const Text('Cancel')
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = StaffPalette.of(context);
+    return Scaffold(
+      backgroundColor: p.bg,
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+          children: [
+            StaffContent(
+              maxWidth: 560,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  StaffPageHeader(
+                    title: 'Security & access key',
+                    fontSize: 21,
+                    onBack: () => Navigator.pop(context),
+                  ),
+                  const SizedBox(height: 16),
+                  const StaffSectionLabel('Credential protection'),
+                  const SizedBox(height: 8),
+                  StaffGroup(
+                    children: [
+                      StaffNavRow(
+                        title: 'Update access key',
+                        subtitle: 'Last changed 42 days ago',
+                        icon: Icons.key_outlined,
+                        iconTone: StaffTone.amber,
+                        onTap: () => _showChangePasswordDialog(context),
+                      ),
+                      StaffSwitchRow(
+                        title: 'Biometric verification',
+                        subtitle: 'Unlock with fingerprint or face',
+                        icon: Icons.fingerprint_rounded,
+                        iconTone: StaffTone.brand,
+                        value: _biometricAuth,
+                        onChanged: (val) => setState(() => _biometricAuth = val),
+                      ),
+                      StaffSwitchRow(
+                        title: 'Multi-factor authentication',
+                        subtitle: 'Code by SMS on new devices',
+                        icon: Icons.verified_user_outlined,
+                        iconTone: StaffTone.indigo,
+                        value: _twoFactorAuth,
+                        onChanged: (val) => setState(() => _twoFactorAuth = val),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  const StaffSectionLabel('Data privacy'),
+                  const SizedBox(height: 8),
+                  StaffGroup(
+                    children: [
+                      StaffNavRow(
+                        title: 'Active sessions',
+                        subtitle: 'Devices and recent sign-ins',
+                        icon: Icons.devices_outlined,
+                        iconTone: StaffTone.sky,
+                        onTap: _showSessions,
+                      ),
+                      StaffNavRow(
+                        title: 'Purge activity records',
+                        subtitle: 'Request deletion of your access logs',
+                        icon: Icons.delete_outline_rounded,
+                        iconTone: StaffTone.danger,
+                        onTap: _confirmPurge,
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              ElevatedButton(
-                onPressed: _isUpdatingPassword ? null : () async {
-                  setStateDialog(() => _isUpdatingPassword = true);
-                  await _updatePassword(context);
-                  if (mounted) setStateDialog(() => _isUpdatingPassword = false);
-                },
-                style: ElevatedButton.styleFrom(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  backgroundColor: Theme.of(context).colorScheme.primary,
-                  foregroundColor: Colors.white,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─── Access key dialog (AccessKey.dc.html) ───
+
+  void _showChangePasswordDialog(BuildContext context) {
+    showStaffDialog<void>(
+      context,
+      barrierDismissible: !_isUpdatingPassword,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setStateDialog) {
+          final p = StaffPalette.of(dialogContext);
+          final amber = p.tone(StaffTone.amber);
+          final newKey = _newPasswordController.text;
+          final longEnough = newKey.length >= 8;
+          final confirm = _confirmPasswordController.text;
+          final mismatch = confirm.isNotEmpty && confirm != newKey;
+
+          Widget keyField(TextEditingController c, IconData icon, {bool autofocus = false}) => TextField(
+                controller: c,
+                autofocus: autofocus,
+                obscureText: true,
+                enabled: !_isUpdatingPassword,
+                onChanged: (_) => setStateDialog(() {}),
+                style: staffBody(15, color: p.ink, letterSpacing: 4),
+                decoration: staffInputDecoration(dialogContext, prefixIcon: Icon(icon, size: 20)),
+              );
+
+          return SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(color: amber.bg, borderRadius: BorderRadius.circular(16)),
+                    child: Icon(Icons.vpn_key_outlined, size: 26, color: p.dark ? amber.fg : kStaffAmber),
+                  ),
                 ),
-                child: _isUpdatingPassword 
-                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Text('Confirm Update'),
-              ),
-            ],
+                const SizedBox(height: 14),
+                Text('Update access key', style: staffHeading(20, color: p.ink)),
+                const SizedBox(height: 14),
+                Text(
+                  'Your key unlocks patient records on shared ward devices. You\'ll be signed out of other devices.',
+                  style: staffBody(13, color: p.inkSoft, height: 1.5),
+                ),
+                const SizedBox(height: 14),
+                StaffField(
+                  label: 'Current key',
+                  child: keyField(_currentPasswordController, Icons.lock_outline_rounded, autofocus: true),
+                ),
+                const SizedBox(height: 14),
+                StaffField(
+                  label: 'New key',
+                  helper: Row(
+                    children: [
+                      Icon(
+                        longEnough ? Icons.check_rounded : Icons.info_outline_rounded,
+                        size: 14,
+                        color: longEnough ? (p.dark ? const Color(0xFF6EE7B7) : kStaffGreen) : p.muted,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'At least 8 characters',
+                        style: staffBody(12,
+                            weight: FontWeight.w500,
+                            color: longEnough ? (p.dark ? const Color(0xFF6EE7B7) : kStaffGreen) : p.muted),
+                      ),
+                    ],
+                  ),
+                  child: keyField(_newPasswordController, Icons.vpn_key_outlined),
+                ),
+                const SizedBox(height: 14),
+                StaffField(
+                  label: 'Confirm new key',
+                  helper: mismatch
+                      ? Text('Keys do not match',
+                          style: staffBody(12, weight: FontWeight.w500, color: p.tone(StaffTone.danger).fg))
+                      : null,
+                  child: keyField(_confirmPasswordController, Icons.check_rounded),
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: StaffButton(
+                        'Cancel',
+                        kind: StaffButtonKind.secondary,
+                        onPressed: _isUpdatingPassword
+                            ? null
+                            : () {
+                                _clearFields();
+                                Navigator.pop(dialogContext);
+                              },
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: StaffButton(
+                        'Update key',
+                        loading: _isUpdatingPassword,
+                        onPressed: () async {
+                          setStateDialog(() => _isUpdatingPassword = true);
+                          final ok = await _updatePassword();
+                          if (!mounted) return;
+                          setState(() => _isUpdatingPassword = false);
+                          if (ok && dialogContext.mounted) {
+                            Navigator.pop(dialogContext);
+                          } else if (dialogContext.mounted) {
+                            setStateDialog(() {});
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           );
-        }
+        },
       ),
     );
   }
 }
 
+class _SessionTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String sub;
+  final bool current;
+  const _SessionTile(this.icon, this.title, this.sub, {this.current = false});
 
+  @override
+  Widget build(BuildContext context) {
+    final p = StaffPalette.of(context);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: p.fill, borderRadius: BorderRadius.circular(14)),
+      child: Row(
+        children: [
+          Icon(icon, size: 22, color: p.inkSoft),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: staffBody(14, weight: FontWeight.w600, color: p.ink)),
+                Text(sub, style: staffBody(12, color: p.muted)),
+              ],
+            ),
+          ),
+          if (current) const StaffTag('This device', tone: StaffTone.green),
+        ],
+      ),
+    );
+  }
+}

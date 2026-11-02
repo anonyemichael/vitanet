@@ -1,0 +1,39 @@
+# Enterprise Clinical UI Design System Guidelines
+
+Strict rules for all Flutter UI screens across VitaNet (inspired by Linear, Shadcn UI, Apple Health, and Oura Web).
+
+## 1. Zero "AI Slop" Hard Ban List
+
+- **NO Pastel Icon Circles**: Never put icons inside 40px pastel-colored circles (#FFE4E6, #E0F2FE, #FEF3C7). Use crisp 16px-18px inline monochrome or duotone icons (#475569 or #0D9488) aligned directly with the card title.
+- **NO Pill Badge Spam**: Never put multiple rounded status pills ("Live Telemetry", "Standby", "2 Active", "10m ago") all over the screen. Maximum ONE subtle status indicator per view.
+- **NO Stadium Pills (borderRadius: 999 or 28px)**: Never use stadium pills for search bars, alert buttons, or cards. Use architectural radii:
+  - 8px for buttons, inputs, and search bars.
+  - 10px - 12px for alert bars and badges.
+  - 12px - 14px for cards and content containers.
+- **NO Giant Empty Cards**: Never create 2x2 grids of 220px-tall cards that are 75% blank white space. Use high-density 4-column single rows (height 136px-144px) on desktop (width >= 1024px / >= 880px).
+- **NO Nested Input Boxes**: Whenever a TextField is inside a styled Container, you MUST set:
+  ```dart
+  InputDecoration(
+    filled: false,
+    border: InputBorder.none,
+    enabledBorder: InputBorder.none,
+    focusedBorder: InputBorder.none,
+    isDense: true,
+    contentPadding: EdgeInsets.zero,
+  )
+  ```
+  An ugly inner gray rectangle must NEVER render inside an outer search bar.
+- **NO Duplicate Avatars**: Never put a user avatar in the top-right page header when the user profile is already anchored in the left sidebar footer.
+
+## 2. Enterprise Clinical Design Tokens (Linear / Shadcn / Apple Health Standard)
+
+- **App Canvas**: #F8FAFC (Dark: #0B0F19)
+- **Card Surface**: #FFFFFF (Dark: #1E293B) with 1px solid #E2E8F0 (Dark: #334155) border and subtle shadow 0 1px 2px rgba(15, 23, 42, 0.03)
+- **Primary Text / Readouts**: #0F172A (Dark: #F8FAFC) — FontWeight.w600, letter-spacing -0.02em
+- **Secondary Labels**: #475569 (Dark: #94A3B8) — 13px, FontWeight.w500
+- **Muted Metadata**: #94A3B8 (Dark: #64748B) — 12px
+- **Primary Brand Accent**: #0D9488 (Medical Teal)
+- **Critical Alert Accent**: #E11D48 (Crimson)
+- **Border Radii**:
+  - Buttons & Inputs: BorderRadius.circular(8)
+  - Cards & Containers: BorderRadius.circular(12)

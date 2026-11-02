@@ -41,6 +41,7 @@ dependencies:
   file_picker: ^11.0.3
   youtube_player_iframe: ^6.0.2
   confetti: ^0.8.0
+  lottie: ^3.6.1
 
 dev_dependencies:
   flutter_test:
@@ -55,11 +56,22 @@ flutter:
     - assets/logo_transparent.png
     - assets/images/
     - assets/images/onboarding/
+    - assets/images/clinical/
+    - assets/images/photos/
+    - assets/health_library_data/medicines/
     - assets/health_library_data/articles/
     - assets/health_library_data/videos/
     - assets/health_library_data/images/
     - assets/health_library_data/interactives/
+    - assets/lottie/
     - .env
+
+flutter_native_splash:
+  color: "#040A10"
+  color_dark: "#040A10"
+  android_12:
+    color: "#040A10"
+    color_dark: "#040A10"
 
 flutter_launcher_icons:
   android: true

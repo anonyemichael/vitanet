@@ -1,608 +1,369 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:vitanet/core/constants/app_spacing.dart';
+import 'package:vitanet/core/constants/app_colors.dart';
 import 'package:vitanet/core/extensions/context_ext.dart';
-import 'package:vitanet/data/providers/providers.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:vitanet/data/models/user_profile.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'package:vitanet/data/providers/providers.dart';
+import 'package:vitanet/shared/utils/profile_image.dart';
+import 'package:vitanet/shared/widgets/vn_kit.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final profile = ref.watch(userProfileProvider);
-    final isHealthWorker =
-        profile?.role == 'health_worker' || profile?.role == 'admin';
-
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = context.theme.scaffoldBackgroundColor;
-    final textColor = context.colorScheme.onSurface;
-
-    return Scaffold(
-      backgroundColor: bgColor,
-      appBar: AppBar(
-        title: Text(
-          'Profile',
-          style: TextStyle(fontWeight: FontWeight.bold, color: textColor),
-        ),
-        elevation: 0,
-        backgroundColor: bgColor,
-        centerTitle: true,
-      ),
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            if (constraints.maxWidth < 800) {
-              return _buildMobileLayout(
-                context,
-                ref,
-                profile,
-                isHealthWorker,
-                isDark,
-              );
-            } else {
-              return _buildDesktopLayout(
-                context,
-                ref,
-                profile,
-                isHealthWorker,
-                isDark,
-              );
-            }
-          },
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMobileLayout(
-    BuildContext context,
-    WidgetRef ref,
-    UserProfile? profile,
-    bool isHealthWorker,
-    bool isDark,
-  ) {
-    return ListView(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.lg,
-        vertical: AppSpacing.md,
-      ),
-      children: [
-        _buildCenteredHeader(
-          context,
-          ref,
-          profile,
-          isDark,
-        ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.05),
-        const SizedBox(height: AppSpacing.xxl),
-
-        if (_needsProfileCompletion(profile)) ...[
-          _buildCompletionPrompt(context, isDark),
-          const SizedBox(height: AppSpacing.xl),
-        ],
-
-        if (profile != null) ...[
-          _buildSectionTitle(
-            context,
-            'Health Overview',
-            isDark,
-          ).animate().fadeIn(delay: 100.ms),
-          _buildHealthMetricsGrid(
-            context,
-            profile,
-            isDark,
-          ).animate().fadeIn(delay: 100.ms).slideY(begin: 0.05),
-          const SizedBox(height: AppSpacing.xl),
-        ],
-
-        _buildSectionTitle(
-          context,
-          'Account',
-          isDark,
-        ).animate().fadeIn(delay: 200.ms),
-        _buildAccountGroup(
-          context,
-          isHealthWorker,
-          isDark,
-        ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.05),
-        const SizedBox(height: AppSpacing.xl),
-
-        _buildSectionTitle(
-          context,
-          'Support',
-          isDark,
-        ).animate().fadeIn(delay: 300.ms),
-        _buildSupportGroup(
-          context,
-          isDark,
-        ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.05),
-        const SizedBox(height: AppSpacing.xxxl),
-
-        _buildLogoutButton(context, ref, isDark).animate().fadeIn(delay: 400.ms),
-        const SizedBox(height: 120),
-      ],
-    );
-  }
-
-  String _getInitials(String? name) {
-    if (name == null || name.isEmpty) return '?';
-    final parts = name.trim().split(RegExp(r'\s+'));
-    if (parts.length > 1) {
-      return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+  Future<void> _pickPhoto(BuildContext context, WidgetRef ref, UserProfile? profile) async {
+    if (profile == null) {
+      context.showSnack('Finish setting up your profile first');
+      return;
     }
-    return parts.first[0].toUpperCase();
+    try {
+      final image = await ImagePicker().pickImage(source: ImageSource.gallery);
+      if (image != null) {
+        await ref
+            .read(userProfileProvider.notifier)
+            .updateProfile(profile.copyWith(profileImagePath: image.path));
+      }
+    } catch (e) {
+      if (context.mounted) context.showSnack('Could not open photos: $e');
+    }
   }
 
-  bool _needsProfileCompletion(UserProfile? profile) {
-    if (profile == null) return true;
-    return profile.phone == null ||
-        profile.phone!.trim().isEmpty ||
-        profile.dob == null ||
-        profile.dob!.trim().isEmpty ||
-        profile.sex == null ||
-        profile.sex!.trim().isEmpty;
-  }
-
-  Widget _buildCompletionPrompt(BuildContext context, bool isDark) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      decoration: BoxDecoration(
-        color: context.colorScheme.primaryContainer.withValues(alpha: 0.65),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.person_add_alt_1_rounded,
-            color: context.colorScheme.primary,
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Text(
-              'Complete your profile so VitaNet can personalize your health guidance.',
-              style: context.textTheme.bodyMedium,
-            ),
-          ),
-          TextButton(
-            onPressed: () => context.push('/edit-profile'),
-            child: const Text('Complete'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDesktopLayout(
-    BuildContext context,
-    WidgetRef ref,
-    UserProfile? profile,
-    bool isHealthWorker,
-    bool isDark,
-  ) {
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 800),
-        child: _buildMobileLayout(
-          context,
-          ref,
-          profile,
-          isHealthWorker,
-          isDark,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCenteredHeader(
-    BuildContext context,
-    WidgetRef ref,
-    UserProfile? profile,
-    bool isDark,
-  ) {
-    final textColor = context.colorScheme.onSurface;
-
-    return Column(
-      children: [
-        _buildAvatarPicker(context, ref, profile, isDark),
-        const SizedBox(height: AppSpacing.lg),
-        Text(
-          profile?.name ?? 'User Name',
-          style: context.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: textColor,
-          ),
-          textAlign: TextAlign.center,
-        ),
-        if (profile?.role != null) ...[
-          const SizedBox(height: 4),
-          Text(
-            (profile!.role!).toUpperCase(),
-            style: context.textTheme.labelMedium?.copyWith(
-              color: isDark ? Colors.blue.shade300 : Colors.blue.shade700,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 1.0,
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildAvatarPicker(
-    BuildContext context,
-    WidgetRef ref,
-    UserProfile? profile,
-    bool isDark,
-  ) {
-    final hasImage =
-        profile?.profileImagePath != null &&
-        profile!.profileImagePath!.isNotEmpty;
-    final cardColor = context.colorScheme.surface;
-    final avatarBgColor = context.colorScheme.surfaceContainerHighest;
-
-    return GestureDetector(
-      onTap: () async {
-        final ImagePicker picker = ImagePicker();
-        final XFile? image = await picker.pickImage(
-          source: ImageSource.gallery,
-        );
-
-        if (image != null && profile != null) {
-          final updatedProfile = profile.copyWith(profileImagePath: image.path);
-          await ref
-              .read(userProfileProvider.notifier)
-              .updateProfile(updatedProfile);
-        }
-      },
-      child: Stack(
-        alignment: Alignment.bottomRight,
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: cardColor, width: 4),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
+  Future<void> _confirmSignOut(BuildContext context, WidgetRef ref) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      useRootNavigator: true,
+      barrierColor: const Color(0x990F172A),
+      builder: (ctx) {
+        final p = VnPalette.of(ctx);
+        return VnDialog(
+          children: [
+            Center(
+              child: Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: p.surfaceAlt,
+                  borderRadius: BorderRadius.circular(18),
                 ),
-              ],
+                child: Icon(Icons.logout_rounded, color: p.ink),
+              ),
             ),
-            child: CircleAvatar(
-              radius: 54,
-              backgroundColor: avatarBgColor,
-              backgroundImage: hasImage
-                  ? FileImage(File(profile!.profileImagePath!))
-                  : null,
-              child: !hasImage
-                  ? Text(
-                      _getInitials(profile?.name),
-                      style: context.textTheme.headlineMedium?.copyWith(
-                        color: isDark
-                            ? Colors.grey.shade400
-                            : Colors.blueGrey.shade300,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    )
-                  : null,
+            Center(
+              child: Text('Sign out of VitaNet?',
+                  textAlign: TextAlign.center, style: VnText.heading(20, color: p.ink)),
             ),
-          ),
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: context.colorScheme.primary,
-              shape: BoxShape.circle,
-              border: Border.all(color: cardColor, width: 2),
+            Text(
+              'Your checks stay saved to your account. You will need to sign in again to see them on this device.',
+              textAlign: TextAlign.center,
+              style: VnText.body(14, color: p.inkSoft, height: 1.55),
             ),
-            child: const Icon(
-              Icons.camera_alt_rounded,
-              color: Colors.white,
-              size: 16,
+            VnButton(
+              label: 'Sign out',
+              height: 50,
+              radius: 14,
+              fontSize: 15,
+              background: const Color(0xFFB91C1C),
+              foreground: Colors.white,
+              onPressed: () => Navigator.pop(ctx, true),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSectionTitle(BuildContext context, String title, bool isDark) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 16, bottom: 8),
-      child: Text(
-        title.toUpperCase(),
-        style: context.textTheme.labelSmall?.copyWith(
-          fontWeight: FontWeight.bold,
-          color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
-          letterSpacing: 1.2,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHealthMetricsGrid(
-    BuildContext context,
-    UserProfile profile,
-    bool isDark,
-  ) {
-    final cardColor = context.colorScheme.surface;
-    final dividerColor = context.colorScheme.outlineVariant.withValues(alpha: 0.5);
-
-    return Container(
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          IntrinsicHeight(
-            child: Row(
-              children: [
-                Expanded(
-                  child: _buildMetricItem(
-                    context,
-                    Icons.water_drop_rounded,
-                    'Blood',
-                    profile.bloodType ?? '--',
-                    isDark,
-                  ),
-                ),
-                VerticalDivider(width: 1, color: dividerColor),
-                Expanded(
-                  child: _buildMetricItem(
-                    context,
-                    Icons.cake_rounded,
-                    'Age',
-                    profile.age?.toString() ?? '--',
-                    isDark,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Divider(height: 1, color: dividerColor),
-          IntrinsicHeight(
-            child: Row(
-              children: [
-                Expanded(
-                  child: _buildMetricItem(
-                    context,
-                    Icons.monitor_weight_rounded,
-                    'Weight',
-                    profile.weight != null ? '${profile.weight}kg' : '--',
-                    isDark,
-                  ),
-                ),
-                VerticalDivider(width: 1, color: dividerColor),
-                Expanded(
-                  child: _buildMetricItem(
-                    context,
-                    Icons.height_rounded,
-                    'Height',
-                    profile.height != null ? '${profile.height}cm' : '--',
-                    isDark,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMetricItem(
-    BuildContext context,
-    IconData icon,
-    String label,
-    String value,
-    bool isDark,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            color: isDark ? Colors.blueGrey.shade300 : Colors.blueGrey.shade400,
-            size: 20,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: context.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: context.colorScheme.onSurface,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: context.textTheme.bodySmall?.copyWith(
-              color: isDark ? Colors.grey.shade400 : Colors.grey.shade500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAccountGroup(
-    BuildContext context,
-    bool isHealthWorker,
-    bool isDark,
-  ) {
-    final cardColor = context.colorScheme.surface;
-    final dividerColor = context.colorScheme.outlineVariant.withValues(alpha: 0.5);
-
-    return Container(
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          _buildGroupedTile(
-            context,
-            icon: Icons.edit_document,
-            title: 'Update Medical Info',
-            isDark: isDark,
-            onTap: () => context.push('/edit-profile'),
-          ),
-          if (isHealthWorker) ...[
-            Divider(height: 1, indent: 56, color: dividerColor),
-            _buildGroupedTile(
-              context,
-              icon: Icons.badge_rounded,
-              title: 'Staff Credentials',
-              isDark: isDark,
-              onTap: () => context.showSnack('Coming soon'),
+            VnOutlineButton(
+              label: 'Cancel',
+              height: 44,
+              borderColor: Colors.transparent,
+              foreground: p.inkSoft,
+              onPressed: () => Navigator.pop(ctx, false),
             ),
           ],
-        ],
+        );
+      },
+    );
+    if (ok != true) return;
+    await ref.read(userProfileProvider.notifier).clearProfile();
+    await ref.read(authProvider.notifier).signOut();
+    if (context.mounted) context.go('/login');
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final p = VnPalette.of(context);
+    final profile = ref.watch(userProfileProvider);
+    final auth = ref.watch(authProvider);
+    final history = ref.watch(triageHistoryProvider);
+    final devices = ref.watch(deviceConnectionProvider).maybeWhen(
+          data: (m) => m.values.where((v) => v).length,
+          orElse: () => 0,
+        );
+    final liveCount = ref.watch(liveVitalsProvider).isNotEmpty ? 1 : 0;
+    final deviceCount = devices > 0 ? devices : liveCount;
+
+    final name = (profile?.name.trim().isNotEmpty ?? false)
+        ? profile!.name.trim()
+        : (auth.user?.displayName ?? 'Guest');
+    final email = auth.user?.email ?? (auth.status == AuthStatus.anonymous ? 'Guest session' : '');
+    final meta = [
+      if (profile?.age != null) '${profile!.age}',
+      if (profile?.sex != null && profile!.sex!.isNotEmpty) profile.sex!,
+      if (profile?.bloodType != null && profile!.bloodType!.isNotEmpty) profile.bloodType!,
+    ].join(' · ');
+    final image = profileImageProvider(profile?.profileImagePath) ??
+        (auth.user?.photoURL != null ? NetworkImage(auth.user!.photoURL!) : null);
+
+    final menu = <(String, String, IconData, Color, Color, VoidCallback)>[
+      ('Update medical info', 'Blood type, allergies, conditions, medications',
+          Icons.note_add_outlined, const Color(0xFFCCFBF1), const Color(0xFF0F766E),
+          () => context.push('/edit-profile?tab=medical')),
+      ('Check history', 'All your past triage results', Icons.history_rounded,
+          const Color(0xFFFEF3C7), const Color(0xFFB45309), () => context.push('/history')),
+      ('Devices & data', 'Watch, Health Connect, permissions', Icons.watch_outlined,
+          const Color(0xFFE0E7FF), const Color(0xFF4338CA),
+          () => context.push('/device-connection/heart_rate')),
+      ('App settings', 'Notifications, appearance and privacy', Icons.tune_rounded,
+          const Color(0xFFF1F5F9), const Color(0xFF334155), () => context.push('/settings')),
+      ('Help center', 'FAQs, guides and contact support', Icons.help_outline_rounded,
+          const Color(0xFFE0F2FE), const Color(0xFF0369A1), () => context.push('/help-center')),
+      ('About VitaNet', 'Version, disclaimers and team', Icons.info_outline_rounded,
+          const Color(0xFFF5F3FF), const Color(0xFF6D28D9), () => context.push('/about')),
+    ];
+
+    Widget statTile(String value, String label, VoidCallback onTap) => Expanded(
+          child: VnCard(
+            radius: 18,
+            padding: const EdgeInsets.all(14),
+            onTap: onTap,
+            semanticLabel: '$value $label',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(value, style: VnText.body(22, weight: FontWeight.w800, color: p.ink)),
+                const SizedBox(height: 2),
+                Text(label, style: VnText.body(12, weight: FontWeight.w600, color: p.muted)),
+              ],
+            ),
+          ),
+        );
+
+    return Scaffold(
+      backgroundColor: p.page,
+      body: SafeArea(
+        bottom: false,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 720),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 110),
+              children: [
+                SizedBox(
+                  height: 48,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Semantics(
+                          header: true,
+                          child: Text('Profile', style: VnText.heading(28, color: p.ink)),
+                        ),
+                      ),
+                      VnIconButton(
+                        icon: Icons.settings_outlined,
+                        tooltip: 'Settings',
+                        bordered: true,
+                        onPressed: () => context.push('/settings'),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    SizedBox(
+                      width: 76,
+                      height: 76,
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          VnAvatar(name: name, size: 76, fontSize: 26, image: image),
+                          Positioned(
+                            right: -8,
+                            bottom: -8,
+                            child: Semantics(
+                              button: true,
+                              label: 'Change photo',
+                              excludeSemantics: true,
+                              child: InkWell(
+                                customBorder: const CircleBorder(),
+                                onTap: () => _pickPhoto(context, ref, profile),
+                                child: SizedBox(
+                                  width: 44,
+                                  height: 44,
+                                  child: Center(
+                                    child: Container(
+                                      width: 28,
+                                      height: 28,
+                                      decoration: BoxDecoration(
+                                        color: p.brand,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(color: p.page, width: 3),
+                                      ),
+                                      child: Icon(Icons.edit_rounded, size: 13, color: p.onBrand),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: VnText.heading(20, color: p.ink)),
+                          if (email.isNotEmpty) ...[
+                            const SizedBox(height: 3),
+                            Text(email,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: VnText.body(14, color: p.muted)),
+                          ],
+                          if (meta.isNotEmpty) ...[
+                            const SizedBox(height: 3),
+                            Text(meta, style: VnText.body(13, color: p.muted)),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                _MedicalIdCard(profile: profile),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    statTile('${history.length}', 'Checks', () => context.push('/history')),
+                    const SizedBox(width: 10),
+                    statTile('${profile?.emergencyContacts.length ?? 0}', 'Care circle',
+                        () => context.push('/edit-profile?tab=emergency')),
+                    const SizedBox(width: 10),
+                    statTile('$deviceCount', deviceCount == 1 ? 'Device' : 'Devices',
+                        () => context.push('/device-connection/heart_rate')),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                VnListGroup(
+                  children: [
+                    for (final (title, sub, icon, bg, fg, onTap) in menu)
+                      VnListRow(
+                        leading: VnIconTile(icon: icon, bg: bg, fg: fg, size: 40),
+                        title: title,
+                        subtitle: sub,
+                        onTap: onTap,
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                VnOutlineButton(
+                  label: 'Sign out',
+                  icon: Icons.logout_rounded,
+                  background: p.surface,
+                  borderColor: p.isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFECACA),
+                  foreground: p.danger,
+                  onPressed: () => _confirmSignOut(context, ref),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
+}
 
-  Widget _buildSupportGroup(BuildContext context, bool isDark) {
-    final cardColor = context.colorScheme.surface;
-    final dividerColor = context.colorScheme.outlineVariant.withValues(alpha: 0.5);
+/// Dark "Medical ID" summary card.
+class _MedicalIdCard extends StatelessWidget {
+  final UserProfile? profile;
+  const _MedicalIdCard({required this.profile});
 
-    return Container(
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          _buildGroupedTile(
-            context,
-            icon: Icons.settings_rounded,
-            title: 'App Settings',
-            isDark: isDark,
-            onTap: () => context.push('/settings'),
-          ),
-          Divider(height: 1, indent: 56, color: dividerColor),
-          _buildGroupedTile(
-            context,
-            icon: Icons.support_agent_rounded,
-            title: 'Help Center',
-            isDark: isDark,
-            onTap: () => context.push('/help-center'),
-          ),
-          Divider(height: 1, indent: 56, color: dividerColor),
-          _buildGroupedTile(
-            context,
-            icon: Icons.info_rounded,
-            title: 'About Vitanet',
-            isDark: isDark,
-            onTap: () => context.push('/about'),
-          ),
-        ],
-      ),
-    );
+  String _num(double? v, String unit) {
+    if (v == null) return '--';
+    final s = v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
+    return '$s $unit';
   }
 
-  Widget _buildGroupedTile(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required bool isDark,
-    required VoidCallback onTap,
-  }) {
-    final iconBgColor = context.colorScheme.surfaceContainerHighest;
+  @override
+  Widget build(BuildContext context) {
+    final p = VnPalette.of(context);
+    final pr = profile;
+    const label = Color(0xFF94A3B8);
 
-    return ListTile(
-      onTap: onTap,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      leading: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: iconBgColor,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(
-          icon,
-          color: isDark ? Colors.blueGrey.shade200 : Colors.blueGrey.shade700,
-          size: 20,
-        ),
-      ),
-      title: Text(
-        title,
-        style: context.textTheme.titleSmall?.copyWith(
-          fontWeight: FontWeight.w600,
-          color: isDark ? Colors.white : Colors.black87,
-        ),
-      ),
-      trailing: Icon(
-        Icons.arrow_forward_ios_rounded,
-        size: 14,
-        color: isDark ? Colors.grey.shade600 : Colors.grey.shade400,
-      ),
-    );
-  }
-
-  Widget _buildLogoutButton(BuildContext context, WidgetRef ref, bool isDark) {
-    final cardColor = context.colorScheme.surface;
-    final borderColor = isDark ? Colors.red.shade900 : Colors.red.shade100;
-    final textColor = isDark ? Colors.red.shade300 : Colors.red.shade600;
-
-    return SizedBox(
-      width: double.infinity,
-      child: TextButton.icon(
-        onPressed: () async {
-          await ref.read(userProfileProvider.notifier).clearProfile();
-          await ref.read(authProvider.notifier).signOut();
-          if (context.mounted) {
-            context.go('/login');
-          }
-        },
-        style: TextButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          backgroundColor: cardColor,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: BorderSide(color: borderColor, width: 1),
+    Widget field(String k, String v) => Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(k, style: VnText.body(11, weight: FontWeight.w600, color: label)),
+              const SizedBox(height: 2),
+              Text(v, style: VnText.body(18, weight: FontWeight.w800, color: Colors.white)),
+            ],
           ),
-        ),
-        icon: Icon(
-          Icons.power_settings_new_rounded,
-          color: textColor,
-          size: 20,
-        ),
-        label: Text(
-          'Sign Out',
-          style: context.textTheme.titleSmall?.copyWith(
-            color: textColor,
-            fontWeight: FontWeight.bold,
+        );
+
+    Widget line(String k, String v, {Color? color}) => Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Text.rich(
+            TextSpan(children: [
+              TextSpan(text: '$k ', style: VnText.body(13, color: label)),
+              TextSpan(
+                  text: v,
+                  style: VnText.body(13, weight: FontWeight.w700, color: color ?? Colors.white)),
+            ]),
+          ),
+        );
+
+    String list(List<String>? l) => (l == null || l.isEmpty) ? 'None recorded' : l.join(', ');
+
+    return Material(
+      color: p.isDark ? const Color(0xFF0B1220) : AppColors.ink,
+      borderRadius: BorderRadius.circular(24),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => context.push('/edit-profile?tab=medical'),
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.medical_information_outlined, size: 18, color: Color(0xFFFCA5A5)),
+                  const SizedBox(width: 8),
+                  Text('Medical ID',
+                      style: VnText.body(14, weight: FontWeight.w700, color: const Color(0xFFFCA5A5))),
+                  const Spacer(),
+                  Text('Tap to edit', style: VnText.body(12, color: label)),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  field('Blood type', (pr?.bloodType?.isNotEmpty ?? false) ? pr!.bloodType! : '--'),
+                  const SizedBox(width: 10),
+                  field('Height', _num(pr?.height, 'cm')),
+                  const SizedBox(width: 10),
+                  field('Weight', _num(pr?.weight, 'kg')),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Container(height: 1, color: Colors.white.withValues(alpha: 0.1)),
+              const SizedBox(height: 6),
+              line('Allergies', list(pr?.allergies),
+                  color: (pr?.allergies.isNotEmpty ?? false) ? const Color(0xFFFCA5A5) : null),
+              line('Conditions', list(pr?.preExistingConditions)),
+              line('Medications', list(pr?.medications)),
+            ],
           ),
         ),
       ),

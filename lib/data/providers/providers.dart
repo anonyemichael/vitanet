@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:vitanet/data/models/chat_message.dart';
@@ -10,6 +11,8 @@ import 'package:vitanet/data/services/ai_service.dart';
 import 'package:vitanet/data/services/local_storage_service.dart';
 import 'package:vitanet/data/services/api_service.dart';
 import 'package:vitanet/data/services/firestore_service.dart';
+import 'package:vitanet/data/services/medical_api_service.dart';
+import 'package:vitanet/data/services/dynamic_resources_service.dart';
 import 'package:vitanet/core/constants/app_strings.dart';
 import 'package:vitanet/data/services/health_service.dart';
 
@@ -18,9 +21,7 @@ export 'package:vitanet/data/providers/auth_provider.dart';
 
 // --- Core Services ---
 
-final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
-  throw UnimplementedError('Must be overridden in main.dart');
-});
+final sharedPreferencesProvider = StateProvider<SharedPreferences?>((ref) => null);
 
 final localStorageProvider = Provider<LocalStorageService>((ref) {
   return LocalStorageService(ref.watch(sharedPreferencesProvider));
@@ -57,6 +58,16 @@ final aiServiceProvider = Provider<AiService>((ref) {
 
 final firestoreServiceProvider = Provider<FirestoreService>(
   (ref) => FirestoreService(),
+);
+
+final medicalApiServiceProvider = Provider<MedicalApiService>(
+  (ref) => MedicalApiService(),
+);
+
+final dynamicResourcesServiceProvider = Provider<DynamicResourcesService>(
+  (ref) => DynamicResourcesService(
+    apiService: ref.watch(medicalApiServiceProvider),
+  ),
 );
 
 // ─── Live Vitals ───
@@ -143,8 +154,9 @@ class UserProfileNotifier extends StateNotifier<UserProfile?> {
   }
 
   Future<void> _init() async {
-    if (_userId != null) {
-      final remoteProfile = await _firestore.getUserProfile(_userId!);
+    final uid = _userId;
+    if (uid != null && Firebase.apps.isNotEmpty) {
+      final remoteProfile = await _firestore.getUserProfile(uid);
       if (remoteProfile != null) {
         await _storage.saveProfile(remoteProfile);
         if (mounted) {
@@ -160,10 +172,11 @@ class UserProfileNotifier extends StateNotifier<UserProfile?> {
       state = profile;
     }
     
-    if (_userId != null) {
+    final uid = _userId;
+    if (uid != null) {
       // Do not await the firestore save so it doesn't hang indefinitely 
       // if the client is offline, as Firebase queues writes locally.
-      _firestore.saveUserProfile(_userId!, profile).catchError((e) {
+      _firestore.saveUserProfile(uid, profile).catchError((e) {
         debugPrint('Failed to sync profile to firestore: $e');
       });
     }
@@ -224,6 +237,8 @@ class ChatMessagesNotifier extends StateNotifier<List<ChatMessage>> {
     ];
   }
 
+  void setMessages(List<ChatMessage> messages) => state = messages;
+
   void clear() => state = [];
 }
 
@@ -248,7 +263,20 @@ final chatHistoryListProvider = FutureProvider<List<Map<String, dynamic>>>((
   if (auth.user == null) return [];
 
   final firestoreService = ref.watch(firestoreServiceProvider);
-  return firestoreService.getUserConversations(auth.user!.uid);
+  try {
+    return await firestoreService
+        .getUserConversations(auth.user!.uid)
+        .timeout(
+          const Duration(milliseconds: 1500),
+          onTimeout: () {
+            debugPrint('chatHistoryListProvider timed out, returning empty list');
+            return [];
+          },
+        );
+  } catch (e) {
+    debugPrint('chatHistoryListProvider error: $e');
+    return [];
+  }
 });
 
 final specificChatHistoryProvider =

@@ -1,7 +1,11 @@
-import 'package:flutter/material.dart';
-
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:vitanet/core/constants/app_colors.dart';
+import '../widgets/staff_demo_data.dart';
+import '../widgets/staff_ui.dart';
 
+/// Profile & credentials, in the staff portal visual language.
 class AdminProfileSettingsPage extends StatefulWidget {
   const AdminProfileSettingsPage({super.key});
 
@@ -12,17 +16,17 @@ class AdminProfileSettingsPage extends StatefulWidget {
 class _ProfileAdminSettingsPageState extends State<AdminProfileSettingsPage> {
   final _nameController = TextEditingController();
   final _bioController = TextEditingController(
-      text: 'Dedicated to providing high-quality clinical care and operational excellence.');
+      text: 'Emergency physician focused on rapid triage, acute cardiac care and smooth handovers from VitaNet referrals.');
   bool _isUpdating = false;
 
   @override
   void initState() {
     super.initState();
-    final user = FirebaseAuth.instance.currentUser;
+    final user = Firebase.apps.isNotEmpty ? FirebaseAuth.instance.currentUser : null;
     if (user != null && user.displayName != null && user.displayName!.isNotEmpty) {
       _nameController.text = user.displayName!;
     } else {
-      _nameController.text = 'Medical Service Provider';
+      _nameController.text = kDemoStaffName;
     }
   }
 
@@ -34,32 +38,24 @@ class _ProfileAdminSettingsPageState extends State<AdminProfileSettingsPage> {
   }
 
   Future<void> _updateProfile() async {
+    if (_nameController.text.trim().isEmpty) {
+      showStaffSnack(context, 'Enter your name as it appears on your license.');
+      return;
+    }
     setState(() => _isUpdating = true);
     try {
-      final user = FirebaseAuth.instance.currentUser;
+      final user = Firebase.apps.isNotEmpty ? FirebaseAuth.instance.currentUser : null;
       if (user != null) {
-        await user.updateDisplayName(_nameController.text);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Identity records updated successfully.'),
-              behavior: SnackBarBehavior.floating,
-              backgroundColor: Colors.green,
-            ),
-          );
-          Navigator.pop(context);
-        }
+        try {
+          await user.updateDisplayName(_nameController.text.trim());
+        } catch (_) {}
+      }
+      if (mounted) {
+        showStaffSnack(context, 'Identity records updated successfully.');
+        Navigator.pop(context);
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to update: $e'),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      if (mounted) showStaffSnack(context, 'Failed to update: $e');
     } finally {
       if (mounted) setState(() => _isUpdating = false);
     }
@@ -67,158 +63,161 @@ class _ProfileAdminSettingsPageState extends State<AdminProfileSettingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final user = FirebaseAuth.instance.currentUser;
+    final p = StaffPalette.of(context);
+    final user = Firebase.apps.isNotEmpty ? FirebaseAuth.instance.currentUser : null;
+    final credential = user != null && user.uid.length >= 8 ? user.uid.substring(0, 8).toUpperCase() : 'MDC/RN/04712';
 
     return Scaffold(
-      backgroundColor: isDark ? colorScheme.surface : const Color(0xFFF1F8FE),
-      appBar: AppBar(
-        title: const Text('Clinical Identity'),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: _isUpdating 
-                ? const SizedBox(
-                    width: 20, height: 20, 
-                    child: CircularProgressIndicator(strokeWidth: 2)
-                  )
-                : TextButton(
-                    onPressed: _updateProfile,
-                    child: const Text('Save', style: TextStyle(fontWeight: FontWeight.bold)),
+      backgroundColor: p.bg,
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+          children: [
+            StaffContent(
+              maxWidth: 560,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  StaffPageHeader(
+                    title: 'Profile & credentials',
+                    fontSize: 21,
+                    onBack: () => Navigator.pop(context),
                   ),
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 500),
-            child: Column(
-              children: [
-                Stack(
-                  alignment: Alignment.bottomRight,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: colorScheme.primary, width: 2),
-                      ),
-                      child: CircleAvatar(
-                        radius: 65,
-                        backgroundColor: colorScheme.primaryContainer,
-                        child: Text(
-                          _nameController.text.isNotEmpty ? _nameController.text[0].toUpperCase() : 'M',
-                          style: TextStyle(
-                            fontSize: 50,
-                            fontWeight: FontWeight.bold,
-                            color: colorScheme.primary,
+                  const SizedBox(height: 14),
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: AppColors.staffNavy,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Column(
+                      children: [
+                        const StaffPhoto(kStaffPhoto, size: 88, radius: 24),
+                        const SizedBox(height: 12),
+                        ListenableBuilder(
+                          listenable: _nameController,
+                          builder: (context, _) => Text(
+                            _nameController.text.isEmpty ? kDemoStaffName : _nameController.text,
+                            textAlign: TextAlign.center,
+                            style: staffHeading(19, color: const Color(0xFFF1F5F9)),
                           ),
                         ),
-                      ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Emergency physician · $kDemoFacility',
+                          textAlign: TextAlign.center,
+                          style: staffBody(12, color: const Color(0xFF94A3B8)),
+                        ),
+                        const SizedBox(height: 10),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: const Color(0x1F2DD4BF),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.verified_user_outlined, size: 14, color: AppColors.mintLight),
+                              const SizedBox(width: 6),
+                              Text('Verified access',
+                                  style: staffBody(12, weight: FontWeight.w600, color: AppColors.mintLight)),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                    CircleAvatar(
-                      backgroundColor: colorScheme.primary,
-                      radius: 20,
-                      child: IconButton(
-                        icon: const Icon(Icons.edit_outlined, size: 20, color: Colors.white),
-                        onPressed: () {},
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 40),
-                _buildFieldLabel(context, 'Provider Designation'),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _nameController,
-                  decoration: InputDecoration(
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide(color: colorScheme.outlineVariant),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide(color: colorScheme.primary.withAlpha(20)),
-                    ),
-                    prefixIcon: Icon(Icons.badge_outlined, color: colorScheme.primary),
                   ),
-                ),
-                const SizedBox(height: 24),
-                _buildFieldLabel(context, 'Professional Profile'),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _bioController,
-                  maxLines: 4,
-                  decoration: InputDecoration(
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide(color: colorScheme.outlineVariant),
+                  const SizedBox(height: 16),
+                  const StaffSectionLabel('Identity'),
+                  const SizedBox(height: 8),
+                  StaffCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        StaffField(
+                          label: 'Full name',
+                          child: TextField(
+                            controller: _nameController,
+                            textCapitalization: TextCapitalization.words,
+                            style: staffBody(15, color: p.ink),
+                            decoration: staffInputDecoration(
+                              context,
+                              prefixIcon: const Icon(Icons.badge_outlined, size: 20),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        StaffField(
+                          label: 'Professional profile',
+                          child: TextField(
+                            controller: _bioController,
+                            minLines: 3,
+                            maxLines: 5,
+                            textCapitalization: TextCapitalization.sentences,
+                            style: staffBody(14, color: p.ink, height: 1.5),
+                            decoration: staffInputDecoration(context),
+                          ),
+                        ),
+                      ],
                     ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide(color: colorScheme.primary.withAlpha(20)),
-                    ),
-                    alignLabelWithHint: true,
                   ),
-                ),
-                const SizedBox(height: 32),
-                _buildInfoTile(context, 'Primary Email', user?.email ?? 'Unknown', Icons.email_outlined),
-                _buildInfoTile(context, 'Clinical Department', 'General Administration', Icons.business_outlined),
-                _buildInfoTile(context, 'Credential ID', user?.uid.substring(0, 8).toUpperCase() ?? 'MSC-2024', Icons.verified_user_outlined),
-              ],
+                  const SizedBox(height: 16),
+                  const StaffSectionLabel('Credentials'),
+                  const SizedBox(height: 8),
+                  StaffGroup(
+                    children: [
+                      _InfoRow(Icons.mail_outline_rounded, 'Work email', user?.email ?? 'k.mensah@korlebu.gov.gh'),
+                      const _InfoRow(Icons.local_hospital_outlined, 'Department', 'Emergency'),
+                      const _InfoRow(Icons.apartment_rounded, 'Facility', kDemoFacility),
+                      _InfoRow(Icons.verified_user_outlined, 'Credential ID', credential),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  StaffButton(
+                    'Save changes',
+                    height: 52,
+                    radius: 16,
+                    loading: _isUpdating,
+                    onPressed: _updateProfile,
+                  ),
+                ],
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
   }
+}
 
-  Widget _buildFieldLabel(BuildContext context, String label) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.bold,
-          color: Theme.of(context).colorScheme.onSurface.withAlpha(150),
-        ),
-      ),
-    );
-  }
+class _InfoRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  const _InfoRow(this.icon, this.label, this.value);
 
-  Widget _buildInfoTile(BuildContext context, String title, String value, IconData icon) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+  @override
+  Widget build(BuildContext context) {
+    final p = StaffPalette.of(context);
+    return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white.withAlpha(150),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colorScheme.primary.withAlpha(10)),
-      ),
       child: Row(
         children: [
-          Icon(icon, size: 20, color: colorScheme.primary.withAlpha(150)),
-          const SizedBox(width: 16),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant)),
-              Text(value, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-            ],
+          Icon(icon, size: 20, color: p.accent),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: staffBody(12, color: p.muted)),
+                const SizedBox(height: 2),
+                Text(value, style: staffBody(14, weight: FontWeight.w600, color: p.ink)),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 }
-
-

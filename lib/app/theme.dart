@@ -1,15 +1,19 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:vitanet/core/constants/app_colors.dart';
 
-/// VitaNet app theme — light and dark.
+/// VitaNet app theme â€” light and dark.
 class AppTheme {
   AppTheme._();
 
-  // ─── Light Theme ───
+  static final String? _jakarta = GoogleFonts.plusJakartaSans().fontFamily;
+  static final String? _inter = GoogleFonts.inter().fontFamily;
+
+  // â”€â”€â”€ Light Theme â”€â”€â”€
   static ThemeData get light {
     final colorScheme = ColorScheme.light(
-      primary: AppColors.primaryLight,
-      primaryContainer: AppColors.primaryContainerLight,
+      primary: AppColors.brand,
+      primaryContainer: AppColors.brandTint,
       secondary: AppColors.secondaryLight,
       secondaryContainer: AppColors.secondaryContainerLight,
       surface: AppColors.surfaceLight,
@@ -24,15 +28,15 @@ class AppTheme {
       useMaterial3: true,
       brightness: Brightness.light,
       colorScheme: colorScheme,
-      scaffoldBackgroundColor: AppColors.backgroundLight,
+      scaffoldBackgroundColor: AppColors.pageBg,
       textTheme: _buildTextTheme(colorScheme),
       appBarTheme: AppBarTheme(
         backgroundColor: AppColors.backgroundLight,
         foregroundColor: AppColors.onSurfaceLight,
         elevation: 0,
         centerTitle: true,
-        titleTextStyle: const TextStyle(
-          fontFamily: 'Plus Jakarta Sans',
+        titleTextStyle: TextStyle(
+          fontFamily: _jakarta,
           fontSize: 20,
           fontWeight: FontWeight.w600,
           color: AppColors.onSurfaceLight,
@@ -48,7 +52,7 @@ class AppTheme {
       ),
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: AppColors.surfaceLight,
-        selectedItemColor: AppColors.primaryLight,
+        selectedItemColor: AppColors.brand,
         unselectedItemColor: AppColors.onSurfaceVariantLight,
         type: BottomNavigationBarType.fixed,
         elevation: 8,
@@ -56,9 +60,9 @@ class AppTheme {
       navigationBarTheme: NavigationBarThemeData(
         height: 72,
         backgroundColor: AppColors.surfaceLight,
-        indicatorColor: AppColors.primaryContainerLight,
-        labelTextStyle: const WidgetStatePropertyAll(
-          TextStyle(fontFamily: 'Inter', fontSize: 11, fontWeight: FontWeight.w600),
+        indicatorColor: AppColors.brandTint,
+        labelTextStyle: WidgetStatePropertyAll(
+          TextStyle(fontFamily: _inter, fontSize: 11, fontWeight: FontWeight.w600),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -75,15 +79,15 @@ class AppTheme {
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primaryLight,
+          backgroundColor: AppColors.brand,
           foregroundColor: AppColors.onPrimaryLight,
           elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          textStyle: const TextStyle(
-            fontFamily: 'Inter',
+          textStyle: TextStyle(
+            fontFamily: _inter,
             fontSize: 16,
             fontWeight: FontWeight.w600,
           ),
@@ -91,14 +95,14 @@ class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.primaryLight,
-          side: const BorderSide(color: AppColors.primaryLight, width: 1.5),
+          foregroundColor: AppColors.brand,
+          side: const BorderSide(color: AppColors.brand, width: 1.5),
           padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          textStyle: const TextStyle(
-            fontFamily: 'Inter',
+          textStyle: TextStyle(
+            fontFamily: _inter,
             fontSize: 16,
             fontWeight: FontWeight.w600,
           ),
@@ -107,11 +111,11 @@ class AppTheme {
     );
   }
 
-  // ─── Dark Theme ───
+  // â”€â”€â”€ Dark Theme â”€â”€â”€
   static ThemeData get dark {
     final colorScheme = ColorScheme.dark(
-      primary: AppColors.primaryDark,
-      primaryContainer: AppColors.primaryContainerDark,
+      primary: AppColors.mint,
+      primaryContainer: Color(0xFF134E4A),
       secondary: AppColors.secondaryDark,
       secondaryContainer: AppColors.secondaryContainerDark,
       surface: AppColors.surfaceDark,
@@ -133,8 +137,8 @@ class AppTheme {
         foregroundColor: AppColors.onSurfaceDark,
         elevation: 0,
         centerTitle: true,
-        titleTextStyle: const TextStyle(
-          fontFamily: 'Plus Jakarta Sans',
+        titleTextStyle: TextStyle(
+          fontFamily: _jakarta,
           fontSize: 20,
           fontWeight: FontWeight.w600,
           color: AppColors.onSurfaceDark,
@@ -153,7 +157,7 @@ class AppTheme {
       ),
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: AppColors.surfaceDark,
-        selectedItemColor: AppColors.primaryDark,
+        selectedItemColor: AppColors.mint,
         unselectedItemColor: AppColors.onSurfaceVariantDark,
         type: BottomNavigationBarType.fixed,
         elevation: 8,
@@ -162,8 +166,8 @@ class AppTheme {
         height: 72,
         backgroundColor: AppColors.surfaceDark,
         indicatorColor: AppColors.primaryContainerDark,
-        labelTextStyle: const WidgetStatePropertyAll(
-          TextStyle(fontFamily: 'Inter', fontSize: 11, fontWeight: FontWeight.w600),
+        labelTextStyle: WidgetStatePropertyAll(
+          TextStyle(fontFamily: _inter, fontSize: 11, fontWeight: FontWeight.w600),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -180,15 +184,15 @@ class AppTheme {
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primaryDark,
+          backgroundColor: AppColors.mint,
           foregroundColor: AppColors.onPrimaryDark,
           elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          textStyle: const TextStyle(
-            fontFamily: 'Inter',
+          textStyle: TextStyle(
+            fontFamily: _inter,
             fontSize: 16,
             fontWeight: FontWeight.w600,
           ),
@@ -196,14 +200,14 @@ class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.primaryDark,
-          side: const BorderSide(color: AppColors.primaryDark, width: 1.5),
+          foregroundColor: AppColors.mint,
+          side: const BorderSide(color: AppColors.mint, width: 1.5),
           padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          textStyle: const TextStyle(
-            fontFamily: 'Inter',
+          textStyle: TextStyle(
+            fontFamily: _inter,
             fontSize: 16,
             fontWeight: FontWeight.w600,
           ),
@@ -212,53 +216,53 @@ class AppTheme {
     );
   }
 
-  // ─── Text Theme ───
+  // â”€â”€â”€ Text Theme â”€â”€â”€
   static TextTheme _buildTextTheme(ColorScheme scheme) {
     return TextTheme(
       displayLarge: TextStyle(
-        fontFamily: 'Plus Jakarta Sans',
+        fontFamily: _jakarta,
         fontSize: 32,
         fontWeight: FontWeight.w700,
         height: 1.25,
         color: scheme.onSurface,
       ),
       headlineMedium: TextStyle(
-        fontFamily: 'Plus Jakarta Sans',
+        fontFamily: _jakarta,
         fontSize: 24,
         fontWeight: FontWeight.w600,
         height: 1.33,
         color: scheme.onSurface,
       ),
       titleLarge: TextStyle(
-        fontFamily: 'Plus Jakarta Sans',
+        fontFamily: _jakarta,
         fontSize: 20,
         fontWeight: FontWeight.w600,
         height: 1.4,
         color: scheme.onSurface,
       ),
       titleMedium: TextStyle(
-        fontFamily: 'Inter',
+        fontFamily: _inter,
         fontSize: 16,
         fontWeight: FontWeight.w500,
         height: 1.5,
         color: scheme.onSurface,
       ),
       headlineSmall: TextStyle(
-        fontFamily: 'Plus Jakarta Sans',
+        fontFamily: _jakarta,
         fontSize: 20,
         fontWeight: FontWeight.w600,
         height: 1.3,
         color: scheme.onSurface,
       ),
       titleSmall: TextStyle(
-        fontFamily: 'Inter',
+        fontFamily: _inter,
         fontSize: 14,
         fontWeight: FontWeight.w600,
         height: 1.4,
         color: scheme.onSurface,
       ),
       labelSmall: TextStyle(
-        fontFamily: 'Inter',
+        fontFamily: _inter,
         fontSize: 11,
         fontWeight: FontWeight.w600,
         height: 1.3,
@@ -266,28 +270,28 @@ class AppTheme {
         color: scheme.onSurfaceVariant,
       ),
       bodyLarge: TextStyle(
-        fontFamily: 'Inter',
+        fontFamily: _inter,
         fontSize: 16,
         fontWeight: FontWeight.w400,
         height: 1.5,
         color: scheme.onSurface,
       ),
       bodyMedium: TextStyle(
-        fontFamily: 'Inter',
+        fontFamily: _inter,
         fontSize: 14,
         fontWeight: FontWeight.w400,
         height: 1.43,
         color: scheme.onSurface,
       ),
       bodySmall: TextStyle(
-        fontFamily: 'Inter',
+        fontFamily: _inter,
         fontSize: 12,
         fontWeight: FontWeight.w400,
         height: 1.33,
         color: scheme.onSurfaceVariant,
       ),
       labelLarge: TextStyle(
-        fontFamily: 'Inter',
+        fontFamily: _inter,
         fontSize: 14,
         fontWeight: FontWeight.w600,
         height: 1.43,

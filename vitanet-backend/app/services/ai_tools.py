@@ -2,8 +2,15 @@
 from uuid import UUID
 from sqlalchemy.orm import Session
 
-from app.services import vitals_service, health_profile_service, care_circle_service, hospital_service, user_location_service
+from app.services import (
+    vitals_service,
+    health_profile_service,
+    care_circle_service,
+    hospital_service,
+    user_location_service,
+)
 from app.models.vitals import VitalType
+from app.services.ml_service import ml_service
 
 TOOL_DEFINITIONS = [
     {
@@ -12,12 +19,36 @@ TOOL_DEFINITIONS = [
         "parameters": {"type": "object", "properties": {}},
     },
     {
+        "name": "get_health_profile",
+        "description": "Get the user's health profile including allergies, lifestyle, height, and weight.",
+        "parameters": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "get_care_circle",
+        "description": "Get the user's emergency care circle contacts and status.",
+        "parameters": {"type": "object", "properties": {}},
+    },
+    {
         "name": "get_nearby_hospitals",
         "description": "Get hospitals near the user's current location, ranked by distance, including ambulance availability.",
         "parameters": {"type": "object", "properties": {}},
     },
+    {
+        "name": "check_symptoms_ml",
+        "description": "Run the VitaNet clinical machine learning model to predict disease, assess severity (urgent, doctor, routine), and get recommended medical precautions based on symptoms and vitals.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "symptoms": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of symptoms reported by the user (e.g. ['chest_pain', 'fever', 'shortness_of_breath', 'headache']).",
+                }
+            },
+            "required": ["symptoms"],
+        },
+    },
 ]
-
 
 
 def execute_tool(name: str, args: dict, db: Session, user_id: UUID):
@@ -63,5 +94,33 @@ def execute_tool(name: str, args: dict, db: Session, user_id: UUID):
         if not location:
             return {"error": "No location on file for this user"}
         return hospital_service.get_nearby_hospitals(db, location.latitude, location.longitude, limit=3)
+
+    elif name == "check_symptoms_ml":
+        symptoms = args.get("symptoms", [])
+        latest = vitals_service.get_all_latest(db, user_id)
+
+        hr = latest.get(VitalType.HEART_RATE)
+        hr_val = hr.value if hr else 80.0
+
+        temp = latest.get(VitalType.TEMPERATURE)
+        temp_val = temp.value if temp else 37.0
+
+        o2 = latest.get(VitalType.BLOOD_OXYGEN)
+        o2_val = o2.value if o2 else 98.0
+
+        sys_bp = latest.get(VitalType.BP_SYSTOLIC)
+        sys_val = sys_bp.value if sys_bp else 120.0
+
+        dia_bp = latest.get(VitalType.BP_DIASTOLIC)
+        dia_val = dia_bp.value if dia_bp else 80.0
+
+        return ml_service.predict_triage(
+            symptoms=symptoms,
+            heart_rate=hr_val,
+            temperature=temp_val,
+            blood_oxygen=o2_val,
+            systolic_bp=sys_val,
+            diastolic_bp=dia_val,
+        )
 
     raise ValueError(f"Unknown tool: {name}")

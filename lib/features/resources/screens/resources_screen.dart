@@ -1,334 +1,483 @@
-import 'dart:ui';
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:vitanet/core/constants/app_spacing.dart';
-import 'package:vitanet/core/extensions/context_ext.dart';
-import 'package:vitanet/features/resources/screens/health_library_screen.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:vitanet/core/providers/shared_state.dart';
+import 'package:vitanet/data/providers/providers.dart';
+import 'package:vitanet/data/services/clinical_articles_data.dart';
+import 'package:vitanet/features/resources/models/health_article.dart';
+import 'package:vitanet/features/resources/screens/emergency_protocols_screen.dart';
 import 'package:vitanet/features/resources/screens/general_health_library_screen.dart';
+import 'package:vitanet/features/resources/screens/health_article_detail_screen.dart';
 import 'package:vitanet/features/resources/screens/medicine_search_screen.dart';
 import 'package:vitanet/features/resources/screens/video_library_screen.dart';
-import 'package:vitanet/shared/widgets/premium_background.dart';
+import 'package:vitanet/features/resources/widgets/resource_media.dart';
+import 'package:vitanet/shared/widgets/vn_kit.dart';
 
-class ResourcesScreen extends StatefulWidget {
+/// Resources hub: emergency entry point, four photo category cards and a
+/// personalised reading pick.
+class ResourcesScreen extends ConsumerStatefulWidget {
   const ResourcesScreen({super.key});
 
   @override
-  State<ResourcesScreen> createState() => _ResourcesScreenState();
+  ConsumerState<ResourcesScreen> createState() => _ResourcesScreenState();
 }
 
-class _ResourcesScreenState extends State<ResourcesScreen> with SingleTickerProviderStateMixin {
-  late final PageController _pageController;
-  late final AnimationController _pulseController;
+class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
-  @override
-  void initState() {
-    super.initState();
-    _pageController = PageController(viewportFraction: 0.85); // Increased width
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    )..repeat(reverse: true);
-  }
+  static final List<_ResourceCategory> _categories = [
+    const _ResourceCategory(
+      title: 'First aid',
+      subtitle: '10 step-by-step guides',
+      imagePath: VnPhotos.firstAidKit,
+      destination: EmergencyHubScreen(),
+      route: '/resources/emergency',
+      keywords: ['emergency', 'first aid', 'triage', 'cpr', 'burn', 'wound', 'bleeding', 'choking', 'guide'],
+    ),
+    const _ResourceCategory(
+      title: 'Medicines',
+      subtitle: 'FDA labels & dosage',
+      imagePath: VnPhotos.pillsColorful,
+      destination: MedicineSearchScreen(),
+      route: '/resources/medicines',
+      keywords: ['medicine', 'drugs', 'fda', 'dosage', 'prescription', 'pills', 'antibiotics'],
+    ),
+    const _ResourceCategory(
+      title: 'Videos',
+      subtitle: 'Shorts & masterclasses',
+      imagePath: VnPhotos.doctorOnPhone,
+      destination: VideoLibraryScreen(),
+      route: '/resources/videos',
+      keywords: ['video', 'tutorials', 'masterclass', 'clinical', 'shorts', 'doctor', 'learn'],
+      isVideo: true,
+    ),
+    const _ResourceCategory(
+      title: 'Health library',
+      subtitle: 'PubMed-verified reading',
+      imagePath: VnPhotos.laptopStethoscope,
+      destination: GeneralHealthLibraryScreen(),
+      route: '/resources/health-library',
+      keywords: ['articles', 'pubmed', 'research', 'library', 'studies', 'reading', 'guides'],
+    ),
+  ];
 
   @override
   void dispose() {
-    _pageController.dispose();
-    _pulseController.dispose();
+    _searchController.dispose();
     super.dispose();
+  }
+
+  void _open(String route, Widget destination) {
+    try {
+      context.push(route);
+    } catch (_) {
+      Navigator.of(context, rootNavigator: true).push(
+        MaterialPageRoute(builder: (_) => destination),
+      );
+    }
+  }
+
+  List<_ResourceCategory> get _filteredCategories {
+    final query = _searchQuery.trim().toLowerCase();
+    if (query.isEmpty) return _categories;
+    return _categories.where((cat) {
+      return cat.title.toLowerCase().contains(query) ||
+          cat.subtitle.toLowerCase().contains(query) ||
+          cat.keywords.any((k) => k.contains(query));
+    }).toList();
+  }
+
+  bool get _emergencyMatches {
+    final q = _searchQuery.trim().toLowerCase();
+    if (q.isEmpty) return true;
+    return const ['emergency', 'cpr', 'choking', 'bleeding', 'burn', 'seizure', 'first aid', '112']
+        .any((k) => k.contains(q) || q.contains(k));
+  }
+
+  /// Picks a curated article that matches the user's profile when possible.
+  ({HealthArticle article, String reason})? _pickedArticle() {
+    final articles = ClinicalArticlesRepository.verifiedArticles;
+    if (articles.isEmpty) return null;
+    final profile = ref.watch(userProfileProvider);
+    final conditions = profile?.preExistingConditions ?? const <String>[];
+    const map = <String, String>{
+      'hypertension': 'Cardiology',
+      'blood pressure': 'Cardiology',
+      'heart': 'Cardiology',
+      'cholesterol': 'Cardiology',
+      'diabetes': 'Nutrition',
+      'obesity': 'Nutrition',
+      'insomnia': 'Sleep',
+      'sleep': 'Sleep',
+      'asthma': 'Immunology',
+      'allerg': 'Immunology',
+      'arthritis': 'Fitness',
+    };
+    for (final condition in conditions) {
+      final lower = condition.toLowerCase();
+      for (final entry in map.entries) {
+        if (lower.contains(entry.key)) {
+          final match = articles.where((a) => a.category == entry.value);
+          if (match.isNotEmpty) {
+            return (article: match.first, reason: 'Because you have ${condition.toLowerCase()}');
+          }
+        }
+      }
+    }
+    return (article: articles.first, reason: 'Recommended reading');
   }
 
   @override
   Widget build(BuildContext context) {
+    final p = VnPalette.of(context);
+    final filtered = _filteredCategories;
+    final picked = _pickedArticle();
+
     return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: PremiumBackground(
-        child: Stack(
-          children: [
-            // Subtle, professional background blobs
-            Positioned(
-              top: -100,
-              left: -100,
-              child: Container(
-                width: 300,
-                height: 300,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: context.colorScheme.primary.withValues(alpha: 0.15),
-                  boxShadow: [BoxShadow(color: context.colorScheme.primary.withValues(alpha: 0.15), blurRadius: 100, spreadRadius: 50)],
+      backgroundColor: p.page,
+      body: SafeArea(
+        bottom: false,
+        child: NotificationListener<ScrollNotification>(
+          onNotification: (n) => handleScrollNotification(n, ref),
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 22, 20, 120),
+            children: [
+              Semantics(
+                header: true,
+                child: Text('Resources', style: VnText.heading(28, color: p.ink)),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Trusted guides, medicines and videos, reviewed by clinicians.',
+                style: VnText.body(15, color: p.muted),
+              ),
+              const SizedBox(height: 20),
+              _buildSearch(p),
+              const SizedBox(height: 20),
+              if (_emergencyMatches) ...[
+                _EmergencyBanner(
+                  onTap: () => _open('/resources/emergency', const EmergencyHubScreen()),
                 ),
-              ),
-            ),
-            Positioned(
-              bottom: 100,
-              right: -50,
-              child: Container(
-                width: 250,
-                height: 250,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: context.colorScheme.primary.withValues(alpha: 0.1),
-                  boxShadow: [BoxShadow(color: context.colorScheme.primary.withValues(alpha: 0.1), blurRadius: 100, spreadRadius: 50)],
-                ),
-              ),
-            ),
-            
-            // Full Page Blur for the Blobs
-            Positioned.fill(
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
-                child: const SizedBox(),
-              ),
-            ),
-            
-            SafeArea(
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.xl,
-                      vertical: AppSpacing.lg,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        AnimatedBuilder(
-                          animation: _pulseController,
-                          builder: (context, child) {
-                            return Transform.scale(
-                              scale: 1.0 + (_pulseController.value * 0.1),
-                              child: child,
-                            );
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: context.colorScheme.primary.withValues(alpha: 0.1),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              Icons.explore_rounded,
-                              size: 48,
-                              color: context.colorScheme.primary,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        ShaderMask(
-                          shaderCallback: (bounds) => LinearGradient(
-                            colors: [
-                              context.colorScheme.primary,
-                              const Color(0xFF10B981), // Emerald green
-                            ],
-                          ).createShader(bounds),
-                          child: Text(
-                            'Resources Hub',
-                            textAlign: TextAlign.center,
-                            style: context.textTheme.headlineMedium?.copyWith(
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: -0.5,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Swipe to explore your health resources.',
-                          textAlign: TextAlign.center,
-                          style: context.textTheme.bodyLarge?.copyWith(
-                            color: context.isDark ? Colors.white70 : Colors.black54,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
+                const SizedBox(height: 20),
+              ],
+              if (filtered.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 32),
+                  child: Column(
+                    children: [
+                      Icon(Icons.search_off_rounded, size: 40, color: p.faint),
+                      const SizedBox(height: 10),
+                      Text(
+                        'No resources found for "$_searchQuery"',
+                        textAlign: TextAlign.center,
+                        style: VnText.body(15, weight: FontWeight.w500, color: p.muted),
+                      ),
+                    ],
                   ),
-                  Expanded(
-                child: LayoutBuilder(
+                )
+              else
+                LayoutBuilder(
                   builder: (context, constraints) {
-                    final isDesktop = constraints.maxWidth > 800;
-                    final cards = [
-                      _buildDashboardCard(
-                        context,
-                        title: 'Emergencies\n& First Aid',
-                        icon: Icons.medical_services_rounded,
-                        color: const Color(0xFFEF4444),
-                        imagePath: 'assets/images/first_aid_real.jpg',
-                        onTap: () {
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const HealthLibraryScreen()));
-                        },
+                    final columns = constraints.maxWidth >= 700 ? 4 : 2;
+                    return GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      padding: EdgeInsets.zero,
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: columns,
+                        mainAxisExtent: 200,
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 12,
                       ),
-                      _buildDashboardCard(
-                        context,
-                        title: 'Medicine\nDirectory',
-                        icon: Icons.medication_liquid_rounded,
-                        color: const Color(0xFF3B82F6),
-                        imagePath: 'assets/images/medicine_real.jpg',
-                        onTap: () {
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const MedicineSearchScreen()));
-                        },
-                      ),
-                      _buildDashboardCard(
-                        context,
-                        title: 'Video\nTutorials',
-                        icon: Icons.play_circle_fill_rounded,
-                        color: const Color(0xFF8B5CF6),
-                        imagePath: 'assets/images/video_real.jpg',
-                        onTap: () {
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const VideoLibraryScreen()));
-                        },
-                      ),
-                      _buildDashboardCard(
-                        context,
-                        title: 'Health\nLibrary',
-                        icon: Icons.library_books_rounded,
-                        color: const Color(0xFF10B981),
-                        imagePath: 'assets/images/health_real.jpg',
-                        onTap: () {
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const GeneralHealthLibraryScreen()));
-                        },
-                      ),
-                    ];
-
-                    if (isDesktop) {
-                      return GridView.count(
-                        crossAxisCount: 4,
-                        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
-                        mainAxisSpacing: AppSpacing.xl,
-                        crossAxisSpacing: AppSpacing.xl,
-                        childAspectRatio: 1.0,
-                        children: cards,
-                      );
-                    }
-
-                    return PageView.builder(
-                      controller: _pageController,
-                      itemCount: cards.length,
+                      itemCount: filtered.length,
                       itemBuilder: (context, index) {
-                        return Center(
-                          child: cards[index],
+                        final cat = filtered[index];
+                        return _PhotoCategoryCard(
+                          category: cat,
+                          onTap: () => _open(cat.route, cat.destination),
                         );
                       },
                     );
                   },
                 ),
-              ),
+              if (picked != null && _searchQuery.trim().isEmpty) ...[
+                const SizedBox(height: 20),
+                VnSectionHeader(
+                  title: 'Picked for you',
+                  action: 'More',
+                  onAction: () => _open('/resources/health-library', const GeneralHealthLibraryScreen()),
+                ),
+                const SizedBox(height: 4),
+                _PickedArticleTile(
+                  article: picked.article,
+                  reason: picked.reason,
+                  onTap: () => Navigator.of(context, rootNavigator: true).push(
+                    MaterialPageRoute(
+                      builder: (_) => HealthArticleDetailScreen(article: picked.article),
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildSearch(VnPalette p) {
+    return Container(
+      height: 52,
+      padding: const EdgeInsets.only(left: 16, right: 4),
+      decoration: BoxDecoration(
+        color: p.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: p.line),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.search_rounded, size: 20, color: p.muted),
+          const SizedBox(width: 10),
+          Expanded(
+            child: TextField(
+              controller: _searchController,
+              onChanged: (val) => setState(() => _searchQuery = val),
+              style: VnText.body(15, color: p.ink),
+              decoration: InputDecoration(
+                hintText: 'Search first aid, medicines, guides…',
+                hintStyle: VnText.body(15, color: p.muted),
+                filled: false,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                isDense: true,
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+          ),
+          if (_searchController.text.isNotEmpty)
+            VnIconButton(
+              icon: Icons.close_rounded,
+              tooltip: 'Clear search',
+              iconSize: 18,
+              foreground: p.muted,
+              onPressed: () {
+                _searchController.clear();
+                setState(() => _searchQuery = '');
+              },
+            ),
         ],
       ),
-    ),
-  );
+    );
+  }
 }
 
-  Widget _buildDashboardCard(
-    BuildContext context, {
-    required String title,
-    required IconData icon,
-    required Color color,
-    required String imagePath,
-    required VoidCallback onTap,
-  }) {
-    final isDark = context.isDark;
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: AppSpacing.md, horizontal: AppSpacing.sm),
-        decoration: BoxDecoration(
-          color: isDark ? context.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3) : Colors.white,
-          borderRadius: BorderRadius.circular(32),
-          border: Border.all(
-            color: color.withValues(alpha: 0.4),
-            width: 4,
+class _ResourceCategory {
+  final String title;
+  final String subtitle;
+  final String imagePath;
+  final Widget destination;
+  final String route;
+  final List<String> keywords;
+  final bool isVideo;
+
+  const _ResourceCategory({
+    required this.title,
+    required this.subtitle,
+    required this.imagePath,
+    required this.destination,
+    required this.route,
+    required this.keywords,
+    this.isVideo = false,
+  });
+}
+
+class _EmergencyBanner extends StatelessWidget {
+  final VoidCallback onTap;
+  const _EmergencyBanner({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = VnPalette.of(context);
+    final bg = p.isDark ? const Color(0xFF2A1212) : const Color(0xFFFEF2F2);
+    final border = p.isDark ? const Color(0xFF5B1D1D) : const Color(0xFFFECACA);
+    return VnCard(
+      onTap: onTap,
+      color: bg,
+      borderColor: border,
+      padding: const EdgeInsets.all(16),
+      semanticLabel: 'Emergency? Start here. CPR, choking, bleeding, burns, seizures',
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: const Color(0xFFB91C1C),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 24),
           ),
-        boxShadow: [
-          BoxShadow(
-            color: color.withValues(alpha: 0.3),
-            blurRadius: 20,
-            spreadRadius: 2,
-            offset: const Offset(0, 10),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Emergency? Start here',
+                  style: VnText.body(16,
+                      weight: FontWeight.w800,
+                      color: p.isDark ? const Color(0xFFFCA5A5) : const Color(0xFF991B1B)),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'CPR, choking, bleeding, burns, seizures',
+                  style: VnText.body(13,
+                      color: p.isDark ? const Color(0xFFFECACA) : const Color(0xFF7F1D1D)),
+                ),
+              ],
+            ),
           ),
+          Icon(Icons.chevron_right_rounded, color: p.danger),
         ],
       ),
+    );
+  }
+}
+
+class _PhotoCategoryCard extends StatelessWidget {
+  final _ResourceCategory category;
+  final VoidCallback onTap;
+
+  const _PhotoCategoryCard({required this.category, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: '${category.title}. ${category.subtitle}',
+      excludeSemantics: true,
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(22),
         child: Material(
-          color: Colors.transparent,
+          color: Colors.black,
           child: InkWell(
             onTap: onTap,
             child: Stack(
               fit: StackFit.expand,
               children: [
-                // Real Image Background
-                Image.asset(
-                  imagePath,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => Container(
-                    color: color.withValues(alpha: 0.2),
-                    child: Icon(icon, size: 64, color: color),
-                  ),
-                ),
-                
-                // Dark Gradient overlay for text readability
-                Container(
+                VnPhoto(category.imagePath),
+                const DecoratedBox(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      begin: Alignment.bottomCenter,
-                      end: Alignment.topCenter,
-                      colors: [
-                        Colors.black.withValues(alpha: 0.8),
-                        Colors.black.withValues(alpha: 0.2),
-                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      stops: [0.3, 1.0],
+                      colors: [Color(0x000F172A), Color(0xD90F172A)],
                     ),
                   ),
                 ),
-                
-                // Content
-                Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.xl),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: color.withValues(alpha: 0.9),
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.5),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Icon(icon, color: Colors.white, size: 48),
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        Text(
-                          title,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 22,
-                            height: 1.2,
-                            shadows: [
-                              Shadow(
-                                color: Colors.black,
-                                blurRadius: 10,
-                                offset: Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                if (category.isVideo)
+                  Positioned(
+                    top: 12,
+                    left: 12,
+                    child: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: const BoxDecoration(
+                        color: Color(0xE6FFFFFF),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.play_arrow_rounded, size: 20, color: Color(0xFF0F172A)),
                     ),
+                  ),
+                Positioned(
+                  left: 14,
+                  right: 14,
+                  bottom: 14,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(category.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: VnText.body(16, weight: FontWeight.w800, color: Colors.white)),
+                      const SizedBox(height: 2),
+                      Text(category.subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: VnText.body(12, color: const Color(0xFFE2E8F0))),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _PickedArticleTile extends StatelessWidget {
+  final HealthArticle article;
+  final String reason;
+  final VoidCallback onTap;
+
+  const _PickedArticleTile({required this.article, required this.reason, required this.onTap});
+
+  IconData get _icon {
+    switch (article.category.toLowerCase()) {
+      case 'cardiology':
+        return Icons.favorite_border_rounded;
+      case 'sleep':
+        return Icons.bedtime_outlined;
+      case 'nutrition':
+        return Icons.restaurant_rounded;
+      case 'fitness':
+        return Icons.fitness_center_rounded;
+      case 'immunology':
+        return Icons.air_rounded;
+      default:
+        return Icons.menu_book_rounded;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = VnPalette.of(context);
+    final minutes = article.readTime.replaceAll(' read', '');
+    return VnCard(
+      onTap: onTap,
+      radius: 18,
+      padding: const EdgeInsets.all(12),
+      child: Row(
+        children: [
+          VnIconTile(
+            icon: _icon,
+            bg: const Color(0xFFE0F2FE),
+            fg: const Color(0xFF0369A1),
+            size: 52,
+            radius: 14,
+            iconSize: 24,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(article.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: VnText.body(15, weight: FontWeight.w600, color: p.ink)),
+                const SizedBox(height: 3),
+                Text('$reason · $minutes', style: VnText.body(13, color: p.muted)),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

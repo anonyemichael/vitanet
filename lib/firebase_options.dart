@@ -69,6 +69,8 @@ class DefaultFirebaseOptions {
     messagingSenderId: '975976200606',
     projectId: 'vitanet-62e40',
     storageBucket: 'vitanet-62e40.firebasestorage.app',
+    androidClientId: '975976200606-d4jvrofthp8ir0uoe4b9cb7dtjtpf023.apps.googleusercontent.com',
+    iosClientId: '975976200606-mg4og468uguel1ir9v0ndk6m76fp11o9.apps.googleusercontent.com',
     iosBundleId: 'com.vitanet.vitanet',
   );
 }

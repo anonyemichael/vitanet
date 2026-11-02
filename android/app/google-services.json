@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "975976200606-d4jvrofthp8ir0uoe4b9cb7dtjtpf023.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.vitanet.vitanet",
+            "certificate_hash": "b80b68a3b577fd8e68d3bdec13140467ad407de0"
+          }
+        },
+        {
           "client_id": "975976200606-t8eoe2nuupo7nf84bi79dtkn4f9t2muc.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {

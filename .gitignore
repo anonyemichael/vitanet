@@ -1,49 +1,89 @@
-# Miscellaneous
-*.class
-*.log
-*.pyc
-*.swp
-.DS_Store
-.atom/
-.build/
-.buildlog/
-.history
-.svn/
-.swiftpm/
-migrate_working_dir/
+# ==============================================================================
+# VitaNet — Unified .gitignore
+# ==============================================================================
 
-# IntelliJ related
+# ─── Environment & Secrets ────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ─── OS Files ─────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ─── IDE / Editor ─────────────────────────────────────────────────────────────
+.idea/
+.vscode/
 *.iml
 *.ipr
 *.iws
-.idea/
+*.swp
+*.swo
+*~
+.atom/
+.history
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
-
-# Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
+# ─── Flutter / Dart ───────────────────────────────────────────────────────────
 .dart_tool/
+.flutter-plugins
 .flutter-plugins-dependencies
+.packages
 .pub-cache/
 .pub/
-/build/
-/coverage/
+build/
+**/doc/api/
+**/ios/Flutter/.last_build_id
+**/ios/Pods/
 
-# Symbolication related
+# Symbolication & Obfuscation
 app.*.symbols
-
-# Obfuscation related
 app.*.map.json
 
-# Android Studio will place build artifacts here
+# Android Studio build artifacts
 /android/app/debug
 /android/app/profile
 /android/app/release
 
-# Environment Variables
-.env
+# ─── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+*.egg
+.venv/
+venv/
+env/
 
+# ─── ML / Data Artifacts ─────────────────────────────────────────────────────
+# Large model & dataset files — track with Git LFS instead
+ml-service/notebooks/*.pkl
+ml-service/data/*.csv
+*.h5
+*.hdf5
+*.onnx
+
+# Jupyter
+.ipynb_checkpoints/
+
+# ─── Node.js ──────────────────────────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# ─── Miscellaneous ────────────────────────────────────────────────────────────
+*.class
+*.log
+*.bak
+migrate_working_dir/
+.svn/
+.swiftpm/
+.build/
+.buildlog/
+/coverage/
+run_web.bat
+run_web.ps1
+# Widget Preview related
+.widget_preview/

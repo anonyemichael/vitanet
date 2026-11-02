@@ -1,15 +1,16 @@
-import 'dart:ui' as dart_ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:vitanet/core/constants/app_colors.dart';
+import 'package:vitanet/core/providers/shared_state.dart';
+import 'package:vitanet/shared/widgets/vn_kit.dart';
 import 'package:vitanet/data/providers/providers.dart';
-
 import 'package:vitanet/features/splash/screens/splash_screen.dart';
 import 'package:vitanet/features/onboarding/screens/onboarding_screen.dart';
 import 'package:vitanet/features/home/screens/home_screen.dart';
 import 'package:vitanet/features/chat/screens/chat_screen.dart';
 import 'package:vitanet/features/triage_result/screens/triage_result_screen.dart';
-import 'package:vitanet/features/history/screens/history_screen.dart';
 import 'package:vitanet/features/profile/screens/profile_screen.dart';
 import 'package:vitanet/features/profile/screens/edit_profile_screen.dart';
 import 'package:vitanet/features/settings/screens/settings_screen.dart';
@@ -17,9 +18,11 @@ import 'package:vitanet/features/settings/screens/privacy_screen.dart';
 import 'package:vitanet/features/settings/screens/about_screen.dart';
 import 'package:vitanet/features/settings/screens/disclaimer_screen.dart';
 import 'package:vitanet/features/settings/screens/help_center_screen.dart';
-import 'package:vitanet/features/first_aid/screens/first_aid_screen.dart';
-import 'package:vitanet/features/assessment/screens/assessment_wizard_screen.dart';
 import 'package:vitanet/features/resources/screens/resources_screen.dart';
+import 'package:vitanet/features/resources/screens/emergency_protocols_screen.dart';
+import 'package:vitanet/features/resources/screens/general_health_library_screen.dart';
+import 'package:vitanet/features/resources/screens/medicine_search_screen.dart';
+import 'package:vitanet/features/resources/screens/video_library_screen.dart';
 
 import 'package:vitanet/features/auth/screens/role_selection_screen.dart';
 import 'package:vitanet/features/auth/screens/patient_login_screen.dart';
@@ -28,9 +31,13 @@ import 'package:vitanet/features/auth/screens/patient_completion_screen.dart';
 
 // Admin screens
 import 'package:vitanet/features/admin/screens/admin_main_navigation_screen.dart';
-import 'package:vitanet/features/admin/screens/case_management_screen.dart';
 
 import 'package:vitanet/features/devices/screens/device_connection_screen.dart';
+import 'package:vitanet/features/assessment/screens/assessment_wizard_screen.dart';
+import 'package:vitanet/features/pharmacy/screens/pharmacy_screen.dart';
+import 'package:vitanet/features/first_aid/screens/first_aid_screen.dart';
+import 'package:vitanet/features/history/screens/history_screen.dart';
+import 'package:vitanet/features/notifications/screens/notifications_screen.dart';
 import 'package:vitanet/features/health_trends/screens/health_trends_screen.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -49,7 +56,7 @@ class _AuthChangeNotifier extends ChangeNotifier {
 }
 
 final goRouterProvider = Provider<GoRouter>((ref) {
-  final refreshNotifier = ref.watch(_routerRefreshStream);
+  final refreshNotifier = ref.read(_routerRefreshStream);
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: '/splash',
@@ -62,8 +69,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 
       final path = state.uri.path;
 
-      // Public routes — always accessible
-      final publicRoutes = ['/splash', '/login', '/onboarding'];
+      // Public routes â€” always accessible
+      final publicRoutes = ['/splash', '/login', '/onboarding', '/privacy', '/disclaimer'];
       final isPublic =
           publicRoutes.any((r) => path == r || path.startsWith('$r/'));
 
@@ -79,8 +86,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       if (path.startsWith('/admin') && !isHealthWorker) {
         return '/home'; // Redirect normal users away from admin
       }
-      if (path == '/home' && isHealthWorker) {
+      if ((path == '/home' || path == '/chat') && isHealthWorker) {
         return '/admin'; // Redirect health workers to admin UI
+      }
+      if (path == '/') {
+        return isHealthWorker ? '/admin' : '/home';
       }
 
       return null;
@@ -149,7 +159,35 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
         path: '/edit-profile',
-        builder: (context, state) => const EditProfileScreen(),
+        builder: (context, state) {
+          final tab = state.uri.queryParameters['tab'] ?? (state.extra as String?);
+          return EditProfileScreen(initialTab: tab);
+        },
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: '/assessment',
+        builder: (context, state) => const AssessmentWizardScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: '/pharmacy',
+        builder: (context, state) => const PharmacyScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: '/first-aid',
+        builder: (context, state) => const FirstAidScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: '/notifications',
+        builder: (context, state) => const NotificationsScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: '/history',
+        builder: (context, state) => const HistoryScreen(),
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
@@ -171,6 +209,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state, navigationShell) {
           return _ScaffoldWithNavBar(
             navigationShell: navigationShell,
+            currentPath: state.uri.path,
           );
         },
         branches: [
@@ -195,6 +234,28 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/resources',
                 builder: (context, state) => const ResourcesScreen(),
+                routes: [
+                  GoRoute(
+                    parentNavigatorKey: _rootNavigatorKey,
+                    path: 'emergency',
+                    builder: (context, state) => const EmergencyHubScreen(),
+                  ),
+                  GoRoute(
+                    parentNavigatorKey: _rootNavigatorKey,
+                    path: 'medicines',
+                    builder: (context, state) => const MedicineSearchScreen(),
+                  ),
+                  GoRoute(
+                    parentNavigatorKey: _rootNavigatorKey,
+                    path: 'videos',
+                    builder: (context, state) => const VideoLibraryScreen(),
+                  ),
+                  GoRoute(
+                    parentNavigatorKey: _rootNavigatorKey,
+                    path: 'health-library',
+                    builder: (context, state) => const GeneralHealthLibraryScreen(),
+                  ),
+                ],
               ),
             ],
           ),
@@ -214,9 +275,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 
 class _ScaffoldWithNavBar extends ConsumerWidget {
   final StatefulNavigationShell navigationShell;
+  final String currentPath;
 
   const _ScaffoldWithNavBar({
     required this.navigationShell,
+    required this.currentPath,
   });
 
   @override
@@ -225,59 +288,128 @@ class _ScaffoldWithNavBar extends ConsumerWidget {
     final isHealthWorker = profile?.role == 'health_worker' || profile?.role == 'admin';
     final isKeyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
     final isDesktop = MediaQuery.of(context).size.width >= 800;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    const topLevelPaths = {'/home', '/chat', '/resources', '/profile'};
+    final isTopLevel = topLevelPaths.contains(currentPath);
+    final isNavVisible = ref.watch(navBarVisibleProvider);
+
+    const activeColor = AppColors.brand;
+    final inactiveColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    final showMobileNav = isTopLevel && !isKeyboardOpen && isNavVisible;
 
     return Scaffold(
       resizeToAvoidBottomInset: false,
-      extendBody: true,
-      extendBodyBehindAppBar: true,
+      extendBody: false,
+      extendBodyBehindAppBar: false,
       body: isDesktop
           ? Row(
               children: [
-                _buildDesktopSidebar(context, isHealthWorker),
-                Container(
-                  width: 1,
-                  color: Theme.of(context).dividerColor.withValues(alpha: 0.08),
-                ),
+                _buildDesktopSidebar(context, isHealthWorker, ref),
                 Expanded(
                   child: Column(
                     children: [
                       _buildDesktopBreadcrumb(context, isHealthWorker),
-                      Expanded(child: navigationShell),
+                      Expanded(
+                        child: NotificationListener<ScrollNotification>(
+                          onNotification: (n) => handleScrollNotification(n, ref),
+                          child: navigationShell,
+                        ),
+                      ),
                     ],
                   ),
                 ),
               ],
             )
-          : navigationShell,
-      bottomNavigationBar: (isKeyboardOpen || isDesktop) 
-        ? const SizedBox.shrink() 
-        : SafeArea(
-            child: Container(
-              margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-              decoration: BoxDecoration(
-                color: Theme.of(context).brightness == Brightness.dark 
-                    ? const Color(0xFF1E1E1E) 
-                    : Colors.white,
-                borderRadius: BorderRadius.circular(32),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.08),
-                    blurRadius: 24,
-                    offset: const Offset(0, 8),
+          : Stack(
+              children: [
+                Positioned.fill(
+                  child: NotificationListener<ScrollNotification>(
+                    onNotification: (n) => handleScrollNotification(n, ref),
+                    child: navigationShell,
                   ),
-                ],
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: _buildNavItems(context, isHealthWorker),
-              ),
+                ),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: AnimatedSlide(
+                    offset: showMobileNav ? Offset.zero : const Offset(0, 1.2),
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.easeInOutCubic,
+                    child: AnimatedOpacity(
+                      opacity: showMobileNav ? 1.0 : 0.0,
+                      duration: const Duration(milliseconds: 200),
+                      curve: Curves.easeInOutCubic,
+                      child: IgnorePointer(
+                        ignoring: !showMobileNav,
+                        child: _buildFullWidthBottomNavBar(
+                          context,
+                          isHealthWorker,
+                          activeColor,
+                          inactiveColor,
+                          isDark,
+                          ref,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ),
+      bottomNavigationBar: null,
     );
   }
 
-  List<Widget> _buildNavItems(BuildContext context, bool showAdminTabs) {
+  Widget _buildFullWidthBottomNavBar(
+    BuildContext context,
+    bool isHealthWorker,
+    Color activeColor,
+    Color inactiveColor,
+    bool isDark,
+    WidgetRef ref,
+  ) {
+    final p = VnPalette.of(context);
+
+    return Semantics(
+      container: true,
+      label: 'Main navigation',
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: p.surface,
+          border: Border(top: BorderSide(color: p.line, width: 1.0)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 10),
+            child: SizedBox(
+              height: 56,
+              child: Row(
+                children: _buildNavItems(
+                  context,
+                  isHealthWorker,
+                  activeColor,
+                  inactiveColor,
+                  isDark,
+                  ref,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+  List<Widget> _buildNavItems(
+    BuildContext context,
+    bool showAdminTabs,
+    Color activeColor,
+    Color inactiveColor,
+    bool isDark,
+    WidgetRef ref,
+  ) {
     final items = showAdminTabs
         ? [
             _NavItem(icon: Icons.home_outlined, activeIcon: Icons.home, label: 'Home'),
@@ -287,57 +419,45 @@ class _ScaffoldWithNavBar extends ConsumerWidget {
             _NavItem(icon: Icons.settings_outlined, activeIcon: Icons.settings, label: 'Settings'),
           ]
         : [
-            _NavItem(icon: Icons.home_outlined, activeIcon: Icons.home_rounded, label: 'Home'),
-            _NavItem(icon: Icons.chat_bubble_outline_rounded, activeIcon: Icons.chat_bubble_rounded, label: 'Chat'),
-            _NavItem(icon: Icons.library_books_outlined, activeIcon: Icons.library_books_rounded, label: 'Resources'),
-            _NavItem(icon: Icons.person_outline_rounded, activeIcon: Icons.person_rounded, label: 'Profile'),
+            _NavItem(
+              icon: Icons.home_outlined,
+              activeIcon: Icons.home_rounded,
+              label: 'Home',
+            ),
+            _NavItem(
+              icon: Icons.chat_bubble_outline_rounded,
+              activeIcon: Icons.chat_bubble_outline_rounded,
+              label: 'AI Chat',
+            ),
+            _NavItem(
+              icon: Icons.menu_book_outlined,
+              activeIcon: Icons.menu_book_rounded,
+              label: 'Resources',
+            ),
+            _NavItem(
+              icon: Icons.person_outline_rounded,
+              activeIcon: Icons.person_rounded,
+              label: 'Profile',
+            ),
           ];
 
     return List.generate(items.length, (index) {
       final isSelected = navigationShell.currentIndex == index;
       final item = items[index];
 
-      return GestureDetector(
-        onTap: () => navigationShell.goBranch(
-          index,
-          initialLocation: index == navigationShell.currentIndex,
-        ),
-        behavior: HitTestBehavior.opaque,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOutCubic,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: BoxDecoration(
-            color: isSelected 
-                ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.12)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(100),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                isSelected ? item.activeIcon : item.icon,
-                color: isSelected
-                    ? Theme.of(context).colorScheme.primary
-                    : Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
-                size: 24,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                item.label,
-                style: TextStyle(
-                  color: isSelected
-                      ? Theme.of(context).colorScheme.primary
-                      : Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                  fontSize: 11,
-                  letterSpacing: -0.2,
-                ),
-              ),
-            ],
-          ),
-        ),
+      return _MobileNavItemWidget(
+        item: item,
+        isSelected: isSelected,
+        activeColor: activeColor,
+        inactiveColor: inactiveColor,
+        isDark: isDark,
+        onTap: () {
+          ref.read(navBarVisibleProvider.notifier).state = true;
+          navigationShell.goBranch(
+            index,
+            initialLocation: index == navigationShell.currentIndex,
+          );
+        },
       );
     });
   }
@@ -393,7 +513,7 @@ class _ScaffoldWithNavBar extends ConsumerWidget {
     );
   }
 
-  Widget _buildDesktopSidebar(BuildContext context, bool showAdminTabs) {
+  Widget _buildDesktopSidebar(BuildContext context, bool showAdminTabs, WidgetRef ref) {
     final items = showAdminTabs
         ? [
             _NavItem(icon: Icons.home_outlined, activeIcon: Icons.home, label: 'Home'),
@@ -403,99 +523,490 @@ class _ScaffoldWithNavBar extends ConsumerWidget {
             _NavItem(icon: Icons.settings_outlined, activeIcon: Icons.settings, label: 'Settings'),
           ]
         : [
-            _NavItem(icon: Icons.home_outlined, activeIcon: Icons.home_rounded, label: 'Home'),
-            _NavItem(icon: Icons.chat_bubble_outline_rounded, activeIcon: Icons.chat_bubble_rounded, label: 'Chat'),
-            _NavItem(icon: Icons.library_books_outlined, activeIcon: Icons.library_books_rounded, label: 'Resources'),
-            _NavItem(icon: Icons.person_outline_rounded, activeIcon: Icons.person_rounded, label: 'Profile'),
+            _NavItem(
+              icon: Icons.home_outlined,
+              activeIcon: Icons.home_rounded,
+              label: 'Home',
+            ),
+            _NavItem(
+              icon: Icons.chat_bubble_outline_rounded,
+              activeIcon: Icons.chat_bubble_outline_rounded,
+              label: 'AI Chat',
+            ),
+            _NavItem(
+              icon: Icons.menu_book_outlined,
+              activeIcon: Icons.menu_book_rounded,
+              label: 'Resources',
+            ),
           ];
 
-    return SafeArea(
-      child: Container(
-        width: 240,
-        padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(left: 8, bottom: 48),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.auto_awesome, 
-                      color: Theme.of(context).colorScheme.primary,
-                      size: 28,
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      'VitaNet',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.primary,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              ...List.generate(items.length, (index) {
-                final isSelected = navigationShell.currentIndex == index;
-                final item = items[index];
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final activeColor = const Color(0xFF0D9488);
+    final inactiveColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    final sidebarBg = isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+    final borderColor = isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0);
 
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: InkWell(
-                    onTap: () => navigationShell.goBranch(
-                      index,
-                      initialLocation: index == navigationShell.currentIndex,
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                    hoverColor: Colors.transparent,
-                    splashColor: Colors.transparent,
-                    highlightColor: Colors.transparent,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      curve: Curves.easeOutCubic,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+    return SizedBox(
+      width: 256,
+      height: double.infinity,
+      child: Container(
+        decoration: BoxDecoration(
+          color: sidebarBg,
+          border: Border(
+            right: BorderSide(color: borderColor, width: 1.0),
+          ),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 24, 14, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Top Brand Mark
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => navigationShell.goBranch(0),
                       child: Row(
                         children: [
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            width: 3,
-                            height: isSelected ? 24 : 0,
-                            margin: const EdgeInsets.only(right: 12),
+                          Container(
+                            width: 32,
+                            height: 32,
                             decoration: BoxDecoration(
-                              color: Theme.of(context).colorScheme.primary,
-                              borderRadius: BorderRadius.circular(4),
+                              color: const Color(0xFF0D9488),
+                              borderRadius: BorderRadius.circular(8),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF0D9488).withValues(alpha: 0.30),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            alignment: Alignment.center,
+                            child: const Icon(
+                              Icons.shield_outlined,
+                              color: Colors.white,
+                              size: 18,
                             ),
                           ),
-                          Icon(
-                            isSelected ? item.activeIcon : item.icon,
-                            color: isSelected
-                                ? Theme.of(context).colorScheme.primary
-                                : Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
-                            size: 24,
-                          ),
-                          const SizedBox(width: 16),
+                          const SizedBox(width: 10),
                           Text(
-                            item.label,
-                            style: TextStyle(
-                              color: isSelected
-                                  ? Theme.of(context).colorScheme.primary
-                                  : Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
-                              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                              fontSize: 15,
-                              letterSpacing: -0.2,
+                            'VitaNet',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.5,
+                              color: isDark ? Colors.white : const Color(0xFF0F172A),
                             ),
                           ),
                         ],
                       ),
                     ),
                   ),
-                );
-              }),
+                ),
+                const SizedBox(height: 28),
+
+                // Navigation Items
+                ...List.generate(items.length, (index) {
+                  final isSelected = navigationShell.currentIndex == index;
+                  final item = items[index];
+
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: _DesktopNavItemRow(
+                      item: item,
+                      isSelected: isSelected,
+                      activeColor: activeColor,
+                      inactiveColor: inactiveColor,
+                      isDark: isDark,
+                      onTap: () => navigationShell.goBranch(
+                        index,
+                        initialLocation: index == navigationShell.currentIndex,
+                      ),
+                    ),
+                  );
+                }),
+
+                const Spacer(),
+
+                // Anchored Interactive User Profile Card
+                _DesktopSidebarUserFooter(
+                  navigationShell: navigationShell,
+                  isDark: isDark,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MobileNavItemWidget extends StatefulWidget {
+  final _NavItem item;
+  final bool isSelected;
+  final VoidCallback onTap;
+  final Color activeColor;
+  final Color inactiveColor;
+  final bool isDark;
+
+  const _MobileNavItemWidget({
+    required this.item,
+    required this.isSelected,
+    required this.onTap,
+    required this.activeColor,
+    required this.inactiveColor,
+    required this.isDark,
+  });
+
+  @override
+  State<_MobileNavItemWidget> createState() => _MobileNavItemWidgetState();
+}
+
+class _MobileNavItemWidgetState extends State<_MobileNavItemWidget>
+    with SingleTickerProviderStateMixin {
+  bool _isHovered = false;
+  late final AnimationController _scaleController;
+  late final Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _scaleController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+    );
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 1.06).animate(
+      CurvedAnimation(
+        parent: _scaleController,
+        curve: Curves.easeOutBack,
+      ),
+    );
+    if (widget.isSelected) {
+      _scaleController.value = 1.0;
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _MobileNavItemWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!oldWidget.isSelected && widget.isSelected) {
+      _scaleController.forward(from: 0.0);
+    } else if (oldWidget.isSelected && !widget.isSelected) {
+      _scaleController.reverse();
+    }
+  }
+
+  @override
+  void dispose() {
+    _scaleController.dispose();
+    super.dispose();
+  }
+
+  void _handleTap() {
+    _scaleController.forward(from: 0.0);
+    widget.onTap();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = VnPalette.of(context);
+    final effectiveColor = widget.isSelected
+        ? (widget.isDark ? AppColors.mintLight : AppColors.brand)
+        : (_isHovered ? p.ink : p.muted);
+
+    return Expanded(
+      child: Semantics(
+        button: true,
+        selected: widget.isSelected,
+        label: widget.item.label,
+        excludeSemantics: true,
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          onEnter: (_) => setState(() => _isHovered = true),
+          onExit: (_) => setState(() => _isHovered = false),
+          child: GestureDetector(
+            onTap: _handleTap,
+            behavior: HitTestBehavior.opaque,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOutCubic,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: widget.isSelected ? p.brandTint : Colors.transparent,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: ScaleTransition(
+                    scale: _scaleAnimation,
+                    child: Icon(
+                      widget.isSelected ? widget.item.activeIcon : widget.item.icon,
+                      color: effectiveColor,
+                      size: 22,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  widget.item.label,
+                  maxLines: 1,
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    fontWeight: widget.isSelected ? FontWeight.w700 : FontWeight.w600,
+                    color: effectiveColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DesktopSidebarUserFooter extends ConsumerStatefulWidget {
+  final StatefulNavigationShell navigationShell;
+  final bool isDark;
+
+  const _DesktopSidebarUserFooter({
+    required this.navigationShell,
+    required this.isDark,
+  });
+
+  @override
+  ConsumerState<_DesktopSidebarUserFooter> createState() =>
+      _DesktopSidebarUserFooterState();
+}
+
+class _DesktopSidebarUserFooterState
+    extends ConsumerState<_DesktopSidebarUserFooter> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final profile = ref.watch(userProfileProvider);
+    final rawName = profile?.name.trim() ?? '';
+    final displayName = rawName.isNotEmpty ? rawName : 'Anonye';
+    final initial = displayName.isNotEmpty ? displayName[0].toUpperCase() : 'A';
+    final isHealthWorker =
+        profile?.role == 'health_worker' || profile?.role == 'admin';
+    final roleText = isHealthWorker ? 'Clinician' : 'Patient';
+    final isSelected = widget.navigationShell.currentIndex == 3;
+
+    final bgColor = isSelected
+        ? (widget.isDark
+            ? const Color(0xFF0D9488).withValues(alpha: 0.15)
+            : const Color(0xFFE6F4F1))
+        : (_isHovered
+            ? (widget.isDark
+                ? const Color(0xFF1E293B)
+                : const Color(0xFFF1F5F9))
+            : Colors.transparent);
+
+    final borderColor = isSelected
+        ? const Color(0xFF0D9488).withValues(alpha: 0.3)
+        : (_isHovered
+            ? (widget.isDark
+                ? const Color(0xFF334155)
+                : const Color(0xFFE2E8F0))
+            : Colors.transparent);
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => widget.navigationShell.goBranch(3),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            color: bgColor,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: borderColor, width: 1.0),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0D9488).withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  initial,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    color: const Color(0xFF0D9488),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      displayName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: widget.isDark
+                            ? Colors.white
+                            : const Color(0xFF0F172A),
+                      ),
+                    ),
+                    Text(
+                      roleText,
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        color: widget.isDark
+                            ? const Color(0xFF94A3B8)
+                            : const Color(0xFF64748B),
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.settings_outlined,
+                size: 16,
+                color: _isHovered || isSelected
+                    ? const Color(0xFF0D9488)
+                    : (widget.isDark
+                        ? const Color(0xFF94A3B8)
+                        : const Color(0xFF64748B)),
+              ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DesktopNavItemRow extends StatefulWidget {
+  final _NavItem item;
+  final bool isSelected;
+  final VoidCallback onTap;
+  final Color activeColor;
+  final Color inactiveColor;
+  final bool isDark;
+
+  const _DesktopNavItemRow({
+    required this.item,
+    required this.isSelected,
+    required this.onTap,
+    required this.activeColor,
+    required this.inactiveColor,
+    required this.isDark,
+  });
+
+  @override
+  State<_DesktopNavItemRow> createState() => _DesktopNavItemRowState();
+}
+
+class _DesktopNavItemRowState extends State<_DesktopNavItemRow> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final effectiveColor = widget.isSelected
+        ? widget.activeColor
+        : (_isHovered
+            ? (widget.isDark ? Colors.white : const Color(0xFF0F172A))
+            : widget.inactiveColor);
+
+    final bgColor = widget.isSelected
+        ? (widget.isDark
+            ? const Color(0xFF0D9488).withValues(alpha: 0.15)
+            : const Color(0xFFE6F4F1))
+        : (_isHovered
+            ? (widget.isDark
+                ? const Color(0xFF1E293B)
+                : const Color(0xFFF1F5F9))
+            : Colors.transparent);
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: widget.onTap,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 140),
+            height: 40,
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Stack(
+              children: [
+                if (widget.isSelected)
+                  Positioned(
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: 3.5,
+                    child: Container(
+                      color: widget.activeColor,
+                    ),
+                  ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  child: Row(
+                    children: [
+                      Icon(
+                        widget.isSelected ? widget.item.activeIcon : widget.item.icon,
+                        color: effectiveColor,
+                        size: 19,
+                        shadows: widget.isSelected
+                            ? [
+                                Shadow(
+                                  color: widget.activeColor.withValues(alpha: 0.35),
+                                  blurRadius: 8,
+                                ),
+                              ]
+                            : null,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          widget.item.label,
+                          style: GoogleFonts.plusJakartaSans(
+                            color: effectiveColor,
+                            fontSize: 13.5,
+                            fontWeight:
+                                widget.isSelected ? FontWeight.w700 : FontWeight.w500,
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

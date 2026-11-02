@@ -17,9 +17,9 @@ from app.services.ai_system_prompt import build_system_prompt
 
 logger = logging.getLogger(__name__)
 
-# Use OpenRouter fallback keys
+# Use OpenRouter or Gemini fallback keys
 or_keys = settings.OPENROUTER_API_KEYS.split(",") if settings.OPENROUTER_API_KEYS else []
-api_key = or_keys[0].strip() if or_keys else settings.GEMINI_API_KEY
+api_key = (or_keys[0].strip() if or_keys else settings.GEMINI_API_KEY) or "sk-vitanet-placeholder-key"
 client = openai.OpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key)
 
 MODEL = "google/gemini-2.5-flash"
@@ -103,8 +103,6 @@ def run_agent(
                 blocks.append(TextBlock(content=reply))
                 break
 
-            # msg.model_dump() doesn't include content if None for some old pydantic versions, 
-            # but usually it's fine. We'll build the assistant message dictionary manually to be safe.
             assistant_msg = {"role": "assistant"}
             if msg.content:
                 assistant_msg["content"] = msg.content

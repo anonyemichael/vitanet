@@ -2,12 +2,61 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vitanet/data/providers/providers.dart';
-import 'package:vitanet/core/constants/app_strings.dart';
-import 'package:vitanet/core/constants/app_spacing.dart';
-import 'package:vitanet/core/extensions/context_ext.dart';
-import 'package:vitanet/shared/widgets/gradient_background.dart';
+import 'package:vitanet/shared/widgets/vn_kit.dart';
 
-/// 3-page onboarding flow with premium realistic imagery.
+class _Slide {
+  final String image;
+  final String alt;
+  final IconData icon;
+  final String chip;
+  final String chipSub;
+  final String title;
+  final String body;
+
+  const _Slide({
+    required this.image,
+    required this.alt,
+    required this.icon,
+    required this.chip,
+    required this.chipSub,
+    required this.title,
+    required this.body,
+  });
+}
+
+const _slides = <_Slide>[
+  _Slide(
+    image: 'assets/images/photos/doctor_on_phone.jpg',
+    alt: 'Doctor reading a message on a phone',
+    icon: Icons.chat_bubble_outline_rounded,
+    chip: 'Ask anything',
+    chipSub: 'Answers in seconds',
+    title: 'Describe how you feel. Get clear next steps.',
+    body:
+        'Chat with VitaNet AI about symptoms, medicines or lab results. It asks the right follow-up questions, like a triage nurse would.',
+  ),
+  _Slide(
+    image: 'assets/images/photos/smartwatch_wrist.jpg',
+    alt: 'Person checking a smartwatch on their wrist',
+    icon: Icons.monitor_heart_outlined,
+    chip: 'Live vitals',
+    chipSub: 'Health Connect · Apple Health',
+    title: 'Your vitals, read in context.',
+    body:
+        'Connect your watch or phone sensors. Heart rate, SpO2, temperature and blood pressure feed straight into every assessment.',
+  ),
+  _Slide(
+    image: 'assets/images/photos/holding_hands.jpg',
+    alt: 'Two people holding hands in support',
+    icon: Icons.group_outlined,
+    chip: 'Care circle',
+    chipSub: 'Trusted contacts',
+    title: 'The people who matter, in the loop.',
+    body:
+        'Add family or caregivers. If a check comes back urgent, they get notified with your location so help arrives sooner.',
+  ),
+];
+
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
 
@@ -17,45 +66,7 @@ class OnboardingScreen extends ConsumerStatefulWidget {
 
 class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final _controller = PageController();
-  int _currentPage = 0;
-
-  static const _pages = [
-    _OnboardingData(
-      imagePath: 'assets/images/onboarding/1.jpg',
-      title: AppStrings.onboardingTitle1,
-      subtitle: AppStrings.onboardingSubtext1,
-    ),
-    _OnboardingData(
-      imagePath: 'assets/images/onboarding/2.jpg',
-      title: AppStrings.onboardingTitle2,
-      subtitle: AppStrings.onboardingSubtext2,
-    ),
-    _OnboardingData(
-      imagePath: 'assets/images/onboarding/3.jpg',
-      title: AppStrings.onboardingTitle3,
-      subtitle: AppStrings.onboardingSubtext3,
-    ),
-  ];
-
-  void _onNext() {
-    if (_currentPage < _pages.length - 1) {
-      _controller.nextPage(
-        duration: const Duration(milliseconds: 350),
-        curve: Curves.easeOutQuart,
-      );
-    } else {
-      _completeOnboarding();
-    }
-  }
-
-  Future<void> _completeOnboarding() async {
-    final storage = ref.read(localStorageProvider);
-    await storage.setOnboardingComplete();
-    ref.read(onboardingCompleteProvider.notifier).state = true;
-    
-    // Now routes to Login/Role Selection because Onboarding is the true first step.
-    if (mounted) context.go('/login');
-  }
+  int _index = 0;
 
   @override
   void dispose() {
@@ -63,262 +74,193 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     super.dispose();
   }
 
+  Future<void> _completeOnboarding() async {
+    final storage = ref.read(localStorageProvider);
+    await storage.setOnboardingComplete();
+    ref.read(onboardingCompleteProvider.notifier).state = true;
+
+    // Routes to Login/Role Selection because Onboarding is the true first step.
+    if (mounted) context.go('/login');
+  }
+
+  void _next() {
+    if (_index == _slides.length - 1) {
+      _completeOnboarding();
+    } else {
+      _controller.nextPage(
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeOutCubic,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isLast = _currentPage == _pages.length - 1;
-    final isWide = MediaQuery.sizeOf(context).width > 800;
+    final p = VnPalette.of(context);
+    final isLast = _index == _slides.length - 1;
 
     return Scaffold(
-      body: Stack(
-        children: [
-          // Background
-          const GradientBackground(child: SizedBox.expand()),
-          
-          // Page view (full screen, bleeds to top)
-          PageView.builder(
-            controller: _controller,
-            onPageChanged: (i) => setState(() => _currentPage = i),
-            itemCount: _pages.length,
-            itemBuilder: (context, index) {
-              final page = _pages[index];
-              return _OnboardingPage(data: page, isWide: isWide);
-            },
-          ),
-          
-          // Skip button floating at the top right
-          Positioned(
-            top: MediaQuery.of(context).padding.top + AppSpacing.md,
-            right: AppSpacing.lg,
-            child: TextButton(
-              onPressed: _completeOnboarding,
-              child: Text(
-                'Skip',
-                style: context.textTheme.labelLarge?.copyWith(
-                  color: isWide ? context.colorScheme.primary : Colors.white,
-                  shadows: isWide ? null : [
-                    Shadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 4),
-                  ]
+      backgroundColor: p.page,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 36),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                height: 44,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '${_index + 1} of ${_slides.length}',
+                      style: VnText.heading(13, weight: FontWeight.w700, color: p.muted),
+                    ),
+                    VnLink(label: 'Skip', onTap: _completeOnboarding),
+                  ],
                 ),
               ),
-            ),
-          ),
-          
-          // Bottom controls
-          Positioned(
-            left: isWide ? MediaQuery.sizeOf(context).width / 2 : 0,
-            right: 0,
-            bottom: MediaQuery.of(context).padding.bottom + AppSpacing.xxl,
-            child: Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: isWide ? AppSpacing.xxl * 2 : AppSpacing.xxl,
+              const SizedBox(height: 28),
+              Expanded(
+                child: PageView.builder(
+                  controller: _controller,
+                  itemCount: _slides.length,
+                  onPageChanged: (i) => setState(() => _index = i),
+                  itemBuilder: (context, i) => _SlideView(slide: _slides[i]),
+                ),
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+              const SizedBox(height: 20),
+              Row(
                 children: [
-                  // Page indicators
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(_pages.length, (i) {
-                      final isActive = i == _currentPage;
-                      return AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        margin: const EdgeInsets.symmetric(horizontal: 4),
-                        width: isActive ? 32 : 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: isActive
-                              ? context.colorScheme.primary
-                              : context.colorScheme.primary.withValues(
-                                  alpha: 0.25,
-                                ),
-                          borderRadius: BorderRadius.circular(
-                            AppSpacing.radiusPill,
+                  Semantics(
+                    label: 'Slide ${_index + 1} of ${_slides.length}',
+                    child: Row(
+                      children: [
+                        for (var k = 0; k < _slides.length; k++) ...[
+                          if (k > 0) const SizedBox(width: 6),
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 220),
+                            height: 8,
+                            width: k == _index ? 28 : 8,
+                            decoration: BoxDecoration(
+                              color: k == _index
+                                  ? p.brand
+                                  : (p.isDark ? const Color(0xFF404040) : const Color(0xFFCBD5E1)),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
                           ),
-                        ),
-                      );
-                    }),
-                  ),
-                  const SizedBox(height: AppSpacing.xxl),
-
-                  // CTA button
-                  SizedBox(
-                    width: isWide ? 400 : double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _onNext,
-                      child: Text(isLast ? 'Get Started' : 'Next'),
+                        ],
+                      ],
                     ),
+                  ),
+                  const Spacer(),
+                  VnButton(
+                    label: isLast ? 'Get started' : 'Next',
+                    icon: Icons.arrow_forward_rounded,
+                    iconAfter: true,
+                    expand: false,
+                    onPressed: _next,
                   ),
                 ],
               ),
-            ),
-          )
-        ],
+            ],
+          ),
+        ),
       ),
     );
   }
 }
 
-// ─── Internal Widgets ───
-
-class _OnboardingData {
-  final String imagePath;
-  final String title;
-  final String subtitle;
-
-  const _OnboardingData({
-    required this.imagePath,
-    required this.title,
-    required this.subtitle,
-  });
-}
-
-class _OnboardingPage extends StatelessWidget {
-  final _OnboardingData data;
-  final bool isWide;
-
-  const _OnboardingPage({required this.data, required this.isWide});
+class _SlideView extends StatelessWidget {
+  final _Slide slide;
+  const _SlideView({required this.slide});
 
   @override
   Widget build(BuildContext context) {
-    if (isWide) {
-      return Row(
-        children: [
-          // Left side: Premium Image blending with background
-          Expanded(
-            flex: 1,
-            child: ShaderMask(
-              shaderCallback: (rect) {
-                return LinearGradient(
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                  colors: [
-                    Colors.black,
-                    Colors.black.withValues(alpha: 0.9),
-                    Colors.transparent,
+    final p = VnPalette.of(context);
+    return LayoutBuilder(builder: (context, c) {
+      final imageH = (c.maxHeight - 170).clamp(200.0, 400.0);
+      return SingleChildScrollView(
+        physics: const ClampingScrollPhysics(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(
+              height: imageH,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(28),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Semantics(
+                      image: true,
+                      label: slide.alt,
+                      child: Image.asset(slide.image, fit: BoxFit.cover),
+                    ),
+                    Positioned(
+                      left: 16,
+                      bottom: 16,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: p.surface,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0x1F0F172A),
+                              blurRadius: 24,
+                              offset: Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: p.brandTint,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(slide.icon, size: 20, color: p.brand),
+                            ),
+                            const SizedBox(width: 10),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(slide.chip,
+                                    style: VnText.body(13,
+                                        weight: FontWeight.w700, color: p.ink)),
+                                Text(slide.chipSub,
+                                    style: VnText.body(12, color: p.muted)),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ],
-                  stops: const [0.0, 0.7, 1.0],
-                ).createShader(rect);
-              },
-              blendMode: BlendMode.dstIn,
-              child: Image.asset(
-                data.imagePath,
-                width: double.infinity,
-                height: double.infinity,
-                fit: BoxFit.cover,
-                alignment: Alignment.center,
-              ),
-            ),
-          ),
-          
-          // Right side: Content
-          Expanded(
-            flex: 1,
-            child: Padding(
-              padding: const EdgeInsets.only(
-                left: AppSpacing.xl,
-                right: AppSpacing.xxl * 3,
-                bottom: 120, // space for bottom controls
-              ),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        data.title,
-                        textAlign: TextAlign.left,
-                        style: context.textTheme.displayMedium?.copyWith(
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -1.5,
-                          height: 1.1,
-                          color: context.colorScheme.onSurface,
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.xl),
-                      Text(
-                        data.subtitle,
-                        textAlign: TextAlign.left,
-                        style: context.textTheme.headlineSmall?.copyWith(
-                          color: context.colorScheme.onSurfaceVariant,
-                          height: 1.5,
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
               ),
             ),
-          ),
-        ],
+            const SizedBox(height: 28),
+            Semantics(
+              header: true,
+              child: Text(
+                slide.title,
+                style: VnText.heading(30,
+                    color: p.ink, height: 1.2, letterSpacing: -0.5),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              slide.body,
+              style: VnText.body(16, color: p.inkSoft, height: 1.55),
+            ),
+          ],
+        ),
       );
-    }
-
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        // Premium Image fading seamlessly into the background
-        Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          height: MediaQuery.sizeOf(context).height * 0.65,
-          child: ShaderMask(
-            shaderCallback: (rect) {
-              return LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.black,
-                  Colors.black,
-                  Colors.black.withValues(alpha: 0.8),
-                  Colors.transparent,
-                ],
-                stops: const [0.0, 0.6, 0.85, 1.0],
-              ).createShader(rect);
-            },
-            blendMode: BlendMode.dstIn,
-            child: Image.asset(
-              data.imagePath,
-              fit: BoxFit.cover,
-              alignment: Alignment.topCenter,
-            ),
-          ),
-        ),
-        
-        // Text Content anchored above the controls
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: 140, // Space for the bottom controls
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxl),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  data.title,
-                  textAlign: TextAlign.center,
-                  style: context.textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                Text(
-                  data.subtitle,
-                  textAlign: TextAlign.center,
-                  style: context.textTheme.bodyLarge?.copyWith(
-                    color: context.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
+    });
   }
 }

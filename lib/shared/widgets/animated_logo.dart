@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:vitanet/shared/widgets/vitanet_logo.dart';
 
-/// App logo using the static asset to ensure consistency with launcher icons.
+/// App logo with optional wordmark. Uses the vector [VitaNetLogo].
 class AnimatedLogo extends StatelessWidget {
   final double size;
   final bool showText;
@@ -16,17 +17,7 @@ class AnimatedLogo extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        SizedBox(
-          width: size,
-          height: size,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(size * 0.22),
-            child: Image.asset(
-              'assets/logo_transparent.png',
-              fit: BoxFit.cover,
-            ),
-          ),
-        ),
+        VitaNetLogo(size: size),
         if (showText) ...[
           const SizedBox(height: 16),
           Text(

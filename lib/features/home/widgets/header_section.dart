@@ -1,255 +1,249 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:vitanet/core/constants/app_spacing.dart';
-import 'package:vitanet/core/extensions/context_ext.dart';
+import 'package:vitanet/core/constants/app_colors.dart';
 import 'package:vitanet/data/providers/providers.dart';
 import 'package:vitanet/features/home/screens/home_search_screen.dart';
-import 'package:vitanet/features/home/widgets/filter_bottom_sheet.dart';
 import 'package:vitanet/features/notifications/screens/notifications_screen.dart';
+import 'package:vitanet/shared/widgets/vn_kit.dart';
 
+/// Home header: avatar, date + greeting, notifications bell, then search bar.
 class HeaderSection extends ConsumerWidget {
   const HeaderSection({super.key});
 
+  static const _months = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+  ];
+  static const _weekdays = [
+    'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday',
+  ];
 
-  String _getInitials(String fullName) {
-    final parts = fullName.trim().split(RegExp(r'\s+'));
-    if (parts.length > 1) {
-      return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
-    }
-    return fullName.isNotEmpty ? fullName[0].toUpperCase() : '?';
-  }
-
-  String _getGreeting() {
+  String _greeting() {
     final hour = DateTime.now().hour;
-    if (hour < 12) return 'Good Morning';
-    if (hour < 17) return 'Good Afternoon';
-    return 'Good Evening';
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
   }
 
-  void _showFilter(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useRootNavigator: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => const FilterBottomSheet(),
+  String _date() {
+    final now = DateTime.now();
+    return '${_weekdays[now.weekday - 1]}, ${now.day} ${_months[now.month - 1]}';
+  }
+
+  void _openSearch(BuildContext context) {
+    Navigator.of(context, rootNavigator: true).push(
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            const HomeSearchScreen(),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) =>
+            FadeTransition(opacity: animation, child: child),
+        transitionDuration: const Duration(milliseconds: 220),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final p = VnPalette.of(context);
     final profile = ref.watch(userProfileProvider);
     final authState = ref.watch(authProvider);
-    final greeting = _getGreeting();
-    final name = profile?.name ?? 'Alex';
+    final unread = ref.watch(notificationsUnreadProvider);
+    final fullName = (profile?.name.trim().isNotEmpty ?? false)
+        ? profile!.name.trim()
+        : (authState.user?.displayName ?? '');
+    final firstName = fullName.isEmpty ? '' : fullName.split(RegExp(r'\s+')).first;
+    final photo = authState.user?.photoURL;
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(AppSpacing.xl, AppSpacing.xxxl, AppSpacing.xl, AppSpacing.xl),
-      decoration: BoxDecoration(
-        color: context.isDark ? Theme.of(context).scaffoldBackgroundColor : Colors.white,
-        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(32)),
-        border: Border(
-          bottom: BorderSide(
-            color: context.isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.05),
-          ),
-        ),
-        boxShadow: [
-          if (!context.isDark)
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 16,
-              offset: const Offset(0, 4),
-            ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(
+          height: 52,
+          child: Row(
             children: [
+              Semantics(
+                button: true,
+                label: 'Profile',
+                excludeSemantics: true,
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: () => StatefulNavigationShell.of(context).goBranch(3),
+                  child: VnAvatar(
+                    name: fullName.isEmpty ? 'VitaNet' : fullName,
+                    size: 48,
+                    image: photo == null
+                        ? null
+                        : ResizeImage(NetworkImage(photo), width: 96, height: 96),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Text(_date(), style: VnText.body(13, color: p.muted)),
                     Text(
-                      greeting,
-                      style: GoogleFonts.inter(
-                        color: context.isDark ? Colors.white60 : Colors.black54,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      name,
-                      style: GoogleFonts.outfit(
-                        color: context.isDark ? Colors.white : Colors.black87,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w500, // Medium, not bold
-                        letterSpacing: -0.5,
-                      ),
-                      maxLines: 2,
+                      firstName.isEmpty ? _greeting() : '${_greeting()}, $firstName',
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
+                      style: VnText.heading(20, color: p.ink),
                     ),
                   ],
                 ),
               ),
-              Row(
-                children: [
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const NotificationsScreen()),
-                      );
-                    },
-                    child: Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: context.isDark ? Colors.white.withValues(alpha: 0.1) : Colors.white,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          if (!context.isDark)
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.05),
-                              blurRadius: 10,
-                              offset: const Offset(0, 2),
-                            ),
-                        ],
-                      ),
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          Icon(
-                            Icons.notifications_outlined,
-                            color: context.isDark ? Colors.white : Colors.black87,
-                            size: 24,
+              VnIconButton(
+                icon: Icons.notifications_none_rounded,
+                tooltip: unread ? 'Notifications, unread' : 'Notifications',
+                size: 46,
+                bordered: true,
+                onPressed: () => context.push('/notifications'),
+                badge: unread
+                    ? Positioned(
+                        top: 9,
+                        right: 10,
+                        child: Container(
+                          width: 9,
+                          height: 9,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFDC2626),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: p.surface, width: 2),
                           ),
-                          Positioned(
-                            top: 10,
-                            right: 12,
-                            child: Container(
-                              width: 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFEF4444),
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: context.isDark ? const Color(0xFF1E293B) : Colors.white,
-                                  width: 2,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  GestureDetector(
-                    onTap: () => StatefulNavigationShell.of(context).goBranch(3),
-                    child: Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: context.isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.05),
-                        image: authState.user?.photoURL != null
-                            ? DecorationImage(
-                                image: NetworkImage(authState.user!.photoURL!),
-                                fit: BoxFit.cover,
-                              )
-                            : null,
-                      ),
-                      child: authState.user?.photoURL == null
-                          ? Center(
-                              child: Text(
-                                _getInitials(name),
-                                style: TextStyle(
-                                  color: context.isDark ? Colors.white : Colors.black54,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              ),
-                            )
-                          : null,
-                    ),
-                  ),
-                ],
+                        ),
+                      )
+                    : null,
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.xl),
-          // Search Bar
-          Hero(
-            tag: 'home_search_bar',
-            child: Material(
-              color: Colors.transparent,
-              child: Container(
-                height: 52,
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                decoration: BoxDecoration(
-                  color: context.isDark ? Colors.white.withValues(alpha: 0.1) : Colors.grey[200],
-                  borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
-                ),
-                child: Row(
-                  children: [
-                    const SizedBox(width: AppSpacing.xs),
-                    Icon(
-                      Icons.search_rounded,
-                      color: context.isDark ? Colors.white54 : Colors.black45,
-                      size: 22,
-                    ),
-                    const SizedBox(width: AppSpacing.md),
-                    Expanded(
-                      child: TextField(
-                        readOnly: true,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            PageRouteBuilder(
-                              pageBuilder: (context, animation, secondaryAnimation) => const HomeSearchScreen(),
-                              transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                                return FadeTransition(opacity: animation, child: child);
-                              },
-                              transitionDuration: const Duration(milliseconds: 300),
-                            ),
-                          );
-                        },
-                        style: TextStyle(
-                          color: context.isDark ? Colors.white : Colors.black87,
-                          fontSize: 15,
+        ),
+        const SizedBox(height: 22),
+        Hero(
+          tag: 'home_search_bar',
+          child: Material(
+            color: p.surface,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(color: p.line),
+            ),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: () => _openSearch(context),
+              child: Semantics(
+                button: true,
+                label: 'Search health, vitals, medicines',
+                excludeSemantics: true,
+                child: SizedBox(
+                  height: 52,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
+                      children: [
+                        Icon(Icons.search_rounded, size: 20, color: p.muted),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text('Search health, vitals, medicines…',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: VnText.body(15, color: p.muted)),
                         ),
-                        decoration: InputDecoration(
-                          hintText: 'Search health, insights...',
-                          hintStyle: TextStyle(
-                            color: context.isDark ? Colors.white38 : Colors.black38,
-                            fontSize: 15,
-                          ),
-                          border: InputBorder.none,
-                          isDense: true,
-                        ),
-                      ),
+                      ],
                     ),
-                    GestureDetector(
-                      onTap: () => _showFilter(context),
-                      child: Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: Icon(
-                          Icons.tune_rounded,
-                          color: context.isDark ? Colors.white54 : Colors.black45,
-                          size: 22,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.xs),
-                  ],
+                  ),
                 ),
               ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Teal "Not feeling well?" call-to-action card.
+class SymptomCheckHero extends StatelessWidget {
+  const SymptomCheckHero({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = VnPalette.of(context);
+    return Container(
+      decoration: BoxDecoration(
+        color: p.isDark ? const Color(0xFF0D5F58) : AppColors.brand,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        children: [
+          Positioned(
+            right: -40,
+            top: -40,
+            child: Container(
+              width: 180,
+              height: 180,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.08), width: 28),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(22),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.auto_awesome_rounded,
+                        size: 16, color: Color(0xFF99F6E4)),
+                    const SizedBox(width: 6),
+                    Text('VITANET AI',
+                        style: VnText.body(12,
+                            weight: FontWeight.w700,
+                            letterSpacing: 0.5,
+                            color: const Color(0xFF99F6E4))),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 260),
+                  child: Text(
+                    'Not feeling well? Check your symptoms in 2 minutes.',
+                    style: VnText.heading(22, color: Colors.white, height: 1.3),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    VnButton(
+                      label: 'Start a check',
+                      icon: Icons.chat_bubble_outline_rounded,
+                      height: 48,
+                      radius: 14,
+                      fontSize: 15,
+                      expand: false,
+                      background: Colors.white,
+                      foreground: AppColors.brand,
+                      onPressed: () => StatefulNavigationShell.of(context).goBranch(1),
+                    ),
+                    VnOutlineButton(
+                      label: 'Guided form',
+                      height: 48,
+                      radius: 14,
+                      expand: false,
+                      background: Colors.white.withValues(alpha: 0.14),
+                      borderColor: Colors.transparent,
+                      foreground: Colors.white,
+                      onPressed: () => context.push('/assessment'),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
         ],

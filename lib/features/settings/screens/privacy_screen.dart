@@ -1,120 +1,141 @@
 import 'package:flutter/material.dart';
-import 'package:vitanet/core/constants/app_spacing.dart';
-import 'package:vitanet/core/extensions/context_ext.dart';
+import 'package:vitanet/core/utils/launch_helpers.dart';
+import 'package:vitanet/shared/widgets/vn_kit.dart';
 
 class PrivacyScreen extends StatelessWidget {
   const PrivacyScreen({super.key});
 
+  static const _sections = <(String, String, IconData)>[
+    (
+      'What we collect',
+      'Your profile, the symptoms you describe, files you upload, and vitals from devices you connect. Nothing from your phone is read without permission.',
+      Icons.description_outlined
+    ),
+    (
+      'How we use it',
+      'Only to give you triage advice, reminders and insights. Anonymised, aggregated statistics may improve our clinical guidelines.',
+      Icons.auto_awesome_outlined
+    ),
+    (
+      'Who sees it',
+      'You, plus care circle contacts you approve. Urgent alerts share your location only at the moment they are sent.',
+      Icons.group_outlined
+    ),
+    (
+      'How it is protected',
+      'Encryption at rest and in transit, with access limited to the services that need it.',
+      Icons.lock_outline_rounded
+    ),
+    (
+      'Your rights',
+      'Export your data or clear your history at any time from Settings. Account deletion completes within 30 days of your request.',
+      Icons.check_rounded
+    ),
+  ];
+
   @override
   Widget build(BuildContext context) {
-    final isDark = context.isDark;
-    final bgColor = isDark ? const Color(0xFF121212) : Colors.grey.shade50;
-    final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final borderColor = isDark ? Colors.grey.shade800 : Colors.grey.shade200;
-
+    final p = VnPalette.of(context);
     return Scaffold(
-      backgroundColor: bgColor,
-      appBar: AppBar(
-        title: const Text('Privacy Policy'),
-        elevation: 0,
-        backgroundColor: bgColor,
-        iconTheme: IconThemeData(color: isDark ? Colors.white : Colors.black87),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(AppSpacing.xl),
-          decoration: BoxDecoration(
-            color: cardColor,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: borderColor, width: 1.5),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildSection(
-                context,
-                title: 'Data Collection & Syncing',
-                content: 'VitaNet securely syncs your data to our cloud servers to ensure '
-                    'seamless access across your devices and to enable '
-                    'health professionals to review your triage cases when necessary.\n\n'
-                    'Your triage history, profile information, and preferences '
-                    'are stored securely in the cloud and can be cleared from your '
-                    'local device at any time from the Settings screen.',
-                icon: Icons.cloud_sync_rounded,
-                isDark: isDark,
-              ),
-              const SizedBox(height: AppSpacing.xxl),
-              _buildSection(
-                context,
-                title: 'Security & Protection',
-                content: 'We strictly protect your medical information. All communications '
-                    'between your device and our servers are heavily encrypted. Only authorized '
-                    'health workers, such as registered nurses and certified doctors, can access your '
-                    'triage reports if you choose to escalate a case.',
-                icon: Icons.security_rounded,
-                isDark: isDark,
-              ),
-              const SizedBox(height: AppSpacing.xxl),
-              _buildSection(
-                context,
-                title: 'Your Rights',
-                content: 'You have the right to request the deletion of all your medical data and account '
-                    'information at any time. Simply navigate to the Settings page and select '
-                    '"Clear Triage History" or reach out to our support team.',
-                icon: Icons.gavel_rounded,
-                isDark: isDark,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSection(BuildContext context, {required String title, required String content, required IconData icon, required bool isDark}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: context.colorScheme.primaryContainer.withValues(alpha: 0.5),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: context.colorScheme.primary, size: 20),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                title,
-                style: context.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : Colors.black87,
+      backgroundColor: p.page,
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 720),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+              children: [
+                const VnTopBar(title: 'Privacy policy'),
+                const SizedBox(height: 18),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: p.brandWash,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: p.brandBorder),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: p.brand,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Icon(Icons.shield_outlined, color: p.onBrand),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('The short version',
+                                style: VnText.body(15, weight: FontWeight.w700, color: p.ink)),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Your health data is yours. We encrypt it, never sell it, and never use it to train AI models.',
+                              style: VnText.body(13,
+                                  color: p.isDark ? p.brandDeep : const Color(0xFF134E4A),
+                                  height: 1.5),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+                const SizedBox(height: 18),
+                Text('Last updated 1 October 2026 · HIPAA and GDPR aligned',
+                    style: VnText.body(12, color: p.muted)),
+                for (final (title, body, icon) in _sections) ...[
+                  const SizedBox(height: 18),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: p.surface,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: p.line),
+                        ),
+                        child: Icon(icon, size: 18, color: p.brand),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Semantics(
+                              header: true,
+                              child: Text(title,
+                                  style: VnText.heading(16, weight: FontWeight.w700, color: p.ink)),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(body, style: VnText.body(14, color: p.inkSoft, height: 1.6)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 28),
+                VnOutlineButton(
+                  label: 'Contact our data protection officer',
+                  icon: Icons.mail_outline_rounded,
+                  borderColor: p.brand,
+                  foreground: p.brand,
+                  onPressed: () =>
+                      LaunchHelpers.openUrlOrSnack(context, 'mailto:privacy@vitanet.health'),
+                ),
+              ],
             ),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.lg),
-        Text(
-          content,
-          style: context.textTheme.bodyMedium?.copyWith(
-            color: isDark ? Colors.grey.shade400 : Colors.grey.shade700,
-            height: 1.6,
           ),
         ),
-      ],
+      ),
     );
   }
 }

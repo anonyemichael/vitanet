@@ -3,7 +3,7 @@ import uuid
 import enum
 from datetime import datetime
 from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Enum as SqlEnum, Boolean
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Uuid as UUID
 from app.database.base import Base
 
 

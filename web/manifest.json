@@ -1,11 +1,11 @@
 {
-    "name": "vitanet",
-    "short_name": "vitanet",
+    "name": "VitaNet - Clinical Health & Triage Platform",
+    "short_name": "VitaNet",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0A5C56",
-    "theme_color": "#0A5C56",
-    "description": "A new Flutter project.",
+    "background_color": "#040A10",
+    "theme_color": "#0D9488",
+    "description": "VitaNet - AI-Powered Clinical Triage & Health Monitoring Platform",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

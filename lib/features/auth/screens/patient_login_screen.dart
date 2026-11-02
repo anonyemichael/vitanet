@@ -1,12 +1,13 @@
-import 'dart:ui';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:vitanet/core/constants/app_spacing.dart';
 import 'package:vitanet/core/extensions/context_ext.dart';
 import 'package:vitanet/data/models/user_profile.dart';
 import 'package:vitanet/data/providers/providers.dart';
-import 'package:vitanet/shared/widgets/gradient_background.dart';
+import 'package:vitanet/shared/widgets/vn_kit.dart';
 
 class PatientLoginScreen extends ConsumerStatefulWidget {
   const PatientLoginScreen({super.key});
@@ -16,271 +17,332 @@ class PatientLoginScreen extends ConsumerStatefulWidget {
 }
 
 class _PatientLoginScreenState extends ConsumerState<PatientLoginScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _emailCtrl = TextEditingController();
+  final _passwordCtrl = TextEditingController();
+  bool _isFetchingProfile = false;
+  bool _obscure = true;
+  bool _createMode = false;
+
+  @override
+  void dispose() {
+    _emailCtrl.dispose();
+    _passwordCtrl.dispose();
+    super.dispose();
+  }
+
+  void _submitEmail() {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    HapticFeedback.lightImpact();
+    FocusScope.of(context).unfocus();
+    final email = _emailCtrl.text.trim();
+    final password = _passwordCtrl.text;
+    final notifier = ref.read(authProvider.notifier);
+    if (_createMode) {
+      notifier.signUpWithEmail(email, password);
+    } else {
+      notifier.signInWithEmail(email, password);
+    }
+  }
+
+  Future<void> _forgotPassword() async {
+    final email = _emailCtrl.text.trim();
+    if (email.isEmpty || !email.contains('@')) {
+      context.showSnack('Enter your email above, then tap Forgot password.');
+      return;
+    }
+    try {
+      if (Firebase.apps.isEmpty) {
+        if (mounted) context.showSnack('Password reset is currently unavailable in offline mode.');
+        return;
+      }
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      if (mounted) context.showSnack('Password reset link sent to $email');
+    } catch (e) {
+      if (mounted) context.showSnack('Could not send reset email: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.listen<AuthState>(authProvider, (previous, next) async {
-      if (next.status == AuthStatus.authenticated || next.status == AuthStatus.anonymous) {
-        
+      if (next.status == AuthStatus.authenticated ||
+          next.status == AuthStatus.anonymous) {
         if (next.status == AuthStatus.anonymous) {
-           var profile = const UserProfile(name: 'Guest User', role: 'user');
-           ref.read(userProfileProvider.notifier).updateProfile(profile);
-           if (mounted) context.go('/home');
-           return;
+          const profile = UserProfile(name: 'Guest User', role: 'user');
+          ref.read(userProfileProvider.notifier).updateProfile(profile);
+          if (context.mounted) context.go('/home');
+          return;
         }
 
-        // It is an authenticated user. Check backend.
+        // Authenticated user: check the backend profile.
+        if (mounted) setState(() => _isFetchingProfile = true);
         try {
-          final userProfile = await ref.read(firestoreServiceProvider).getUserProfile(next.user!.uid);
-          
-          if (userProfile != null) {
-            final role = userProfile.role;
-            ref.read(userProfileProvider.notifier).updateProfile(userProfile);
-            
-            if (mounted) {
+          if (next.user != null) {
+            final userProfile = await ref
+                .read(firestoreServiceProvider)
+                .getUserProfile(next.user!.uid);
+
+            if (!context.mounted) return;
+
+            if (userProfile != null) {
+              final role = userProfile.role;
+              ref.read(userProfileProvider.notifier).updateProfile(userProfile);
+
               if (role == 'admin') {
                 context.go('/admin');
               } else {
                 context.go('/home');
               }
+            } else {
+              // New user, push to the completion form.
+              context.go('/login/patient_completion');
             }
           } else {
-            // New user, push to the completion form!
-            if (mounted) context.go('/login/patient_completion');
+            if (context.mounted) context.go('/home');
           }
         } catch (e) {
-           if (mounted) context.showSnack('Failed to fetch profile: $e');
+          if (context.mounted) context.showSnack('Failed to fetch profile: $e');
+        } finally {
+          if (mounted) setState(() => _isFetchingProfile = false);
         }
-
       } else if (next.status == AuthStatus.error) {
+        if (mounted) setState(() => _isFetchingProfile = false);
         context.showSnack(next.errorMessage ?? 'Authentication failed');
       }
     });
 
-    final isWide = MediaQuery.sizeOf(context).width > 800;
+    final p = VnPalette.of(context);
     final authState = ref.watch(authProvider);
-    final isLoading = authState.status == AuthStatus.loading;
+    final isLoading =
+        authState.status == AuthStatus.loading || _isFetchingProfile;
+    final topInset = MediaQuery.paddingOf(context).top;
 
-    Widget content = SingleChildScrollView(
+    return Scaffold(
+      backgroundColor: p.page,
+      body: SingleChildScrollView(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SizedBox(
+                  height: 230 + topInset,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Semantics(
+                        image: true,
+                        label: 'Doctor chatting with a smiling patient',
+                        child: Image.asset(
+                          'assets/images/photos/doctor_with_patient.jpg',
+                          fit: BoxFit.cover,
+                          alignment: const Alignment(0, -0.4),
+                        ),
+                      ),
+                      Positioned(
+                        top: 16 + topInset,
+                        left: 16,
+                        child: VnIconButton(
+                          icon: Icons.chevron_left_rounded,
+                          tooltip: 'Back',
+                          iconSize: 26,
+                          background: p.surface,
+                          onPressed: () {
+                            if (context.canPop()) {
+                              context.pop();
+                            } else {
+                              context.go('/login');
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Transform.translate(
+                  offset: const Offset(0, -28),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: p.page,
+                      borderRadius:
+                          const BorderRadius.vertical(top: Radius.circular(28)),
+                    ),
+                    padding: const EdgeInsets.fromLTRB(20, 28, 20, 0),
+                    child: SafeArea(
+                      top: false,
+                      child: _buildForm(p, isLoading),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildForm(VnPalette p, bool isLoading) {
+    return Form(
+      key: _formKey,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            'Welcome to VitaNet',
-            style: context.textTheme.headlineLarge?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: context.colorScheme.onSurface,
-            ),
-            textAlign: TextAlign.center,
+          Semantics(
+            header: true,
+            child: Text(_createMode ? 'Create your account' : 'Welcome back',
+                style: VnText.heading(26, color: p.ink)),
           ),
-          const SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: 6),
           Text(
-            'Sign in to manage your health',
-            style: context.textTheme.bodyLarge?.copyWith(
-              color: context.colorScheme.onSurfaceVariant,
-            ),
-            textAlign: TextAlign.center,
+            _createMode
+                ? 'Sign up to save your checks, vitals and care circle.'
+                : 'Sign in to see your checks, vitals and care circle.',
+            style: VnText.body(15, color: p.muted),
           ),
-          const SizedBox(height: AppSpacing.xxl * 1.5),
-          if (isLoading)
-            const Center(child: CircularProgressIndicator())
+          const SizedBox(height: 18),
+          if (_isFetchingProfile)
+            VnCard(
+              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+              child: Column(
+                children: [
+                  SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: CircularProgressIndicator(strokeWidth: 2.5, color: p.brand),
+                  ),
+                  const SizedBox(height: 16),
+                  Text('Preparing your health dashboard…',
+                      style: VnText.body(14, weight: FontWeight.w600, color: p.ink)),
+                ],
+              ),
+            )
           else ...[
-            FilledButton.icon(
-              onPressed: () => ref.read(authProvider.notifier).linkGoogleAccount(),
-              icon: _googleIcon(),
-              label: const Text('Continue with Google'),
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                backgroundColor: context.colorScheme.onSurface,
-                foregroundColor: context.colorScheme.surface,
-                textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            VnTextField(
+              label: 'Email',
+              controller: _emailCtrl,
+              hint: 'you@example.com',
+              prefixIcon: Icons.mail_outline_rounded,
+              keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.next,
+              validator: (v) {
+                final s = v?.trim() ?? '';
+                if (s.isEmpty) return 'Enter your email';
+                if (!s.contains('@') || !s.contains('.')) return 'Enter a valid email';
+                return null;
+              },
+            ),
+            const SizedBox(height: 18),
+            VnTextField(
+              label: 'Password',
+              controller: _passwordCtrl,
+              hint: 'Your password',
+              prefixIcon: Icons.lock_outline_rounded,
+              obscure: _obscure,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => _submitEmail(),
+              validator: (v) {
+                if ((v ?? '').isEmpty) return 'Enter your password';
+                if (_createMode && v!.length < 6) {
+                  return 'Use at least 6 characters';
+                }
+                return null;
+              },
+              suffix: IconButton(
+                tooltip: _obscure ? 'Show password' : 'Hide password',
+                icon: Icon(
+                  _obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                  color: p.muted,
+                  size: 20,
+                ),
+                onPressed: () => setState(() => _obscure = !_obscure),
               ),
             ),
-            const SizedBox(height: AppSpacing.lg),
-            const Row(
-              children: [
-                Expanded(child: Divider()),
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: Text('OR'),
+            if (!_createMode)
+              Align(
+                alignment: Alignment.centerRight,
+                child: VnLink(
+                  label: 'Forgot password?',
+                  fontSize: 13,
+                  onTap: isLoading ? null : _forgotPassword,
                 ),
-                Expanded(child: Divider()),
+              )
+            else
+              const SizedBox(height: 18),
+            VnButton(
+              label: _createMode ? 'Create account' : 'Sign in',
+              loading: isLoading,
+              onPressed: isLoading ? null : _submitEmail,
+            ),
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                Expanded(child: Divider(color: p.line, height: 1)),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Text('or', style: VnText.body(12, color: p.muted)),
+                ),
+                Expanded(child: Divider(color: p.line, height: 1)),
               ],
             ),
-            const SizedBox(height: AppSpacing.lg),
-            OutlinedButton(
-              onPressed: () => ref.read(authProvider.notifier).signInAnonymously(),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                side: BorderSide(color: context.colorScheme.outline.withValues(alpha: 0.3), width: 2),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            const SizedBox(height: 18),
+            VnOutlineButton(
+              label: 'Continue with Google',
+              background: p.surface,
+              leading: Image.asset(
+                'assets/images/google_logo.png',
+                width: 20,
+                height: 20,
+                errorBuilder: (c, e, s) => const Icon(
+                    Icons.g_mobiledata_rounded,
+                    color: Colors.blue,
+                    size: 24),
               ),
-              child: const Text('Continue as Guest', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+              onPressed: isLoading
+                  ? null
+                  : () {
+                      HapticFeedback.lightImpact();
+                      ref.read(authProvider.notifier).linkGoogleAccount();
+                    },
             ),
-            const SizedBox(height: AppSpacing.md),
+            const SizedBox(height: 18),
+            VnOutlineButton(
+              label: 'Try anonymously',
+              icon: Icons.person_outline_rounded,
+              background: p.surfaceAlt,
+              borderColor: Colors.transparent,
+              onPressed: isLoading
+                  ? null
+                  : () {
+                      HapticFeedback.lightImpact();
+                      ref.read(authProvider.notifier).signInAnonymously();
+                    },
+            ),
+
+            const SizedBox(height: 8),
             Text(
-              'Guest mode limits: No history, no syncing.',
+              'Guest mode: no history sync across devices.',
               textAlign: TextAlign.center,
-              style: context.textTheme.bodySmall?.copyWith(
-                color: context.colorScheme.onSurfaceVariant,
-              ),
+              style: VnText.body(12, color: p.muted),
             ),
           ],
-        ],
-      ),
-    );
-
-    if (isWide) {
-      return Scaffold(
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_rounded),
-            onPressed: () => context.pop(),
-          ),
-        ),
-        extendBodyBehindAppBar: true,
-        body: GradientBackground(
-          child: Row(
+          const SizedBox(height: 18),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Expanded(
-                flex: 5,
-                child: ShaderMask(
-                  shaderCallback: (rect) {
-                    return LinearGradient(
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                      colors: [
-                        Colors.black,
-                        Colors.black.withValues(alpha: 0.8),
-                        Colors.transparent,
-                      ],
-                      stops: const [0.0, 0.7, 1.0],
-                    ).createShader(rect);
-                  },
-                  blendMode: BlendMode.dstIn,
-                  child: Image.asset(
-                    'assets/images/patient_login.jpg',
-                    fit: BoxFit.cover,
-                    height: double.infinity,
-                    alignment: Alignment.centerLeft,
-                  ),
-                ),
-              ),
-              Expanded(
-                flex: 4,
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxHeight: 800),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxl * 2),
-                      child: content,
-                    ),
-                  ),
-                ),
+              Text(_createMode ? 'Already have an account? ' : 'New to VitaNet? ',
+                  style: VnText.body(14, color: p.muted)),
+              VnLink(
+                label: _createMode ? 'Sign in' : 'Create an account',
+                weight: FontWeight.w700,
+                onTap: () => setState(() => _createMode = !_createMode),
               ),
             ],
-          ),
-        ),
-      );
-    }
-
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-          onPressed: () => context.pop(),
-        ),
-      ),
-      body: Stack(
-        children: [
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: MediaQuery.sizeOf(context).height * 0.45,
-            child: ShaderMask(
-              shaderCallback: (rect) {
-                return LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black,
-                    Colors.black.withValues(alpha: 0.8),
-                    Colors.transparent,
-                  ],
-                  stops: const [0.0, 0.6, 1.0],
-                ).createShader(rect);
-              },
-              blendMode: BlendMode.dstIn,
-              child: Image.asset(
-                'assets/images/patient_login.jpg',
-                fit: BoxFit.cover,
-                alignment: Alignment.topCenter,
-              ),
-            ),
-          ),
-          Positioned.fill(
-            top: MediaQuery.sizeOf(context).height * 0.30,
-            child: ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).brightness == Brightness.dark 
-                        ? const Color(0xFF061017).withValues(alpha: 0.85)
-                        : Colors.white.withValues(alpha: 0.9),
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-                    border: Border(
-                      top: BorderSide(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        width: 1,
-                      ),
-                    ),
-                  ),
-                  child: SafeArea(
-                    top: false,
-                    child: Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 600),
-                        child: Padding(
-                          padding: const EdgeInsets.all(AppSpacing.xxl),
-                          child: content,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
           ),
         ],
       ),
     );
   }
-}
-
-// ─── Helpers ───
-
-// ─── Helpers ───
-
-Widget _googleIcon() {
-  return Container(
-    padding: const EdgeInsets.all(4),
-    decoration: const BoxDecoration(
-      color: Colors.white,
-      shape: BoxShape.circle,
-    ),
-    child: Image.asset(
-      'assets/images/google_logo.png',
-      width: 20,
-      height: 20,
-      errorBuilder: (c, e, s) => const Icon(Icons.g_mobiledata_rounded, color: Colors.blue, size: 24),
-    ),
-  );
 }

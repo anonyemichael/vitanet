@@ -1,231 +1,232 @@
-import 'dart:ui';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:vitanet/core/constants/app_spacing.dart';
-import 'package:vitanet/core/extensions/context_ext.dart';
-import 'package:vitanet/shared/widgets/animated_logo.dart';
-import 'package:vitanet/shared/widgets/gradient_background.dart';
+import 'package:vitanet/shared/widgets/vitanet_logo.dart';
+import 'package:vitanet/shared/widgets/vn_kit.dart';
 
-class RoleSelectionScreen extends StatelessWidget {
+class RoleSelectionScreen extends StatefulWidget {
   const RoleSelectionScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final isWide = MediaQuery.sizeOf(context).width > 800;
-
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      body: isWide 
-          ? const _WideRoleSelection() 
-          : const _NarrowRoleSelection(),
-    );
-  }
+  State<RoleSelectionScreen> createState() => _RoleSelectionScreenState();
 }
 
-class _WideRoleSelection extends StatelessWidget {
-  const _WideRoleSelection();
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _ImageRoleCard(
-            title: 'Personal User',
-            subtitle: 'Check symptoms and manage your health securely',
-            imagePath: 'assets/images/patient_login.jpg',
-            icon: Icons.person_rounded,
-            onTap: () => context.push('/login/patient'),
-          ),
-        ),
-        Expanded(
-          child: _ImageRoleCard(
-            title: 'Hospital Personnel',
-            subtitle: 'Access the admin dashboard and review cases',
-            imagePath: 'assets/images/staff_login.jpg',
-            icon: Icons.medical_services_rounded,
-            onTap: () => context.push('/login/hospital_personnel'),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _NarrowRoleSelection extends StatelessWidget {
-  const _NarrowRoleSelection();
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Expanded(
-          child: _ImageRoleCard(
-            title: 'Personal User',
-            subtitle: 'Check symptoms and manage your health securely',
-            imagePath: 'assets/images/patient_login.jpg',
-            icon: Icons.person_rounded,
-            onTap: () => context.push('/login/patient'),
-          ),
-        ),
-        Expanded(
-          child: _ImageRoleCard(
-            title: 'Hospital Personnel',
-            subtitle: 'Access the admin dashboard and review cases',
-            imagePath: 'assets/images/staff_login.jpg',
-            icon: Icons.medical_services_rounded,
-            onTap: () => context.push('/login/hospital_personnel'),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ImageRoleCard extends StatefulWidget {
-  final String title;
-  final String subtitle;
-  final String imagePath;
-  final IconData icon;
-  final VoidCallback onTap;
-
-  const _ImageRoleCard({
-    required this.title,
-    required this.subtitle,
-    required this.imagePath,
-    required this.icon,
-    required this.onTap,
-  });
-
-  @override
-  State<_ImageRoleCard> createState() => _ImageRoleCardState();
-}
-
-class _ImageRoleCardState extends State<_ImageRoleCard> with SingleTickerProviderStateMixin {
-  bool _isHovered = false;
-  late AnimationController _controller;
-  late Animation<double> _scaleAnimation;
+class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
+  late final TapGestureRecognizer _privacyTap;
+  late final TapGestureRecognizer _disclaimerTap;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 300),
-    );
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 1.05).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutQuart),
-    );
+    _privacyTap = TapGestureRecognizer()..onTap = () => context.push('/privacy');
+    _disclaimerTap = TapGestureRecognizer()
+      ..onTap = () => context.push('/disclaimer');
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _privacyTap.dispose();
+    _disclaimerTap.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) {
-        setState(() => _isHovered = true);
-        _controller.forward();
-      },
-      onExit: (_) {
-        setState(() => _isHovered = false);
-        _controller.reverse();
-      },
-      child: GestureDetector(
-        onTapDown: (_) => _controller.forward(),
-        onTapUp: (_) => _controller.reverse(),
-        onTapCancel: () => _controller.reverse(),
-        onTap: widget.onTap,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            // Background Image with Scale Transition
-            ScaleTransition(
-              scale: _scaleAnimation,
-              child: Image.asset(
-                widget.imagePath,
-                fit: BoxFit.cover,
-                cacheWidth: 600,
-                errorBuilder: (c, e, s) => Container(color: context.colorScheme.primary),
-              ),
-            ),
-            
-            // Overlay gradient
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withValues(alpha: _isHovered ? 0.3 : 0.6),
-                    Colors.black.withValues(alpha: _isHovered ? 0.7 : 0.9),
-                  ],
-                ),
-              ),
-            ),
+    final p = VnPalette.of(context);
+    final wide = MediaQuery.sizeOf(context).width >= 760;
 
-            // Content
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxl, vertical: AppSpacing.md),
-              child: Center(
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                          color: _isHovered 
-                              ? context.colorScheme.primary 
-                              : Colors.white.withValues(alpha: 0.1),
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: _isHovered ? Colors.transparent : Colors.white.withValues(alpha: 0.2),
-                            width: 2,
+    final patient = _RoleCard(
+      image: 'assets/images/photos/doctor_with_patient.jpg',
+      alt: 'Doctor chatting with a smiling patient in a hospital bed',
+      alignment: const Alignment(0, -0.4),
+      title: 'Personal user',
+      body: 'Check symptoms and manage your health securely',
+      highlighted: true,
+      onTap: () => context.push('/login/patient'),
+    );
+    final staff = _RoleCard(
+      image: 'assets/images/photos/medical_team.jpg',
+      alt: 'Doctors and nurses standing in a hospital corridor',
+      alignment: const Alignment(0, -0.5),
+      title: 'Hospital personnel',
+      body: 'Access the clinical dashboard and review cases',
+      onTap: () => context.push('/login/hospital_personnel'),
+    );
+
+    return Scaffold(
+      backgroundColor: p.page,
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: wide ? 880 : 560),
+            child: CustomScrollView(
+              slivers: [
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
+                  sliver: SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        SizedBox(
+                          height: 44,
+                          child: Row(
+                            children: [
+                              const VitaNetLogo(size: 36),
+                              const SizedBox(width: 10),
+                              Text('VitaNet', style: VnText.heading(20, color: p.ink)),
+                            ],
                           ),
                         ),
-                        child: Icon(
-                          widget.icon,
-                          size: 64,
-                          color: Colors.white,
+                        const SizedBox(height: 24),
+                        Semantics(
+                          header: true,
+                          child: Text('How will you use VitaNet?',
+                              style: VnText.heading(28, color: p.ink, height: 1.2)),
                         ),
-                      ),
-                      const SizedBox(height: AppSpacing.xxl),
-                      Text(
-                        widget.title,
-                        style: context.textTheme.displaySmall?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -1.0,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      AnimatedOpacity(
-                        duration: const Duration(milliseconds: 300),
-                        opacity: _isHovered ? 1.0 : 0.7,
-                        child: Text(
-                          widget.subtitle,
-                          style: context.textTheme.titleLarge?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w400,
+                        const SizedBox(height: 8),
+                        Text('Pick one. You can switch later from Settings.',
+                            style: VnText.body(15, color: p.muted, height: 1.5)),
+                        const SizedBox(height: 24),
+                        if (wide)
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(child: patient),
+                              const SizedBox(width: 20),
+                              Expanded(child: staff),
+                            ],
+                          )
+                        else ...[
+                          patient,
+                          const SizedBox(height: 24),
+                          staff,
+                        ],
+                        const Spacer(),
+                        const SizedBox(height: 24),
+                        Text.rich(
+                          TextSpan(
+                            style: VnText.body(12, color: p.muted, height: 1.5),
+                            children: [
+                              const TextSpan(text: 'By continuing you agree to the '),
+                              TextSpan(
+                                text: 'Privacy Policy',
+                                recognizer: _privacyTap,
+                                style: VnText.body(12,
+                                    weight: FontWeight.w600, color: p.brand),
+                              ),
+                              const TextSpan(text: ' and '),
+                              TextSpan(
+                                text: 'Medical Disclaimer',
+                                recognizer: _disclaimerTap,
+                                style: VnText.body(12,
+                                    weight: FontWeight.w600, color: p.brand),
+                              ),
+                              const TextSpan(text: '.'),
+                            ],
                           ),
                           textAlign: TextAlign.center,
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
+              ],
             ),
-          ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RoleCard extends StatelessWidget {
+  final String image;
+  final String alt;
+  final Alignment alignment;
+  final String title;
+  final String body;
+  final bool highlighted;
+  final VoidCallback onTap;
+
+  const _RoleCard({
+    required this.image,
+    required this.alt,
+    required this.alignment,
+    required this.title,
+    required this.body,
+    required this.onTap,
+    this.highlighted = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = VnPalette.of(context);
+    return Semantics(
+      button: true,
+      label: '$title. $body',
+      excludeSemantics: true,
+      child: Material(
+        color: p.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: BorderSide(
+            color: highlighted ? p.brand : p.line,
+            width: highlighted ? 2 : 1,
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                height: 150,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Image.asset(image,
+                        fit: BoxFit.cover, alignment: alignment, semanticLabel: alt),
+                    if (highlighted)
+                      Positioned(
+                        top: 12,
+                        right: 12,
+                        child: Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(color: p.brand, shape: BoxShape.circle),
+                          child: Icon(Icons.check_rounded, size: 16, color: p.onBrand),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(title,
+                              style: VnText.heading(18,
+                                  weight: FontWeight.w700, color: p.ink)),
+                          const SizedBox(height: 4),
+                          Text(body,
+                              style: VnText.body(14, color: p.muted, height: 1.4)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Icon(Icons.chevron_right_rounded,
+                        color: highlighted ? p.brand : p.muted),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
