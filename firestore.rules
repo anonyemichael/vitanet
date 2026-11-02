@@ -1,18 +1,36 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
 
-      // Allow access to the conversations subcollection
+    // A user may only set their own role to 'user'. Hospital staff access is
+    // granted by the backend (staff approval), never by the client, so an
+    // elevated role can only stay as it already is, never be self-assigned.
+    function roleIsSafe() {
+      return !('role' in request.resource.data)
+        || request.resource.data.role == 'user'
+        || (resource != null && 'role' in resource.data
+            && request.resource.data.role == resource.data.role);
+    }
+
+    match /users/{userId} {
+      allow read, delete: if request.auth != null && request.auth.uid == userId;
+      allow create, update: if request.auth != null && request.auth.uid == userId && roleIsSafe();
+
       match /conversations/{conversationId} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }
     }
 
+    // Public app configuration (e.g. the current backend URL). Read-only for
+    // clients; updated from the console / admin tooling.
+    match /app_config/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // Shared, curated content read by every signed-in user. Writes stay
-    // closed: content should be managed from the console / backend, not by
-    // app clients (the app's cache writes simply fail and are ignored).
+    // closed: content is managed from the console / backend, not by app
+    // clients (the app's cache writes fail quietly and are ignored).
     match /first_aid_guides/{docId} {
       allow read: if request.auth != null;
     }

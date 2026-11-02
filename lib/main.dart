@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'package:vitanet/firebase_options.dart';
 import 'package:vitanet/app/router.dart';
@@ -28,11 +27,6 @@ Future<void> main() async {
     FlutterNativeSplash.remove();
   }
 
-  try {
-    await dotenv.load(fileName: ".env");
-  } catch (e) {
-    debugPrint('DotEnv load: $e');
-  }
 
   try {
     await Firebase.initializeApp(

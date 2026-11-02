@@ -1,3 +1,4 @@
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -11,6 +12,7 @@ from app.schemas.care_circle_activity import CareCircleActivityOut
 
 
 from app.database.connection import get_db
+from app.dependencies.security import CurrentUser, get_current_user, owned_user_id, current_user_id
 from app.models.care_circle import CareCircleStatus
 from app.schemas.care_circle import CareCircleOut, CareCircleUpdate
 from app.schemas.user import CareCircleMemberInput
@@ -25,15 +27,10 @@ router = APIRouter(prefix="/care-circles", tags=["care-circles"])
 DEMO_USER_ID = UUID("00000000-0000-0000-0000-000000000001")
 
 
-def _resolve_user_id(db: Session, identifier: str) -> UUID:
-    try:
-        return UUID(identifier)
-    except ValueError:
-        from app.services import user_service
-        user = user_service.get_user_by_firebase_uid(db, identifier)
-        if user:
-            return user.id
-        return DEMO_USER_ID
+def _resolve_user_id(db: Session, identifier) -> UUID:
+    # Ownership is already enforced by the owned_user_id dependency, which
+    # resolves the path to the caller's own backend user id.
+    return identifier if isinstance(identifier, UUID) else UUID(str(identifier))
 
 
 def render_response_page(success: bool, title: str, message: str) -> str:
@@ -109,14 +106,14 @@ def render_response_page(success: bool, title: str, message: str) -> str:
 
 
 @router.get("/user/{user_id}", response_model=list[CareCircleOut])
-def list_care_circle_for_user(user_id: str, db: Session = Depends(get_db)):
+def list_care_circle_for_user(user_id: Annotated[UUID, Depends(owned_user_id)], db: Session = Depends(get_db)):
     uid = _resolve_user_id(db, user_id)
     return care_circle_service.get_care_circle_for_user(db, uid)
 
 
 
 @router.post("/user/{user_id}", response_model=CareCircleOut, status_code=status.HTTP_201_CREATED)
-def add_care_circle_member(user_id: str, payload: CareCircleMemberInput, db: Session = Depends(get_db)):
+def add_care_circle_member(user_id: Annotated[UUID, Depends(owned_user_id)], payload: CareCircleMemberInput, db: Session = Depends(get_db)):
     uid = _resolve_user_id(db, user_id)
     member = care_circle_service.create_care_circle_member(db, uid, payload)
     db.commit()
@@ -199,20 +196,25 @@ def respond_to_invite(token: str, action: str, db: Session = Depends(get_db)):
 
 
 @router.get("/activity/{user_id}", response_model=list[CareCircleActivityOut])
-def get_activity_feed(user_id: UUID, db: Session = Depends(get_db)):
+def get_activity_feed(user_id: Annotated[UUID, Depends(owned_user_id)], db: Session = Depends(get_db)):
     return care_circle_activity_service.get_activity_for_user(db, user_id)
 
 
 @router.get("/{care_circle_id}", response_model=CareCircleOut)
-def get_care_circle(care_circle_id: UUID, db: Session = Depends(get_db)):
-    care_circle = care_circle_service.get_care_circle_by_id(db, care_circle_id)
-    if not care_circle:
+def get_care_circle(care_circle_id: UUID, me: Annotated[UUID, Depends(current_user_id)], db: Session = Depends(get_db)):
+    return _own_member(db, care_circle_id, me)
+
+
+def _own_member(db: Session, care_circle_id: UUID, me: UUID):
+    member = care_circle_service.get_care_circle_by_id(db, care_circle_id)
+    if not member or member.requester_id != me:
         raise HTTPException(status_code=404, detail="Care circle member not found")
-    return care_circle
+    return member
 
 
 @router.patch("/{care_circle_id}", response_model=CareCircleOut)
-def update_care_circle(care_circle_id: UUID, payload: CareCircleUpdate, db: Session = Depends(get_db)):
+def update_care_circle(care_circle_id: UUID, payload: CareCircleUpdate, me: Annotated[UUID, Depends(current_user_id)], db: Session = Depends(get_db)):
+    _own_member(db, care_circle_id, me)
     updates = payload.model_dump(exclude_unset=True)
     care_circle = care_circle_service.update_care_circle_member(db, care_circle_id, updates)
     if not care_circle:
@@ -221,7 +223,8 @@ def update_care_circle(care_circle_id: UUID, payload: CareCircleUpdate, db: Sess
 
 
 @router.delete("/{care_circle_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_care_circle(care_circle_id: UUID, db: Session = Depends(get_db)):
+def delete_care_circle(care_circle_id: UUID, me: Annotated[UUID, Depends(current_user_id)], db: Session = Depends(get_db)):
+    _own_member(db, care_circle_id, me)
     deleted = care_circle_service.delete_care_circle_member(db, care_circle_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Care circle member not found")

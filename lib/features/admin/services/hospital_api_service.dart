@@ -1,7 +1,6 @@
 import 'package:dio/dio.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:vitanet/core/network/backend.dart';
 import '../models/patient.dart';
 import '../models/alert.dart';
 import '../models/hospital_data.dart';
@@ -10,36 +9,15 @@ import '../widgets/staff_demo_data.dart';
 
 class ApiService {
   final Dio _dio;
-  static const String _defaultUrl = String.fromEnvironment(
-    'BACKEND_BASE_URL',
-    defaultValue: 'https://passed-nest-rouge-arrange.trycloudflare.com/',
-  );
 
-  ApiService({String? baseUrl})
-      : _dio = Dio(BaseOptions(
-          baseUrl: baseUrl ?? _defaultUrl,
-          connectTimeout: const Duration(seconds: 4),
-          receiveTimeout: const Duration(seconds: 4),
-        )) {
-    _dio.interceptors.add(
-      InterceptorsWrapper(
-        onRequest: (options, handler) async {
-          try {
-            final currentUser =
-                Firebase.apps.isNotEmpty ? FirebaseAuth.instance.currentUser : null;
-            if (currentUser != null) {
-              final idToken = await currentUser.getIdToken();
-              if (idToken != null) {
-                options.headers['Authorization'] = 'Bearer $idToken';
-              }
-            }
-          } catch (_) {
-            // Ignore in offline / test environments
-          }
-          return handler.next(options);
-        },
-      ),
-    );
+  /// Remotely configured backend URL + Firebase ID token on every request.
+  ApiService({String? baseUrl}) : _dio = createBackendDio() {
+    if (baseUrl != null) {
+      _dio.interceptors.add(InterceptorsWrapper(onRequest: (o, h) {
+        o.baseUrl = baseUrl;
+        h.next(o);
+      }));
+    }
   }
 
   Future<HospitalStats> getDashboardStats() async {

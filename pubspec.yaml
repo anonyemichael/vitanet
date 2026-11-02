@@ -64,7 +64,6 @@ flutter:
     - assets/health_library_data/images/
     - assets/health_library_data/interactives/
     - assets/lottie/
-    - .env
 
 flutter_native_splash:
   color: "#040A10"

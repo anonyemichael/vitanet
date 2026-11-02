@@ -1,3 +1,4 @@
+from app.dependencies.security import require_staff
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -22,7 +23,7 @@ from app.schemas.health_alert import HealthAlertOut
 from app.models.health_alert import HealthAlert, AlertStatus
 from app.services import admin_service
 
-router = APIRouter(prefix="/admin", tags=["admin"])
+router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_staff)])
 
 
 @router.get("/stats", response_model=HospitalStatsOut)

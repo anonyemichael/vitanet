@@ -3,12 +3,12 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vitanet/core/constants/app_colors.dart';
+import 'package:vitanet/core/network/backend.dart';
 import 'package:vitanet/data/providers/providers.dart';
 import 'package:vitanet/firebase_options.dart';
 import 'package:vitanet/shared/widgets/vitanet_logo.dart';
@@ -80,13 +80,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       debugPrint('Bootstrap firebase: $e');
     }
 
-    try {
-      if (!dotenv.isInitialized) {
-        await dotenv.load(fileName: ".env");
-      }
-    } catch (e) {
-      debugPrint('DotEnv load: $e');
-    }
+    // Current backend address from Firebase (falls back to the cached value).
+    await BackendConfig.load();
   }
 
   Future<void> _decideRoute() async {

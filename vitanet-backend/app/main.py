@@ -20,11 +20,14 @@ from app.routes import (
     sms_router,
     admin,
     triage,
+    staff,
+    ai_proxy,
 )
+from app.dependencies.security import DEV_BYPASS_AUTH
 
-if os.getenv("DEV_BYPASS_AUTH", "false").lower() == "true":
+if DEV_BYPASS_AUTH:
     print("=" * 60)
-    print("WARNING: DEV_BYPASS_AUTH is enabled — auth is DISABLED")
+    print("WARNING: DEV_BYPASS_AUTH is enabled - auth is DISABLED (non-production only)")
     print("=" * 60)
 
 
@@ -46,8 +49,9 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Allow all localhost origins (any port) for Flutter web dev, plus any
-# additional origins configured via the ALLOWED_ORIGINS env var.
+# Browsers may only call the API from the VitaNet web app (live site and
+# Firebase preview channels) or local development. Mobile apps aren't affected
+# by CORS. Auth uses bearer tokens, so cookies/credentials are not needed.
 _extra_origins = [
     o.strip()
     for o in os.getenv("ALLOWED_ORIGINS", "").split(",")
@@ -56,10 +60,18 @@ _extra_origins = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"https?://.*",
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=[
+        "https://vitanet-62e40.web.app",
+        "https://vitanet-62e40.firebaseapp.com",
+        *_extra_origins,
+    ],
+    allow_origin_regex=(
+        r"https://vitanet-62e40--[a-z0-9-]+\.web\.app"
+        r"|http://(localhost|127\.0\.0\.1)(:\d+)?"
+    ),
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 app.include_router(users.router)
@@ -74,6 +86,8 @@ app.include_router(health_alert.router)
 app.include_router(sms_router.router)
 app.include_router(admin.router)
 app.include_router(triage.router)
+app.include_router(staff.router)
+app.include_router(ai_proxy.router)
 
 
 @app.get("/")

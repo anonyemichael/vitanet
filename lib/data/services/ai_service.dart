@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
+import 'package:vitanet/core/network/backend.dart';
 import 'package:uuid/uuid.dart';
 import 'package:vitanet/data/models/chat_message.dart';
 import 'package:vitanet/data/models/triage_result.dart';
@@ -140,15 +140,12 @@ class AiService {
   }
 
   Future<String?> _searchTavily(String query) async {
-    final apiKey = dotenv.env['TAVILY_API_KEY'];
-    if (apiKey == null || apiKey.isEmpty) return null;
 
     try {
       final response = await http.post(
-        Uri.parse('https://api.tavily.com/search'),
-        headers: {'Content-Type': 'application/json'},
+        BackendConfig.uri('ai/search/tavily'),
+        headers: await BackendConfig.authHeaders(),
         body: jsonEncode({
-          'api_key': apiKey,
           'query': query,
           'search_depth': 'basic',
           'include_answer': true,
@@ -172,13 +169,10 @@ class AiService {
   }
 
   Future<String?> _searchGoogle(String query) async {
-    final apiKey = dotenv.env['GOOGLE_API_KEY'];
-    final cx = dotenv.env['GOOGLE_CSE_ID'];
-    if (apiKey == null || apiKey.isEmpty || cx == null || cx.isEmpty) return null;
 
     try {
-      final url = Uri.parse('https://www.googleapis.com/customsearch/v1?key=$apiKey&cx=$cx&q=${Uri.encodeComponent(query)}&num=3');
-      final response = await http.get(url);
+      final url = BackendConfig.uri('ai/search/google').replace(queryParameters: {'q': query, 'num': '3'});
+      final response = await http.get(url, headers: await BackendConfig.authHeaders());
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -194,10 +188,6 @@ class AiService {
   }
 
   Future<String?> _checkSearchIntent(String userMessage) async {
-    final apiKeyString = dotenv.env['OPENROUTER_API_KEYS'] ?? '';
-    final apiKeys = apiKeyString.split(',').where((k) => k.trim().isNotEmpty).toList();
-    if (apiKeys.isEmpty) return null;
-    final apiKey = apiKeys.first.trim();
 
     final prompt = '''
 You are an intent classifier. Does the user's message require fetching real-time information from the web (e.g., live operating hours, today's news, current events, or searching for specific places/hospitals/clinics near them)?
@@ -216,11 +206,8 @@ User message: "$userMessage"
 
     try {
       final response = await http.post(
-        Uri.parse('https://openrouter.ai/api/v1/chat/completions'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $apiKey',
-        },
+        BackendConfig.uri('ai/chat/completions'),
+        headers: await BackendConfig.authHeaders(),
         body: jsonEncode(body),
       );
 
@@ -240,13 +227,6 @@ User message: "$userMessage"
   Stream<String> getResponseStream(String userMessage, {String? base64Image}) async* {
     _questionCount++;
 
-    final apiKeyString = dotenv.env['OPENROUTER_API_KEYS'] ?? '';
-    final apiKeys = apiKeyString.split(',').where((k) => k.trim().isNotEmpty).toList();
-    if (apiKeys.isEmpty) {
-      yield 'OpenRouter API key not configured.';
-      return;
-    }
-    final apiKey = apiKeys.first.trim();
 
     // Check if web search is needed
     String? searchContext;
@@ -300,9 +280,8 @@ User message: "$userMessage"
       'stream': true,
     };
 
-    final request = http.Request('POST', Uri.parse('https://openrouter.ai/api/v1/chat/completions'));
-    request.headers['Content-Type'] = 'application/json';
-    request.headers['Authorization'] = 'Bearer $apiKey';
+    final request = http.Request('POST', BackendConfig.uri('ai/chat/completions'));
+    request.headers.addAll(await BackendConfig.authHeaders());
     request.body = jsonEncode(body);
 
     try {
@@ -351,13 +330,6 @@ User message: "$userMessage"
   }) async {
     _questionCount++;
 
-    final apiKeyString = dotenv.env['OPENROUTER_API_KEYS'] ?? '';
-    final apiKeys = apiKeyString.split(',').where((k) => k.trim().isNotEmpty).toList();
-    if (apiKeys.isEmpty) {
-      return [_errorMessage('OpenRouter API key not configured.')];
-    }
-    // We'll just use the first key for now, could randomly pick for rotation
-    final apiKey = apiKeys.first.trim();
 
     // Check if web search is needed
     String? searchContext;
@@ -413,11 +385,8 @@ User message: "$userMessage"
 
     try {
       final response = await http.post(
-        Uri.parse('https://openrouter.ai/api/v1/chat/completions'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $apiKey',
-        },
+        BackendConfig.uri('ai/chat/completions'),
+        headers: await BackendConfig.authHeaders(),
         body: jsonEncode(body),
       );
 
@@ -530,10 +499,6 @@ User message: "$userMessage"
     required String high,
     required String low,
   }) async {
-    final apiKeyString = dotenv.env['OPENROUTER_API_KEYS'] ?? '';
-    final apiKeys = apiKeyString.split(',').where((k) => k.trim().isNotEmpty).toList();
-    if (apiKeys.isEmpty) return 'Error: API key not configured.';
-    final apiKey = apiKeys.first.trim();
 
     final prompt = '''
 You are a medical AI assistant analyzing health data for a user.
@@ -556,11 +521,8 @@ Lowest (recent): $low $unit
 
     try {
       final response = await http.post(
-        Uri.parse('https://openrouter.ai/api/v1/chat/completions'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $apiKey',
-        },
+        BackendConfig.uri('ai/chat/completions'),
+        headers: await BackendConfig.authHeaders(),
         body: jsonEncode(body),
       );
 

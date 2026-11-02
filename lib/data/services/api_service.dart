@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:vitanet/core/network/backend.dart';
 
 class MLTriagePrediction {
   final String disease;
@@ -33,17 +34,18 @@ class MLTriagePrediction {
 
 class ApiService {
   final Dio _dio;
-  static const String _defaultUrl = String.fromEnvironment(
-    'BACKEND_BASE_URL',
-    defaultValue: 'https://passed-nest-rouge-arrange.trycloudflare.com/',
-  );
 
-  ApiService({String? baseUrl})
-      : _dio = Dio(BaseOptions(
-          baseUrl: baseUrl ?? _defaultUrl,
-          connectTimeout: const Duration(seconds: 4),
-          receiveTimeout: const Duration(seconds: 4),
-        ));
+  /// Uses the remotely configured backend URL and sends the user's Firebase
+  /// ID token with every request (see [BackendConfig]).
+  ApiService({String? baseUrl}) : _dio = createBackendDio() {
+    if (baseUrl != null) {
+      // Runs after the shared interceptor, so an explicit URL (tests) wins.
+      _dio.interceptors.add(InterceptorsWrapper(onRequest: (o, h) {
+        o.baseUrl = baseUrl;
+        h.next(o);
+      }));
+    }
+  }
 
   /// Fetches the connection status of various health monitoring devices.
   Future<Map<String, bool>> getDeviceConnections() async {

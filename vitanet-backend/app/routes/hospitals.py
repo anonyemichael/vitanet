@@ -1,16 +1,18 @@
+from typing import Annotated
 # app/routers/hospital.py
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database.connection import get_db
+from app.dependencies.security import CurrentUser, get_current_user, owned_user_id
 from app.services import hospital_service, user_location_service
 
 router = APIRouter(prefix="/hospitals", tags=["hospitals"])
 
 
 @router.get("/nearby/{user_id}")
-def nearby_hospitals(user_id: UUID, limit: int = 5, db: Session = Depends(get_db)):
+def nearby_hospitals(user_id: Annotated[UUID, Depends(owned_user_id)], limit: int = 5, db: Session = Depends(get_db)):
     location = user_location_service.get_location(db, user_id)
     if not location:
         raise HTTPException(status_code=404, detail="No location on file for this user")

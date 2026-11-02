@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:vitanet/shared/widgets/vitanet_logo.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:vitanet/core/constants/app_colors.dart';
 import 'package:vitanet/core/providers/shared_state.dart';
@@ -538,6 +539,11 @@ class _ScaffoldWithNavBar extends ConsumerWidget {
               activeIcon: Icons.menu_book_rounded,
               label: 'Resources',
             ),
+            _NavItem(
+              icon: Icons.person_outline_rounded,
+              activeIcon: Icons.person_rounded,
+              label: 'Profile',
+            ),
           ];
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -572,27 +578,7 @@ class _ScaffoldWithNavBar extends ConsumerWidget {
                       onTap: () => navigationShell.goBranch(0),
                       child: Row(
                         children: [
-                          Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF0D9488),
-                              borderRadius: BorderRadius.circular(8),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(0xFF0D9488).withValues(alpha: 0.30),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            alignment: Alignment.center,
-                            child: const Icon(
-                              Icons.shield_outlined,
-                              color: Colors.white,
-                              size: 18,
-                            ),
-                          ),
+                          const VitaNetLogo(size: 32),
                           const SizedBox(width: 10),
                           Text(
                             'VitaNet',

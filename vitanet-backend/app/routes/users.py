@@ -1,3 +1,4 @@
+from typing import Annotated
 from uuid import UUID
 import traceback
 
@@ -5,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database.connection import get_db
+from app.dependencies.security import CurrentUser, get_current_user, owned_user_id
 from app.schemas.user import UserSignupRequest, UserSignupResponse, UserOut, UserUpdate
 from app.services import user_service, care_circle_service
 from app.services.verify_care_email import send_care_circle_invite
@@ -13,7 +15,9 @@ router = APIRouter(prefix="/users", tags=["users"])
 
 
 @router.post("/signup", response_model=UserSignupResponse, status_code=status.HTTP_201_CREATED)
-def signup(payload: UserSignupRequest, db: Session = Depends(get_db)):
+def signup(payload: UserSignupRequest, current: Annotated[CurrentUser, Depends(get_current_user)], db: Session = Depends(get_db)):
+    if payload.user.firebase_uid != current.uid:
+        raise HTTPException(status_code=403, detail="Not allowed")
     existing = user_service.get_user_by_firebase_uid(db, payload.user.firebase_uid)
     if existing:
         raise HTTPException(status_code=400, detail="User already exists")
@@ -42,7 +46,7 @@ def signup(payload: UserSignupRequest, db: Session = Depends(get_db)):
 
 
 @router.get("/{user_id}", response_model=UserOut)
-def get_user(user_id: UUID, db: Session = Depends(get_db)):
+def get_user(user_id: Annotated[UUID, Depends(owned_user_id)], db: Session = Depends(get_db)):
     user = user_service.get_user_by_id(db, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -50,7 +54,9 @@ def get_user(user_id: UUID, db: Session = Depends(get_db)):
 
 
 @router.get("/firebase/{firebase_uid}", response_model=UserOut)
-def get_user_by_firebase(firebase_uid: str, db: Session = Depends(get_db)):
+def get_user_by_firebase(firebase_uid: str, current: Annotated[CurrentUser, Depends(get_current_user)], db: Session = Depends(get_db)):
+    if firebase_uid != current.uid:
+        raise HTTPException(status_code=403, detail="Not allowed")
     user = user_service.get_user_by_firebase_uid(db, firebase_uid)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -58,7 +64,7 @@ def get_user_by_firebase(firebase_uid: str, db: Session = Depends(get_db)):
 
 
 @router.patch("/{user_id}", response_model=UserOut)
-def update_user(user_id: UUID, payload: UserUpdate, db: Session = Depends(get_db)):
+def update_user(user_id: Annotated[UUID, Depends(owned_user_id)], payload: UserUpdate, db: Session = Depends(get_db)):
     updates = payload.model_dump(exclude_unset=True)
     user = user_service.update_user(db, user_id, updates)
     if not user:
@@ -67,7 +73,7 @@ def update_user(user_id: UUID, payload: UserUpdate, db: Session = Depends(get_db
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_user(user_id: UUID, db: Session = Depends(get_db)):
+def delete_user(user_id: Annotated[UUID, Depends(owned_user_id)], db: Session = Depends(get_db)):
     deleted = user_service.delete_user(db, user_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="User not found")

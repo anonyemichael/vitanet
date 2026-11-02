@@ -8,6 +8,7 @@ from app.models.user_location import UserLocation
 from app.models.hospital import Hospital
 from app.models.user_settings import UserSettings
 from app.models.health_alert import HealthAlert, AlertSeverity, AlertStatus
+from app.models.staff_account import StaffAccount, StaffRole, StaffStatus
 from app.models.hospital_ops import (
     HospitalPatientRecord,
     HospitalCase,

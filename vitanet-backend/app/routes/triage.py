@@ -1,9 +1,11 @@
+from fastapi import Depends
+from app.dependencies.security import get_current_user
 from fastapi import APIRouter, HTTPException
 from typing import List
 from app.schemas.triage import TriagePredictRequest, TriagePredictResponse
 from app.services.ml_service import ml_service, SYMPTOM_MAP
 
-router = APIRouter(prefix="/triage", tags=["triage"])
+router = APIRouter(prefix="/triage", tags=["triage"], dependencies=[Depends(get_current_user)])
 
 
 @router.post("/predict", response_model=TriagePredictResponse)
