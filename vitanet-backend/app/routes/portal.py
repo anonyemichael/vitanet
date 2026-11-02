@@ -30,7 +30,6 @@ from app.models.portal import (
     Referral,
 )
 from app.models.staff_account import StaffAccount, StaffRole, StaffStatus
-from app.models.user import User
 
 router = APIRouter(tags=["portal"])
 
@@ -91,6 +90,9 @@ def _hospital_out(h: Hospital, reg: Optional[FacilityRegistration]) -> Dict[str,
 def _referral_out(r: Referral, h: Optional[Hospital] = None) -> Dict[str, Any]:
     return {
         "id": str(r.id), "hospital_id": str(r.hospital_id), "hospital_name": h.name if h else None,
+        "hospital_phone": h.phone_number if h else None,
+        "hospital_latitude": h.latitude if h else None,
+        "hospital_longitude": h.longitude if h else None,
         "status": r.status, "triage_level": r.triage_level, "summary": r.summary or {},
         "eta_minutes": r.eta_minutes, "decline_reason": r.decline_reason,
         "case_id": str(r.case_id) if r.case_id else None,
@@ -266,12 +268,12 @@ def create_referral(payload: ReferralIn, me: UUID = Depends(current_user_id), db
     if open_ref:
         raise HTTPException(status_code=409, detail="You already have an open referral")
     h = db.query(Hospital).filter(Hospital.id == payload.hospital_id).first()
-    user = db.query(User).filter(User.id == me).first()
     eta = None
     if payload.latitude is not None and payload.longitude is not None:
         eta = _eta_minutes(_haversine_km(payload.latitude, payload.longitude, h.latitude, h.longitude))
     summary = {
-        "patient_name": payload.patient_name or (user.full_name if user else "VitaNet patient"),
+        # Only what the patient chose to share — never fill in the account name.
+        "patient_name": (payload.patient_name or "").strip() or "Name not shared",
         "age": payload.age, "sex": payload.sex, "complaint": payload.complaint,
         "triage_summary": payload.triage_summary, "allergies": payload.allergies,
         "medications": payload.medications, "conditions": payload.conditions, "vitals": payload.vitals,
@@ -313,7 +315,7 @@ def cancel_referral(referral_id: UUID, me: UUID = Depends(current_user_id), db: 
         raise HTTPException(status_code=409, detail="This referral can no longer be cancelled")
     r.status = "cancelled"
     db.commit()
-    return _referral_out(r)
+    return _referral_out(r, db.query(Hospital).filter(Hospital.id == r.hospital_id).first())
 
 
 # ───────────────────────── staff: dashboard ─────────────────────────

@@ -7,6 +7,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:vitanet/data/providers/providers.dart';
 import 'package:vitanet/shared/widgets/vn_kit.dart';
 
+import 'package:vitanet/features/home/widgets/active_referral_section.dart';
 import 'package:vitanet/features/home/widgets/header_section.dart';
 import 'package:vitanet/features/home/widgets/profile_completion_banner.dart';
 import 'package:vitanet/features/home/widgets/urgent_care_alert_banner.dart';
@@ -79,6 +80,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               children: [
                 const HeaderSection(),
                 gap,
+                const ActiveReferralSection(),
                 const UrgentCareAlertBanner(),
                 const SymptomCheckHero(),
                 if (completion < 1) ...[

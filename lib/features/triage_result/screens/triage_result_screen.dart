@@ -7,6 +7,7 @@ import 'package:vitanet/core/utils/launch_helpers.dart';
 import 'package:vitanet/data/models/triage_result.dart';
 import 'package:vitanet/data/providers/providers.dart';
 import 'package:vitanet/shared/widgets/vn_kit.dart';
+import 'package:vitanet/features/triage_result/widgets/referral_section.dart';
 
 /// Per-level hero palette and copy (AA contrast with white text).
 class _LevelSpec {
@@ -287,6 +288,10 @@ class TriageResultScreen extends ConsumerWidget {
                           ],
                         ),
                       ),
+                      if (result.level != TriageLevel.selfCare) ...[
+                        const SizedBox(height: 16),
+                        ReferralSection(result: result),
+                      ],
                       if (result.recommendations.isNotEmpty) ...[
                         const SizedBox(height: 16),
                         VnCard(
