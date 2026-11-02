@@ -22,6 +22,7 @@ from app.routes import (
     triage,
     staff,
     ai_proxy,
+    portal,
 )
 from app.dependencies.security import DEV_BYPASS_AUTH
 
@@ -88,6 +89,7 @@ app.include_router(admin.router)
 app.include_router(triage.router)
 app.include_router(staff.router)
 app.include_router(ai_proxy.router)
+app.include_router(portal.router)
 
 
 @app.get("/")

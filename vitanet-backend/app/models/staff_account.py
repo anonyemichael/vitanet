@@ -1,6 +1,7 @@
 from enum import Enum
 
-from sqlalchemy import Column, String, DateTime, Enum as SQLEnum
+from sqlalchemy import Boolean, Column, String, DateTime, Enum as SQLEnum, ForeignKey
+from sqlalchemy import Uuid as UUID
 from sqlalchemy.sql import func
 
 from app.database.base import Base
@@ -34,6 +35,8 @@ class StaffAccount(Base):
         nullable=False,
         default=StaffStatus.PENDING,
     )
+    hospital_id = Column(UUID(as_uuid=True), ForeignKey("hospitals.id"), nullable=True, index=True)
+    on_duty = Column(Boolean, nullable=False, default=False)
     facility = Column(String(200), nullable=True)
     department = Column(String(120), nullable=True)
     license_number = Column(String(80), nullable=True)

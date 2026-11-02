@@ -96,10 +96,22 @@ def test_cannot_access_someone_else():
                       headers=h("tok-bob")).status_code in (403, 404)
 
 
+HOSPITAL = {}
+
+
+def _facility():
+    if "id" not in HOSPITAL:
+        client.get("/staff/me", headers=h("tok-boss"))  # provisions the bootstrap admin
+        r = client.post("/portal/hospitals", headers=h("tok-boss"),
+                        json={"name": "Test Hospital", "latitude": 5.6, "longitude": -0.2})
+        HOSPITAL["id"] = r.json()["id"]
+    return HOSPITAL["id"]
+
+
 def test_staff_needs_approval():
     assert client.get("/admin/stats", headers=h("tok-nurse")).status_code == 403
     r = client.post("/staff/register", headers=h("tok-nurse"),
-                    json={"full_name": "Nurse Joy", "role": "admin"})
+                    json={"full_name": "Nurse Joy", "role": "admin", "hospital_id": _facility()})
     assert r.status_code == 200 and r.json()["status"] == "pending"
     # self-requested "admin" grants nothing until approved
     assert client.get("/admin/stats", headers=h("tok-nurse")).status_code == 403
@@ -112,7 +124,8 @@ def test_anonymous_cannot_register_as_staff():
 
 
 def test_unverified_bootstrap_email_is_not_admin():
-    r = client.post("/staff/register", headers=h("tok-fakeboss"), json={"full_name": "Fake"})
+    r = client.post("/staff/register", headers=h("tok-fakeboss"),
+                    json={"full_name": "Fake", "hospital_id": _facility()})
     assert r.json()["status"] == "pending"
     assert client.get("/admin/stats", headers=h("tok-fakeboss")).status_code == 403
 

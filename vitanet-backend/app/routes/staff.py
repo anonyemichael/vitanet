@@ -3,6 +3,7 @@
 admin reviews requests. Emails listed in BOOTSTRAP_ADMIN_EMAILS (verified
 email only) become the first admin automatically."""
 from typing import List, Optional
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -15,6 +16,7 @@ from app.dependencies.security import (
     is_bootstrap_admin,
     require_admin,
 )
+from app.models.portal import FacilityRegistration
 from app.models.staff_account import StaffAccount, StaffRole, StaffStatus
 
 router = APIRouter(tags=["staff"])
@@ -23,6 +25,7 @@ router = APIRouter(tags=["staff"])
 class StaffRegisterIn(BaseModel):
     full_name: str = Field(..., min_length=2, max_length=150)
     role: StaffRole = StaffRole.DOCTOR
+    hospital_id: Optional[UUID] = None  # the registered facility to join
     facility: Optional[str] = Field(default=None, max_length=200)
     department: Optional[str] = Field(default=None, max_length=120)
     license_number: Optional[str] = Field(default=None, max_length=80)
@@ -34,6 +37,8 @@ class StaffOut(BaseModel):
     full_name: str
     role: StaffRole
     status: StaffStatus
+    hospital_id: Optional[UUID] = None
+    on_duty: bool = False
     facility: Optional[str] = None
     department: Optional[str] = None
     license_number: Optional[str] = None
@@ -46,6 +51,10 @@ class StaffOut(BaseModel):
 class ReviewIn(BaseModel):
     note: Optional[str] = Field(default=None, max_length=500)
     role: Optional[StaffRole] = None  # admin may adjust the role on approval
+
+
+def _is_facility(db: Session, hospital_id: UUID) -> bool:
+    return db.query(FacilityRegistration).filter(FacilityRegistration.hospital_id == hospital_id).first() is not None
 
 
 @router.post("/staff/register", response_model=StaffOut)
@@ -75,9 +84,15 @@ def register_staff(
     staff.review_note = None
 
     if is_bootstrap_admin(current):
+        # The bootstrap admin creates their facility next (POST /portal/hospitals).
         staff.role = StaffRole.ADMIN
         staff.status = StaffStatus.APPROVED
         staff.reviewed_by = "bootstrap"
+        staff.hospital_id = payload.hospital_id if payload.hospital_id and _is_facility(db, payload.hospital_id) else staff.hospital_id
+    else:
+        if payload.hospital_id is None or not _is_facility(db, payload.hospital_id):
+            raise HTTPException(status_code=400, detail="Choose the hospital you work at")
+        staff.hospital_id = payload.hospital_id
 
     db.commit()
     db.refresh(staff)
@@ -112,10 +127,10 @@ def my_staff_status(
 @router.get("/admin/staff-requests", response_model=List[StaffOut])
 def list_staff_requests(
     status: Optional[StaffStatus] = None,
-    _: StaffAccount = Depends(require_admin),
+    admin: StaffAccount = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    q = db.query(StaffAccount)
+    q = db.query(StaffAccount).filter(StaffAccount.hospital_id == admin.hospital_id)
     if status is not None:
         q = q.filter(StaffAccount.status == status)
     return q.order_by(StaffAccount.created_at.desc()).all()
@@ -123,7 +138,7 @@ def list_staff_requests(
 
 def _review(db: Session, uid: str, reviewer: StaffAccount, new_status: StaffStatus, payload: ReviewIn):
     staff = db.query(StaffAccount).filter(StaffAccount.firebase_uid == uid).first()
-    if staff is None:
+    if staff is None or staff.hospital_id is None or staff.hospital_id != reviewer.hospital_id:
         raise HTTPException(status_code=404, detail="Staff request not found")
     if staff.firebase_uid == reviewer.firebase_uid:
         raise HTTPException(status_code=400, detail="You can't review your own account")
