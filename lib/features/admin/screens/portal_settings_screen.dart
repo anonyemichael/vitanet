@@ -71,6 +71,16 @@ class PortalSettingsScreen extends ConsumerWidget {
                                   Text(me.email ?? '', style: staffBody(13, color: p.muted)),
                                 ]),
                               ),
+                              IconButton(
+                                tooltip: 'Edit profile',
+                                icon: Icon(Icons.edit_outlined, color: p.accent),
+                                onPressed: () => showModalBottomSheet<void>(
+                                  context: context,
+                                  isScrollControlled: true,
+                                  backgroundColor: Colors.transparent,
+                                  builder: (_) => _EditProfileSheet(me: me),
+                                ),
+                              ),
                             ]),
                             const SizedBox(height: 8),
                             InfoRow('Role', me.role.label),
@@ -159,6 +169,79 @@ class PortalSettingsScreen extends ConsumerWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _EditProfileSheet extends ConsumerStatefulWidget {
+  final StaffMe me;
+  const _EditProfileSheet({required this.me});
+
+  @override
+  ConsumerState<_EditProfileSheet> createState() => _EditProfileSheetState();
+}
+
+class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
+  late final _name = TextEditingController(text: widget.me.fullName);
+  late final _dept = TextEditingController(text: widget.me.department ?? '');
+  late final _licence = TextEditingController(text: widget.me.licenseNumber ?? '');
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _dept.dispose();
+    _licence.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_name.text.trim().length < 2) {
+      showStaffSnack(context, 'Enter your full name.');
+      return;
+    }
+    setState(() => _saving = true);
+    final ok = await runPortalAction<bool>(context, () async {
+      await ref.read(hospitalApiProvider).updateMyProfile(
+            fullName: _name.text.trim(),
+            department: _dept.text.trim().isEmpty ? null : _dept.text.trim(),
+            licenseNumber: _licence.text.trim().isEmpty ? null : _licence.text.trim(),
+          );
+      return true;
+    }, success: 'Profile updated.');
+    if (!mounted) return;
+    setState(() => _saving = false);
+    if (ok == true) {
+      ref.invalidate(staffAccessProvider);
+      Navigator.of(context).pop();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = StaffPalette.of(context);
+    InputDecoration deco(String hint) => InputDecoration(
+          hintText: hint,
+          filled: true,
+          fillColor: p.card,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+        );
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: PortalSheet(
+        title: 'Edit profile',
+        subtitle: 'Your role and approval can only be changed by an administrator.',
+        actions: [
+          StaffButton('Save', onPressed: _saving ? null : _save),
+        ],
+        children: [
+          StaffField(label: 'Full name', child: TextField(controller: _name, decoration: deco('Dr. Ama Mensah'))),
+          const SizedBox(height: 12),
+          StaffField(label: 'Department', child: TextField(controller: _dept, decoration: deco('Emergency'))),
+          const SizedBox(height: 12),
+          StaffField(label: 'License no.', child: TextField(controller: _licence, decoration: deco('MDC/RN/04712'))),
+        ],
+      ),
     );
   }
 }

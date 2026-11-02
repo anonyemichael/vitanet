@@ -155,6 +155,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
         email: email.trim(),
         password: password,
       );
+      try {
+        await cred.user?.sendEmailVerification();
+      } catch (e) {
+        debugPrint('Verification email not sent: $e');
+      }
       state = state.copyWith(
         status: AuthStatus.authenticated,
         user: cred.user ?? auth.currentUser,

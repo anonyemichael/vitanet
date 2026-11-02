@@ -11,6 +11,7 @@ import 'package:vitanet/features/admin/providers/portal_providers.dart';
 import 'package:vitanet/features/admin/services/hospital_api_service.dart';
 import 'package:vitanet/features/admin/widgets/portal_common.dart';
 import 'package:vitanet/features/admin/widgets/staff_ui.dart';
+import 'package:vitanet/features/auth/widgets/email_verification_banner.dart';
 
 /// Hospital staff sign-in / sign-up (StaffRegister.dc.html).
 ///
@@ -436,6 +437,7 @@ class _StaffDetailsStepState extends ConsumerState<_StaffDetailsStep> {
           Text('Signed in as $email', style: staffBody(13, color: p.muted)),
           const SizedBox(height: 16),
         ],
+        const EmailVerificationBanner(),
         StaffField(
           label: 'Full name',
           child: TextField(
@@ -596,24 +598,21 @@ class _HospitalPickerSheetState extends ConsumerState<_HospitalPickerSheet> {
   @override
   Widget build(BuildContext context) {
     final p = StaffPalette.of(context);
-    final value = ref.watch(facilitiesProvider);
+    final value = ref.watch(facilitySearchProvider(_q));
     return PortalSheet(
       title: 'Choose your hospital',
       children: [
-        StaffSearchField(controller: _search, hint: 'Search hospitals', onChanged: (v) => setState(() => _q = v.trim().toLowerCase())),
+        StaffSearchField(controller: _search, hint: 'Search hospitals', onChanged: (v) => setState(() => _q = v.trim())),
         const SizedBox(height: 12),
         ...value.when(
           loading: () => const [PortalLoading()],
-          error: (e, _) => [PortalError(error: e, onRetry: () => ref.invalidate(facilitiesProvider))],
-          data: (list) {
-            final filtered = list
-                .where((f) => _q.isEmpty || f.name.toLowerCase().contains(_q) || (f.address ?? '').toLowerCase().contains(_q))
-                .toList();
+          error: (e, _) => [PortalError(error: e, onRetry: () => ref.invalidate(facilitySearchProvider(_q)))],
+          data: (filtered) {
             return [
               if (filtered.isEmpty)
                 PortalEmpty(
                   icon: Icons.search_off_rounded,
-                  title: list.isEmpty ? 'No hospitals registered yet' : 'No hospital matches "$_q"',
+                  title: _q.isEmpty ? 'No hospitals registered yet' : 'No hospital matches "$_q"',
                   message: 'Ask your administrator whether your hospital is on VitaNet.',
                 )
               else

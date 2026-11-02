@@ -63,6 +63,18 @@ final facilitiesProvider = FutureProvider.autoDispose<List<Facility>>(
   (ref) => ref.watch(hospitalApiProvider).listFacilities(),
 );
 
+/// Server-side hospital search (name or address); '' lists all (up to 200).
+final facilitySearchProvider = FutureProvider.autoDispose.family<List<Facility>, String>(
+  (ref, query) async {
+    // Small debounce so typing doesn't fire a request per keystroke.
+    var cancelled = false;
+    ref.onDispose(() => cancelled = true);
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    if (cancelled) return const [];
+    return ref.watch(hospitalApiProvider).listFacilities(query: query);
+  },
+);
+
 final dashboardProvider = FutureProvider.autoDispose<Dashboard>(
   (ref) => ref.watch(hospitalApiProvider).getDashboard(),
 );

@@ -214,12 +214,18 @@ def update_hospital(payload: HospitalIn, staff: StaffAccount = Depends(facility_
 @router.get("/facilities")
 def list_facilities(
     lat: Optional[float] = None, lng: Optional[float] = None, limit: int = 10,
+    q: Optional[str] = Query(default=None, max_length=100),
     _: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db),
 ):
     """Registered hospitals (for staff sign-up and for patients choosing where
-    to send a referral), nearest first when a location is given."""
-    rows = (db.query(Hospital, FacilityRegistration)
-            .join(FacilityRegistration, FacilityRegistration.hospital_id == Hospital.id).all())
+    to send a referral), nearest first when a location is given. `q` filters
+    by name or address."""
+    query = (db.query(Hospital, FacilityRegistration)
+             .join(FacilityRegistration, FacilityRegistration.hospital_id == Hospital.id))
+    if q and q.strip():
+        like = f"%{q.strip()}%"
+        query = query.filter(Hospital.name.ilike(like) | Hospital.address.ilike(like))
+    rows = query.all()
     out = []
     for h, reg in rows:
         item = _hospital_out(h, reg)
@@ -232,7 +238,7 @@ def list_facilities(
         out.sort(key=lambda x: x["distance_km"])
     else:
         out.sort(key=lambda x: x["name"].lower())
-    return out[: max(1, min(limit, 50))]
+    return out[: max(1, min(limit, 200))]
 
 
 # ───────────────────────── patient: referrals ─────────────────────────
@@ -709,6 +715,25 @@ def delete_equipment(equipment_id: int, staff: StaffAccount = Depends(facility_a
     db.delete(e)
     _audit(db, staff, "equipment.delete", e.name)
     db.commit()
+
+
+class StaffProfileIn(BaseModel):
+    full_name: str = Field(..., min_length=2, max_length=150)
+    department: Optional[str] = Field(default=None, max_length=120)
+    license_number: Optional[str] = Field(default=None, max_length=80)
+
+
+@router.put("/portal/me/profile")
+def update_my_profile(payload: StaffProfileIn, staff: StaffAccount = Depends(require_staff),
+                      db: Session = Depends(get_db)):
+    """Staff edit their own name, department and licence (not role/status)."""
+    staff.full_name = payload.full_name.strip()
+    staff.department = payload.department
+    staff.license_number = payload.license_number
+    if staff.hospital_id is not None:
+        _audit(db, staff, "profile.update")
+    db.commit()
+    return _staff_out(staff)
 
 
 @router.put("/portal/me/duty")

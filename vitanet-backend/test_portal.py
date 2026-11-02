@@ -144,6 +144,11 @@ def test_capacity_permissions():
     assert c.put(f"/portal/wards/{w}", headers=h("nurse"),
                  json={"name": "Emergency", "beds_total": 9, "beds_occupied": 2, "critical": True}).status_code == 403
     assert c.post("/portal/wards", headers=h("nurse"), json={"name": "X", "beds_total": 1}).status_code == 403
+    prof = c.put("/portal/me/profile", headers=h("nurse"),
+                 json={"full_name": "Nurse Joy Mensah", "department": "Emergency"}).json()
+    assert prof["full_name"] == "Nurse Joy Mensah" and prof["role"] == "nurse"
+    found = c.get("/facilities?q=korle", headers=h("pat")).json()
+    assert [f["name"] for f in found] == ["Korle Bu Teaching Hospital"]
     duty = c.put("/portal/me/duty", headers=h("nurse"), json={"on_duty": True}).json()
     assert duty["on_duty"] is True
     assert c.get("/portal/dashboard", headers=h("boss")).json()["counts"]["staff_on_duty"] == 1

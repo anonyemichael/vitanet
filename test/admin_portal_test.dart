@@ -52,7 +52,7 @@ class FakeApi extends Fake implements HospitalApiService {
   Map<String, Object?>? lastAccept;
 
   @override
-  Future<List<Facility>> listFacilities({double? lat, double? lng, int limit = 50}) async =>
+  Future<List<Facility>> listFacilities({double? lat, double? lng, String? query, int limit = 200}) async =>
       [const Facility(id: 'h1', name: 'Ridge Hospital', latitude: 5.56, longitude: -0.2)];
 
   @override

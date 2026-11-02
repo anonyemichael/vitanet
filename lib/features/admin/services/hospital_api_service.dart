@@ -109,14 +109,23 @@ class HospitalApiService {
 
   // ─── Facility ───
 
-  Future<List<Facility>> listFacilities({double? lat, double? lng, int limit = 50}) async =>
+  Future<List<Facility>> listFacilities({double? lat, double? lng, String? query, int limit = 200}) async =>
       parseList(
           await _send(() => _dio.get('facilities', queryParameters: {
                 'limit': limit,
                 'lat': ?lat,
                 'lng': ?lng,
+                if (query != null && query.trim().isNotEmpty) 'q': query.trim(),
               })),
           Facility.fromJson);
+
+  /// Staff edit their own name, department and licence.
+  Future<void> updateMyProfile({required String fullName, String? department, String? licenseNumber}) async =>
+      _send(() => _dio.put('portal/me/profile', data: {
+            'full_name': fullName,
+            'department': department,
+            'license_number': licenseNumber,
+          }));
 
   Future<Facility> createHospital(Facility input) async =>
       Facility.fromJson(_obj(await _send(() => _dio.post('portal/hospitals', data: input.toJson()))));
