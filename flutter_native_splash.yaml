@@ -1,6 +1,10 @@
 flutter_native_splash:
-  color: "#061017"
-  image: assets/logo_transparent.png
+  # Matches the in-app minimal splash (white, centred logo) so there's no
+  # colour flash between the native splash and the Flutter splash.
+  color: "#FFFFFF"
+  color_dark: "#121212"
+  image: assets/splash_logo.png
   android_12:
-    color: "#061017"
-    image: assets/logo_transparent.png
+    color: "#FFFFFF"
+    color_dark: "#121212"
+    image: assets/splash_logo.png

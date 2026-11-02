@@ -16,8 +16,8 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="VitaNet - AI-Powered Clinical Triage & Health Monitoring Platform">
-  <meta name="theme-color" content="#040A10">
+  <meta name="description" content="VitaNet - AI-Powered Clinical Triage &amp; Health Monitoring Platform">
+  <meta name="theme-color" content="#FFFFFF">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
@@ -28,10 +28,12 @@
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png">
 
-  <title>VitaNet - Clinical Triage & Health Platform</title>
+  <title>VitaNet - Clinical Triage &amp; Health Platform</title>
   <link rel="manifest" href="manifest.json">
   
   <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport">
+  
+  
   
   
   
@@ -44,7 +46,7 @@
     body {
       margin: 0;
       min-height: 100%;
-      background-color: #061017;
+      background-color: #FFFFFF;
           background-size: 100% 100%;
     }
 
@@ -93,37 +95,19 @@
       bottom: 0;
       right: 0;
     }
+
+    @media (prefers-color-scheme: dark) {
+      body {
+        background-color: #121212;
+          }
+    }
   </style>
   <script id="splash-screen-script">
     function removeSplashFromWeb() {
-      var s = document.getElementById("splash");
-      if (s) s.remove();
-      var sb = document.getElementById("splash-branding");
-      if (sb) sb.remove();
+      document.getElementById("splash")?.remove();
+      document.getElementById("splash-branding")?.remove();
       document.body.style.background = "transparent";
     }
-
-    // Automatically remove splash when Flutter renders first frame
-    window.addEventListener('flutter-first-frame', removeSplashFromWeb);
-
-    // Watch for Flutter DOM elements and remove splash immediately
-    var observer = new MutationObserver(function(mutations, obs) {
-      if (document.querySelector('flutter-view') || document.querySelector('flt-glass-pane') || document.querySelector('flt-scene-host')) {
-        removeSplashFromWeb();
-        obs.disconnect();
-      }
-    });
-
-    if (document.body) {
-      observer.observe(document.body, { childList: true, subtree: true });
-    } else {
-      window.addEventListener('DOMContentLoaded', function() {
-        observer.observe(document.body, { childList: true, subtree: true });
-      });
-    }
-
-    // Safety timeout: never stay stuck on HTML splash logo
-    setTimeout(removeSplashFromWeb, 1800);
   </script>
 </head>
 <body>
@@ -132,6 +116,7 @@
       <source srcset="splash/img/dark-1x.png 1x, splash/img/dark-2x.png 2x, splash/img/dark-3x.png 3x, splash/img/dark-4x.png 4x" media="(prefers-color-scheme: dark)">
       <img class="center" aria-hidden="true" src="splash/img/light-1x.png" alt="">
   </picture>
+  
   
   
   
