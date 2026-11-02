@@ -86,14 +86,10 @@ class _PatientLoginScreenState extends ConsumerState<PatientLoginScreen> {
             if (!context.mounted) return;
 
             if (userProfile != null) {
-              final role = userProfile.role;
               ref.read(userProfileProvider.notifier).updateProfile(userProfile);
-
-              if (role == 'admin') {
-                context.go('/admin');
-              } else {
-                context.go('/home');
-              }
+              // Staff access is decided by the backend (/staff/me); the
+              // router sends approved staff to the portal.
+              context.go('/home');
             } else {
               // New user, push to the completion form.
               context.go('/login/patient_completion');

@@ -327,11 +327,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
         } catch (_) {}
       }
     } finally {
-      state = state.copyWith(
-        status: AuthStatus.unauthenticated,
-        user: null,
-        errorMessage: null,
-      );
+      // Build a fresh state: copyWith(user: null) would keep the old user.
+      state = AuthState(status: AuthStatus.unauthenticated);
     }
   }
 

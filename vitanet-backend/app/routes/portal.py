@@ -609,7 +609,9 @@ class DutyIn(BaseModel):
 def _staff_out(s: StaffAccount) -> Dict[str, Any]:
     return {"firebase_uid": s.firebase_uid, "full_name": s.full_name, "email": s.email,
             "role": s.role.value, "status": s.status.value, "on_duty": bool(s.on_duty),
-            "department": s.department, "license_number": s.license_number}
+            "department": s.department, "license_number": s.license_number,
+            "review_note": s.review_note,
+            "created_at": s.created_at.isoformat() if s.created_at else None}
 
 
 @router.get("/portal/capacity")

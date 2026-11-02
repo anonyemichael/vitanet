@@ -1,16 +1,23 @@
-import 'package:file_picker/file_picker.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vitanet/core/constants/app_colors.dart';
-import 'package:vitanet/data/models/user_profile.dart';
 import 'package:vitanet/data/providers/providers.dart';
+import 'package:vitanet/features/admin/models/portal_models.dart';
+import 'package:vitanet/features/admin/providers/portal_providers.dart';
+import 'package:vitanet/features/admin/services/hospital_api_service.dart';
+import 'package:vitanet/features/admin/widgets/portal_common.dart';
 import 'package:vitanet/features/admin/widgets/staff_ui.dart';
 
-/// Hospital staff sign-up / sign-in (StaffRegister.dc.html).
+/// Hospital staff sign-in / sign-up (StaffRegister.dc.html).
+///
+/// Step 1 is a Firebase account (email + password or Google). Step 2 is the
+/// staff request (POST /staff/register): name, role, hospital, department,
+/// license. Portal access comes only from GET /staff/me — the Firestore
+/// profile role is never set to a staff role here.
 class RegistrationFormScreen extends ConsumerStatefulWidget {
   const RegistrationFormScreen({super.key});
 
@@ -19,7 +26,7 @@ class RegistrationFormScreen extends ConsumerStatefulWidget {
 }
 
 class _RegistrationFormScreenState extends ConsumerState<RegistrationFormScreen> {
-  bool _isSignIn = false;
+  bool _isSignIn = true;
 
   void _back() {
     if (context.canPop()) {
@@ -33,6 +40,50 @@ class _RegistrationFormScreenState extends ConsumerState<RegistrationFormScreen>
   Widget build(BuildContext context) {
     final p = StaffPalette.of(context);
     final topPad = MediaQuery.paddingOf(context).top;
+    final signedIn = ref.watch(authProvider.select((s) => s.status == AuthStatus.authenticated && s.user != null));
+    final access = signedIn ? ref.watch(staffAccessProvider) : null;
+    // Someone who signs in here and already has a staff account goes
+    // straight to the portal (which shows pending / approved etc.).
+    ref.listen<AsyncValue<StaffAccess>>(staffAccessProvider, (prev, next) {
+      final a = next.valueOrNull;
+      if (next.isLoading || a == null || !mounted) return;
+      if (a.kind != StaffAccessKind.none && a.kind != StaffAccessKind.rejected) {
+        context.go('/admin');
+      }
+    });
+
+    final String title;
+    final String subtitle;
+    if (!signedIn) {
+      title = _isSignIn ? 'Clinical staff sign-in' : 'Clinical staff sign-up';
+      subtitle = _isSignIn
+          ? 'Use the account your hospital administrator approved.'
+          : 'Create your account, then tell us where you work. Your hospital administrator approves new staff.';
+    } else {
+      title = 'Request staff access';
+      subtitle = 'Your hospital administrator reviews requests, usually within one working day.';
+    }
+
+    Widget body;
+    if (!signedIn) {
+      body = _CredentialsStep(
+        key: ValueKey(_isSignIn),
+        isSignIn: _isSignIn,
+        onSwitch: () => setState(() => _isSignIn = !_isSignIn),
+      );
+    } else {
+      body = access!.when(
+        loading: () => const PortalLoading(),
+        error: (e, _) => PortalError(error: e, onRetry: () => ref.invalidate(staffAccessProvider)),
+        data: (a) => a.kind == StaffAccessKind.none || a.kind == StaffAccessKind.rejected
+            ? _StaffDetailsStep(
+                notice: a.kind == StaffAccessKind.rejected
+                    ? 'Your last request was declined. You can send a new one.'
+                    : (_isSignIn ? 'This account has no staff access yet. Complete the form to request it.' : null),
+              )
+            : _AlreadyRegistered(access: a),
+      );
+    }
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
@@ -41,7 +92,6 @@ class _RegistrationFormScreenState extends ConsumerState<RegistrationFormScreen>
         body: ListView(
           padding: EdgeInsets.zero,
           children: [
-            // ── Navy header ──
             Container(
               color: AppColors.staffNavy,
               padding: EdgeInsets.fromLTRB(20, topPad + 16, 20, 28),
@@ -82,39 +132,19 @@ class _RegistrationFormScreenState extends ConsumerState<RegistrationFormScreen>
                     const SizedBox(height: 18),
                     Semantics(
                       header: true,
-                      child: Text(
-                        _isSignIn ? 'Clinical staff sign-in' : 'Clinical staff sign-up',
-                        style: staffHeading(26, color: const Color(0xFFF1F5F9)),
-                      ),
+                      child: Text(title, style: staffHeading(26, color: const Color(0xFFF1F5F9))),
                     ),
                     const SizedBox(height: 6),
-                    Text(
-                      _isSignIn
-                          ? 'Use the work email your facility administrator approved.'
-                          : 'Your facility administrator approves new accounts, usually within one working day.',
-                      style: staffBody(14, color: const Color(0xFF94A3B8), height: 1.5),
-                    ),
+                    Text(subtitle, style: staffBody(14, color: const Color(0xFF94A3B8), height: 1.5)),
                   ],
                 ),
               ),
             ),
-            // ── Form ──
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
               child: StaffContent(
                 maxWidth: 480,
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 250),
-                  child: _isSignIn
-                      ? _SignInTab(
-                          key: const ValueKey('signin'),
-                          onSwitch: () => setState(() => _isSignIn = false),
-                        )
-                      : _SignUpTab(
-                          key: const ValueKey('signup'),
-                          onSwitch: () => setState(() => _isSignIn = true),
-                        ),
-                ),
+                child: AnimatedSwitcher(duration: const Duration(milliseconds: 250), child: body),
               ),
             ),
           ],
@@ -126,12 +156,10 @@ class _RegistrationFormScreenState extends ConsumerState<RegistrationFormScreen>
 
 // ─── Shared pieces ───
 
-InputDecoration _fieldDecoration(BuildContext context, {String? hint, Widget? suffix, Widget? prefix}) =>
-    staffInputDecoration(
+InputDecoration _fieldDecoration(BuildContext context, {String? hint, Widget? suffix}) => staffInputDecoration(
       context,
       hint: hint,
       radius: 16,
-      prefixIcon: prefix,
       suffixIcon: suffix,
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
     );
@@ -141,7 +169,7 @@ Widget _footerLink(BuildContext context, String lead, String action, VoidCallbac
   return Row(
     mainAxisAlignment: MainAxisAlignment.center,
     children: [
-      Text(lead, style: staffBody(14, color: p.muted)),
+      Flexible(child: Text(lead, style: staffBody(14, color: p.muted))),
       TextButton(
         onPressed: onTap,
         style: TextButton.styleFrom(minimumSize: const Size(44, 44), padding: const EdgeInsets.symmetric(horizontal: 6)),
@@ -151,21 +179,22 @@ Widget _footerLink(BuildContext context, String lead, String action, VoidCallbac
   );
 }
 
-// ─── Sign In Tab ───
+// ─── Step 1: Firebase account ───
 
-class _SignInTab extends ConsumerStatefulWidget {
+class _CredentialsStep extends ConsumerStatefulWidget {
+  final bool isSignIn;
   final VoidCallback onSwitch;
-  const _SignInTab({super.key, required this.onSwitch});
+  const _CredentialsStep({super.key, required this.isSignIn, required this.onSwitch});
 
   @override
-  ConsumerState<_SignInTab> createState() => _SignInTabState();
+  ConsumerState<_CredentialsStep> createState() => _CredentialsStepState();
 }
 
-class _SignInTabState extends ConsumerState<_SignInTab> {
+class _CredentialsStepState extends ConsumerState<_CredentialsStep> {
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   bool _isLoading = false;
-  bool _obscurePassword = true;
+  bool _obscure = true;
 
   @override
   void dispose() {
@@ -174,50 +203,47 @@ class _SignInTabState extends ConsumerState<_SignInTab> {
     super.dispose();
   }
 
-  Future<void> _signIn() async {
-    if (_emailCtrl.text.isEmpty || _passCtrl.text.isEmpty) {
-      showStaffSnack(context, 'Please enter both email and password.');
+  /// Surfaces Firebase errors. On success the parent swaps to step 2 and
+  /// routes staff with an existing account to the portal.
+  void _afterSignIn() {
+    final authState = ref.read(authProvider);
+    if (authState.status == AuthStatus.error) throw authState.errorMessage ?? 'Sign in failed.';
+  }
+
+  Future<void> _submit() async {
+    final email = _emailCtrl.text.trim();
+    final pass = _passCtrl.text;
+    if (email.isEmpty || pass.isEmpty) {
+      showStaffSnack(context, 'Enter your email and password.');
       return;
     }
-
+    if (!widget.isSignIn && pass.length < 8) {
+      showStaffSnack(context, 'Use at least 8 characters for your password.');
+      return;
+    }
     setState(() => _isLoading = true);
     try {
-      await ref.read(authProvider.notifier).signInWithEmail(
-            _emailCtrl.text.trim(),
-            _passCtrl.text,
-          );
-
-      final authState = ref.read(authProvider);
-      if (authState.status == AuthStatus.error) {
-        throw Exception(authState.errorMessage);
+      final notifier = ref.read(authProvider.notifier);
+      if (widget.isSignIn) {
+        await notifier.signInWithEmail(email, pass);
+      } else {
+        await notifier.signUpWithEmail(email, pass);
       }
-
-      if (authState.status == AuthStatus.authenticated && authState.user != null) {
-        final backendUser = await ref.read(firestoreServiceProvider).getUserProfile(authState.user!.uid);
-        if (backendUser != null) {
-          final accountType = backendUser.role;
-
-          if (accountType == 'personal_user' || accountType == 'patient' || accountType == 'user') {
-            await ref.read(authProvider.notifier).signOut();
-            if (mounted) {
-              showStaffSnack(context, 'This account belongs to a Personal User. Please use the Patient login.');
-              setState(() => _isLoading = false);
-            }
-            return;
-          }
-
-          ref.read(userProfileProvider.notifier).updateProfile(backendUser);
-        } else {
-          // Fallback if backend fetch fails or no user found
-          ref.read(userProfileProvider.notifier).updateProfile(
-                UserProfile(name: 'Provider', role: 'admin'),
-              );
-        }
-      }
-
-      if (mounted) context.go('/admin');
+      _afterSignIn();
     } catch (e) {
-      if (mounted) showStaffSnack(context, 'Sign in failed: $e');
+      if (mounted) showStaffSnack(context, e is String ? e : apiErrorMessage(e));
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _google() async {
+    setState(() => _isLoading = true);
+    try {
+      await ref.read(authProvider.notifier).linkGoogleAccount();
+      _afterSignIn();
+    } catch (e) {
+      if (mounted) showStaffSnack(context, e is String ? e : apiErrorMessage(e));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -230,7 +256,7 @@ class _SignInTabState extends ConsumerState<_SignInTab> {
       return;
     }
     if (Firebase.apps.isEmpty) {
-      showStaffSnack(context, 'Password reset is currently unavailable in offline mode.');
+      showStaffSnack(context, 'Password reset is unavailable right now.');
       return;
     }
     try {
@@ -254,141 +280,138 @@ class _SignInTabState extends ConsumerState<_SignInTab> {
             keyboardType: TextInputType.emailAddress,
             autofillHints: const [AutofillHints.email],
             style: staffBody(15, color: p.ink),
-            decoration: _fieldDecoration(context, hint: 'k.mensah@korlebu.gov.gh'),
+            decoration: _fieldDecoration(context, hint: 'name@hospital.org'),
           ),
         ),
         const SizedBox(height: 16),
         StaffField(
-          label: 'Password',
+          label: widget.isSignIn ? 'Password' : 'Create password',
+          helper: widget.isSignIn
+              ? null
+              : ListenableBuilder(
+                  listenable: _passCtrl,
+                  builder: (context, _) => _StrengthMeter(password: _passCtrl.text),
+                ),
           child: TextField(
             controller: _passCtrl,
-            obscureText: _obscurePassword,
-            autofillHints: const [AutofillHints.password],
-            onSubmitted: (_) => _signIn(),
+            obscureText: _obscure,
+            autofillHints: [widget.isSignIn ? AutofillHints.password : AutofillHints.newPassword],
+            onSubmitted: (_) => _submit(),
             style: staffBody(15, color: p.ink),
             decoration: _fieldDecoration(
               context,
               suffix: IconButton(
-                tooltip: _obscurePassword ? 'Show password' : 'Hide password',
-                icon: Icon(_obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                    color: p.muted, size: 20),
-                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                tooltip: _obscure ? 'Show password' : 'Hide password',
+                icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined, color: p.muted, size: 20),
+                onPressed: () => setState(() => _obscure = !_obscure),
               ),
             ),
           ),
         ),
-        Align(
-          alignment: Alignment.centerRight,
-          child: TextButton(
-            onPressed: _resetPassword,
-            style: TextButton.styleFrom(minimumSize: const Size(44, 44)),
-            child: Text('Forgot password?', style: staffBody(13, weight: FontWeight.w600, color: p.accent)),
-          ),
-        ),
+        if (widget.isSignIn)
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: _resetPassword,
+              style: TextButton.styleFrom(minimumSize: const Size(44, 44)),
+              child: Text('Forgot password?', style: staffBody(13, weight: FontWeight.w600, color: p.accent)),
+            ),
+          )
+        else
+          const SizedBox(height: 20),
+        const SizedBox(height: 8),
+        StaffButton(widget.isSignIn ? 'Sign in' : 'Create account',
+            height: 56, radius: 16, fontSize: 16, loading: _isLoading, onPressed: _submit),
         const SizedBox(height: 12),
-        StaffButton('Sign in', height: 56, radius: 16, fontSize: 16, loading: _isLoading, onPressed: _signIn),
-
+        StaffButton('Continue with Google',
+            kind: StaffButtonKind.secondary,
+            icon: Icons.account_circle_outlined,
+            height: 52,
+            radius: 16,
+            onPressed: _isLoading ? null : _google),
         const SizedBox(height: 12),
-        _footerLink(context, 'New to VitaNet?', 'Request access', widget.onSwitch),
+        widget.isSignIn
+            ? _footerLink(context, 'New to VitaNet?', 'Request access', widget.onSwitch)
+            : _footerLink(context, 'Already have an account?', 'Sign in', widget.onSwitch),
       ],
     );
   }
 }
 
-// ─── Sign Up Tab ───
+// ─── Step 2: staff request ───
 
-class _SignUpTab extends ConsumerStatefulWidget {
-  final VoidCallback onSwitch;
-  const _SignUpTab({super.key, required this.onSwitch});
+class _StaffDetailsStep extends ConsumerStatefulWidget {
+  final String? notice;
+  const _StaffDetailsStep({this.notice});
 
   @override
-  ConsumerState<_SignUpTab> createState() => _SignUpTabState();
+  ConsumerState<_StaffDetailsStep> createState() => _StaffDetailsStepState();
 }
 
-class _SignUpTabState extends ConsumerState<_SignUpTab> {
-  static const _roles = ['Doctor', 'Nurse', 'Admin'];
-  static const _facilities = [
-    'Korle Bu Teaching Hospital',
-    'Ridge Hospital',
-    'Komfo Anokye Teaching Hospital',
-    '37 Military Hospital',
-    'Tamale Teaching Hospital',
-  ];
-
-  final _nameController = TextEditingController();
-  final _emailController = TextEditingController();
+class _StaffDetailsStepState extends ConsumerState<_StaffDetailsStep> {
+  final _nameController = TextEditingController(
+    text: Firebase.apps.isEmpty ? null : FirebaseAuth.instance.currentUser?.displayName,
+  );
   final _departmentController = TextEditingController();
   final _licenseController = TextEditingController();
-  final _passwordController = TextEditingController();
-  String _role = _roles.first;
-  String _facility = _facilities.first;
-  PlatformFile? _staffId;
+  StaffRole _role = StaffRole.doctor;
+  Facility? _hospital;
+  bool _newHospital = false;
   bool _isLoading = false;
-  bool _obscurePassword = true;
 
   @override
   void dispose() {
     _nameController.dispose();
-    _emailController.dispose();
     _departmentController.dispose();
     _licenseController.dispose();
-    _passwordController.dispose();
     super.dispose();
   }
 
-  Future<void> _pickStaffId() async {
-    try {
-      final result = await FilePicker.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf'],
-      );
-      if (result != null && result.files.isNotEmpty && mounted) {
-        setState(() => _staffId = result.files.single);
+  Future<void> _pickHospital() async {
+    final result = await showStaffSheet<Object>(context, tall: true, builder: (_) => const _HospitalPickerSheet());
+    if (!mounted || result == null) return;
+    setState(() {
+      if (result is Facility) {
+        _hospital = result;
+        _newHospital = false;
+      } else {
+        _hospital = null;
+        _newHospital = true;
+        _role = StaffRole.admin;
       }
-    } catch (e) {
-      if (mounted) showStaffSnack(context, 'Could not open files: $e');
-    }
+    });
   }
 
   Future<void> _register() async {
     final name = _nameController.text.trim();
-    final email = _emailController.text.trim();
-    final password = _passwordController.text;
-
-    if (name.isEmpty ||
-        email.isEmpty ||
-        password.isEmpty ||
-        _departmentController.text.trim().isEmpty ||
-        _licenseController.text.trim().isEmpty) {
-      showStaffSnack(context, 'Please fill in all fields.');
+    if (name.length < 2) {
+      showStaffSnack(context, 'Enter your full name.');
       return;
     }
-
+    if (_hospital == null && !_newHospital) {
+      showStaffSnack(context, 'Choose the hospital you work at.');
+      return;
+    }
     setState(() => _isLoading = true);
-
     try {
-      await ref.read(authProvider.notifier).signUpWithEmail(email, password);
-
-      final authState = ref.read(authProvider);
-      if (authState.status == AuthStatus.error) {
-        throw Exception(authState.errorMessage);
-      }
-
-      final currentUser =
-          Firebase.apps.isNotEmpty ? FirebaseAuth.instance.currentUser : null;
-      if (currentUser != null) {
+      final user = Firebase.apps.isEmpty ? null : FirebaseAuth.instance.currentUser;
+      if (user != null && (user.displayName ?? '').isEmpty) {
         try {
-          await currentUser.updateDisplayName(name);
+          await user.updateDisplayName(name);
         } catch (_) {}
       }
-
-      ref.read(userProfileProvider.notifier).updateProfile(
-            UserProfile(name: name, role: _role == 'Admin' ? 'admin' : 'health_worker'),
+      await ref.read(hospitalApiProvider).registerStaff(
+            fullName: name,
+            role: _role,
+            hospitalId: _newHospital ? null : _hospital!.id,
+            department: _departmentController.text.trim(),
+            licenseNumber: _licenseController.text.trim(),
           );
-
+      ref.invalidate(staffAccessProvider);
+      await ref.read(staffAccessProvider.future);
       if (mounted) context.go('/admin');
     } catch (e) {
-      if (mounted) showStaffSnack(context, 'Registration failed: $e');
+      if (mounted) showStaffSnack(context, apiErrorMessage(e));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -397,9 +420,22 @@ class _SignUpTabState extends ConsumerState<_SignUpTab> {
   @override
   Widget build(BuildContext context) {
     final p = StaffPalette.of(context);
+    final email = Firebase.apps.isEmpty ? null : FirebaseAuth.instance.currentUser?.email;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (widget.notice != null) ...[
+          StaffCard(
+            color: p.tone(StaffTone.amber).bg,
+            padding: const EdgeInsets.all(12),
+            child: Text(widget.notice!, style: staffBody(13, weight: FontWeight.w600, color: p.tone(StaffTone.amber).fg)),
+          ),
+          const SizedBox(height: 16),
+        ],
+        if (email != null) ...[
+          Text('Signed in as $email', style: staffBody(13, color: p.muted)),
+          const SizedBox(height: 16),
+        ],
         StaffField(
           label: 'Full name',
           child: TextField(
@@ -407,18 +443,7 @@ class _SignUpTabState extends ConsumerState<_SignUpTab> {
             textCapitalization: TextCapitalization.words,
             autofillHints: const [AutofillHints.name],
             style: staffBody(15, color: p.ink),
-            decoration: _fieldDecoration(context, hint: 'Dr. Kwame Mensah'),
-          ),
-        ),
-        const SizedBox(height: 16),
-        StaffField(
-          label: 'Work email',
-          child: TextField(
-            controller: _emailController,
-            keyboardType: TextInputType.emailAddress,
-            autofillHints: const [AutofillHints.email],
-            style: staffBody(15, color: p.ink),
-            decoration: _fieldDecoration(context, hint: 'k.mensah@korlebu.gov.gh'),
+            decoration: _fieldDecoration(context, hint: 'Dr. Ama Mensah'),
           ),
         ),
         const SizedBox(height: 16),
@@ -426,23 +451,51 @@ class _SignUpTabState extends ConsumerState<_SignUpTab> {
         const SizedBox(height: 8),
         Row(
           children: [
-            for (var i = 0; i < _roles.length; i++) ...[
+            for (var i = 0; i < StaffRole.values.length; i++) ...[
               if (i > 0) const SizedBox(width: 8),
-              Expanded(child: _roleButton(_roles[i], p)),
+              Expanded(child: _roleButton(StaffRole.values[i], p)),
             ],
           ],
         ),
         const SizedBox(height: 16),
         StaffField(
-          label: 'Facility',
-          child: StaffSelect<String>(
-            value: _facility,
-            items: _facilities,
-            labelOf: (f) => f,
-            icon: Icons.local_hospital_outlined,
-            height: 52,
-            radius: 16,
-            onChanged: (f) => setState(() => _facility = f),
+          label: 'Hospital',
+          helper: _newHospital
+              ? Text(
+                  'Only the VitaNet bootstrap administrator can set up a new hospital. '
+                  'You will create it on the next screen.',
+                  style: staffBody(12, color: p.muted, height: 1.4))
+              : null,
+          child: Semantics(
+            button: true,
+            label: 'Choose hospital',
+            child: Material(
+              color: p.card,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: p.line)),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: _pickHospital,
+                child: SizedBox(
+                  height: 52,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    child: Row(children: [
+                      Icon(Icons.local_hospital_outlined, size: 20, color: p.muted),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _newHospital ? 'Setting up a new hospital' : (_hospital?.name ?? 'Choose your hospital'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: staffBody(15, color: _hospital == null && !_newHospital ? p.faint : p.ink),
+                        ),
+                      ),
+                      Icon(Icons.expand_more_rounded, color: p.muted),
+                    ]),
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
         const SizedBox(height: 16),
@@ -474,40 +527,21 @@ class _SignUpTabState extends ConsumerState<_SignUpTab> {
             ),
           ],
         ),
-        const SizedBox(height: 16),
-        _IdUploadRow(file: _staffId, onTap: _pickStaffId),
-        const SizedBox(height: 16),
-        StaffField(
-          label: 'Create password',
-          helper: ListenableBuilder(
-            listenable: _passwordController,
-            builder: (context, _) => _StrengthMeter(password: _passwordController.text),
-          ),
-          child: TextField(
-            controller: _passwordController,
-            obscureText: _obscurePassword,
-            autofillHints: const [AutofillHints.newPassword],
-            style: staffBody(15, color: p.ink),
-            decoration: _fieldDecoration(
-              context,
-              suffix: IconButton(
-                tooltip: _obscurePassword ? 'Show password' : 'Hide password',
-                icon: Icon(_obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                    color: p.muted, size: 20),
-                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-              ),
-            ),
-          ),
-        ),
         const SizedBox(height: 24),
         StaffButton('Request access', height: 56, radius: 16, fontSize: 16, loading: _isLoading, onPressed: _register),
         const SizedBox(height: 12),
-        _footerLink(context, 'Already approved?', 'Sign in', widget.onSwitch),
+        Center(
+          child: TextButton(
+            onPressed: () => ref.read(authProvider.notifier).signOut(),
+            style: TextButton.styleFrom(minimumSize: const Size(44, 44)),
+            child: Text('Use a different account', style: staffBody(14, weight: FontWeight.w600, color: p.accent)),
+          ),
+        ),
       ],
     );
   }
 
-  Widget _roleButton(String role, StaffPalette p) {
+  Widget _roleButton(StaffRole role, StaffPalette p) {
     final sel = _role == role;
     final brand = p.tone(StaffTone.brand);
     return Semantics(
@@ -526,7 +560,7 @@ class _SignUpTabState extends ConsumerState<_SignUpTab> {
             height: 44,
             child: Center(
               child: Text(
-                role,
+                role.label,
                 style: staffBody(14, weight: sel ? FontWeight.w700 : FontWeight.w600, color: sel ? brand.fg : p.ink),
               ),
             ),
@@ -537,102 +571,109 @@ class _SignUpTabState extends ConsumerState<_SignUpTab> {
   }
 }
 
-class _IdUploadRow extends StatelessWidget {
-  final PlatformFile? file;
-  final VoidCallback onTap;
-  const _IdUploadRow({required this.file, required this.onTap});
+/// Marker returned by the picker for "I'm setting up a new hospital".
+class _NewHospital {
+  const _NewHospital();
+}
 
-  String _size(int bytes) {
-    if (bytes >= 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-    return '${(bytes / 1024).ceil()} KB';
+class _HospitalPickerSheet extends ConsumerStatefulWidget {
+  const _HospitalPickerSheet();
+
+  @override
+  ConsumerState<_HospitalPickerSheet> createState() => _HospitalPickerSheetState();
+}
+
+class _HospitalPickerSheetState extends ConsumerState<_HospitalPickerSheet> {
+  final _search = TextEditingController();
+  String _q = '';
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final p = StaffPalette.of(context);
-    final f = file;
-    return Semantics(
-      button: true,
-      label: f == null ? 'Upload staff ID card' : 'Staff ID card uploaded, ${f.name}. Tap to replace',
-      excludeSemantics: true,
-      child: Material(
-        color: p.card,
-        borderRadius: BorderRadius.circular(20),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: CustomPaint(
-            painter: _DashedBorderPainter(color: p.faint, radius: 20),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(color: p.chip, borderRadius: BorderRadius.circular(14)),
-                    child: Icon(Icons.file_upload_outlined, size: 20, color: p.accent),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Staff ID card', style: staffBody(14, weight: FontWeight.w600, color: p.ink)),
-                        const SizedBox(height: 2),
-                        Text(
-                          f == null ? 'Upload the front · JPG, PNG or PDF' : '${f.name} · ${_size(f.size)}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: staffBody(12, color: p.muted),
+    final value = ref.watch(facilitiesProvider);
+    return PortalSheet(
+      title: 'Choose your hospital',
+      children: [
+        StaffSearchField(controller: _search, hint: 'Search hospitals', onChanged: (v) => setState(() => _q = v.trim().toLowerCase())),
+        const SizedBox(height: 12),
+        ...value.when(
+          loading: () => const [PortalLoading()],
+          error: (e, _) => [PortalError(error: e, onRetry: () => ref.invalidate(facilitiesProvider))],
+          data: (list) {
+            final filtered = list
+                .where((f) => _q.isEmpty || f.name.toLowerCase().contains(_q) || (f.address ?? '').toLowerCase().contains(_q))
+                .toList();
+            return [
+              if (filtered.isEmpty)
+                PortalEmpty(
+                  icon: Icons.search_off_rounded,
+                  title: list.isEmpty ? 'No hospitals registered yet' : 'No hospital matches "$_q"',
+                  message: 'Ask your administrator whether your hospital is on VitaNet.',
+                )
+              else
+                StaffGroup(children: [
+                  for (final f in filtered)
+                    InkWell(
+                      onTap: () => Navigator.of(context).pop(f),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(minHeight: 56),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(f.name, style: staffBody(15, weight: FontWeight.w600, color: p.ink)),
+                              if ((f.address ?? '').isNotEmpty)
+                                Text(f.address!, style: staffBody(12, color: p.muted)),
+                            ],
+                          ),
                         ),
-                      ],
+                      ),
                     ),
-                  ),
-                  if (f != null)
-                    Container(
-                      width: 28,
-                      height: 28,
-                      decoration: const BoxDecoration(color: Color(0xFF059669), shape: BoxShape.circle),
-                      child: const Icon(Icons.check_rounded, size: 16, color: Colors.white),
-                    ),
-                ],
-              ),
-            ),
-          ),
+                ]),
+            ];
+          },
         ),
-      ),
+        const SizedBox(height: 12),
+        StaffButton("I'm setting up a new hospital",
+            kind: StaffButtonKind.secondary,
+            icon: Icons.add_business_outlined,
+            onPressed: () => Navigator.of(context).pop(const _NewHospital())),
+        const SizedBox(height: 8),
+      ],
     );
   }
 }
 
-class _DashedBorderPainter extends CustomPainter {
-  final Color color;
-  final double radius;
-  _DashedBorderPainter({required this.color, required this.radius});
+class _AlreadyRegistered extends StatelessWidget {
+  final StaffAccess access;
+  const _AlreadyRegistered({required this.access});
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
-    final rrect = RRect.fromRectAndRadius(
-      Offset.zero & size,
-      Radius.circular(radius),
-    ).deflate(0.5);
-    final path = Path()..addRRect(rrect);
-    for (final metric in path.computeMetrics()) {
-      double d = 0;
-      while (d < metric.length) {
-        canvas.drawPath(metric.extractPath(d, d + 5), paint);
-        d += 9;
-      }
-    }
+  Widget build(BuildContext context) {
+    final p = StaffPalette.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        StaffCard(
+          child: Text(
+            access.kind == StaffAccessKind.pending
+                ? 'Your staff request is waiting for approval.'
+                : 'You already have a staff account.',
+            style: staffBody(15, weight: FontWeight.w600, color: p.ink),
+          ),
+        ),
+        const SizedBox(height: 16),
+        StaffButton('Continue to the portal', height: 56, radius: 16, onPressed: () => context.go('/admin')),
+      ],
+    );
   }
-
-  @override
-  bool shouldRepaint(_DashedBorderPainter old) => old.color != color || old.radius != radius;
 }
 
 class _StrengthMeter extends StatelessWidget {

@@ -1,261 +1,226 @@
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 import 'package:vitanet/core/network/backend.dart';
-import '../models/patient.dart';
-import '../models/alert.dart';
-import '../models/hospital_data.dart';
-import '../models/case_model.dart';
-import '../widgets/staff_demo_data.dart';
+import 'package:vitanet/features/admin/models/portal_models.dart';
 
-class ApiService {
+/// An error from the portal API, carrying the server's `detail` message
+/// when there is one.
+class ApiException implements Exception {
+  final int? statusCode;
+  final String message;
+  const ApiException(this.message, {this.statusCode});
+
+  @override
+  String toString() => message;
+}
+
+/// Human-readable message for any error thrown by [HospitalApiService].
+String apiErrorMessage(Object error) {
+  if (error is ApiException) return error.message;
+  return 'Something went wrong. Please try again.';
+}
+
+/// Typed client for the hospital portal backend. Every call is authenticated
+/// with the signed-in user's Firebase ID token (see [createBackendDio]).
+/// There are no sample-data fallbacks: failures throw [ApiException].
+class HospitalApiService {
+  HospitalApiService([Dio? dio]) : _dio = dio ?? createBackendDio();
+
   final Dio _dio;
 
-  /// Remotely configured backend URL + Firebase ID token on every request.
-  ApiService({String? baseUrl}) : _dio = createBackendDio() {
-    if (baseUrl != null) {
-      _dio.interceptors.add(InterceptorsWrapper(onRequest: (o, h) {
-        o.baseUrl = baseUrl;
-        h.next(o);
-      }));
+  static ApiException _toApiException(DioException e) {
+    final res = e.response;
+    if (res == null) {
+      return const ApiException("Can't reach the VitaNet server. Check your connection and try again.");
+    }
+    final data = res.data;
+    String? detail;
+    if (data is Map && data['detail'] != null) {
+      final d = data['detail'];
+      if (d is String) {
+        detail = d;
+      } else if (d is List) {
+        // FastAPI validation errors: [{loc, msg, type}, ...]
+        detail = d
+            .whereType<Map>()
+            .map((m) {
+              final loc = m['loc'] is List ? (m['loc'] as List).last.toString().replaceAll('_', ' ') : null;
+              final msg = m['msg']?.toString() ?? '';
+              return loc == null ? msg : '$loc: $msg';
+            })
+            .where((s) => s.isNotEmpty)
+            .join('\n');
+      }
+    }
+    final code = res.statusCode;
+    detail ??= switch (code) {
+      401 => 'Your sign-in has expired. Please sign in again.',
+      403 => "You don't have permission to do that.",
+      404 => 'Not found.',
+      _ => 'The server returned an error ($code). Please try again.',
+    };
+    return ApiException(detail, statusCode: code);
+  }
+
+  Future<dynamic> _send(Future<Response<dynamic>> Function() request) async {
+    try {
+      final res = await request();
+      return res.data;
+    } on DioException catch (e) {
+      throw _toApiException(e);
     }
   }
 
-  Future<HospitalStats> getDashboardStats() async {
+  Map<String, dynamic> _obj(dynamic data) =>
+      data is Map ? Map<String, dynamic>.from(data) : throw const ApiException('Unexpected response from the server.');
+
+  // ─── Staff account ───
+
+  /// The caller's staff account, or null when they have none (404).
+  Future<StaffMe?> getStaffMe() async {
     try {
-      final response = await _dio.get('admin/stats');
-      final data = response.data;
-      return HospitalStats(
-        activePatients: data['activePatients'] ?? 0,
-        availableWards: data['availableWards'] ?? 0,
-        systemHealth: data['systemHealth'] ?? '98%',
-        staffOnDuty: data['staffOnDuty'] ?? 0,
-      );
-    } catch (e) {
-      debugPrint('HospitalApiService: fallback stats used ($e)');
-      return HospitalStats(activePatients: 24, availableWards: 5, systemHealth: '98%', staffOnDuty: 6);
+      return StaffMe.fromJson(_obj(await _send(() => _dio.get('staff/me'))));
+    } on ApiException catch (e) {
+      if (e.statusCode == 404) return null;
+      rethrow;
     }
   }
 
-  Future<List<Patient>> getPatients({String? query}) async {
-    try {
-      final response = await _dio.get(
-        'admin/patients',
-        queryParameters: query != null && query.isNotEmpty ? {'query': query} : null,
-      );
-      return (response.data as List).map((p) => Patient(
-        id: p['id'] ?? '',
-        name: p['name'] ?? 'Unknown',
-        age: p['age'] ?? 0,
-        gender: p['gender'] ?? 'Unknown',
-        status: p['status'] ?? 'Unknown',
-        lastUpdated: p['lastUpdated'] != null ? DateTime.parse(p['lastUpdated']) : DateTime.now(),
-      )).toList();
-    } catch (e) {
-      debugPrint('HospitalApiService: fallback patients used ($e)');
-      return [];
-    }
+  Future<StaffMe> registerStaff({
+    required String fullName,
+    required StaffRole role,
+    String? hospitalId,
+    String? department,
+    String? licenseNumber,
+  }) async =>
+      StaffMe.fromJson(_obj(await _send(() => _dio.post('staff/register', data: {
+            'full_name': fullName,
+            'role': role.api,
+            'hospital_id': hospitalId,
+            'department': (department ?? '').isEmpty ? null : department,
+            'license_number': (licenseNumber ?? '').isEmpty ? null : licenseNumber,
+          }))));
+
+  /// approve | reject | suspend.
+  Future<StaffMe> reviewStaff(String uid, String action, {String? note, StaffRole? role}) async =>
+      StaffMe.fromJson(_obj(await _send(() => _dio.post('admin/staff-requests/${Uri.encodeComponent(uid)}/$action', data: {
+            'note': (note ?? '').isEmpty ? null : note,
+            'role': ?role?.api,
+          }))));
+
+  // ─── Facility ───
+
+  Future<List<Facility>> listFacilities({double? lat, double? lng, int limit = 50}) async =>
+      parseList(
+          await _send(() => _dio.get('facilities', queryParameters: {
+                'limit': limit,
+                'lat': ?lat,
+                'lng': ?lng,
+              })),
+          Facility.fromJson);
+
+  Future<Facility> createHospital(Facility input) async =>
+      Facility.fromJson(_obj(await _send(() => _dio.post('portal/hospitals', data: input.toJson()))));
+
+  Future<Facility> getMyHospital() async =>
+      Facility.fromJson(_obj(await _send(() => _dio.get('portal/hospital'))));
+
+  Future<Facility> updateHospital(Facility input) async =>
+      Facility.fromJson(_obj(await _send(() => _dio.put('portal/hospital', data: input.toJson()))));
+
+  // ─── Dashboard & referrals ───
+
+  Future<Dashboard> getDashboard() async =>
+      Dashboard.fromJson(_obj(await _send(() => _dio.get('portal/dashboard'))));
+
+  Future<List<Referral>> listReferrals({String? status}) async => parseList(
+      await _send(() => _dio.get('portal/referrals', queryParameters: {'status': ?status})),
+      Referral.fromJson);
+
+  Future<Referral> getReferral(String id) async =>
+      Referral.fromJson(_obj(await _send(() => _dio.get('portal/referrals/$id'))));
+
+  Future<AcceptResult> acceptReferral(String id, {String? assigneeUid, int? wardId, String? bed}) async {
+    final j = _obj(await _send(() => _dio.post('portal/referrals/$id/accept', data: {
+          'assignee_uid': (assigneeUid ?? '').isEmpty ? null : assigneeUid,
+          'ward_id': wardId,
+          'bed': (bed ?? '').isEmpty ? null : bed,
+        })));
+    return AcceptResult(Referral.fromJson(_obj(j['referral'])), PortalCase.fromJson(_obj(j['case'])));
   }
 
-  Future<StaffPatientRecord?> getPatientDetail(String id) async {
-    try {
-      final response = await _dio.get('admin/patients/$id');
-      final d = response.data;
-      return StaffPatientRecord(
-        id: d['id'] ?? id,
-        name: d['name'] ?? '',
-        age: d['age'] ?? 0,
-        sex: d['sex'] ?? 'F',
-        location: d['location'] ?? '',
-        status: PatientStatus.parse(d['status'] ?? 'stable'),
-        diagnosis: d['diagnosis'],
-        allergy: d['allergy'],
-        vitals: (d['vitals'] as List? ?? []).map((v) => VitalReading(
-          v['label'] ?? '',
-          v['value'] ?? '',
-          alert: v['alert'] ?? false,
-        )).toList(),
-        timeline: (d['timeline'] as List? ?? []).map((t) => TimelineEntry(
-          t['time'] ?? '',
-          t['text'] ?? '',
-          t['tone'] == 'critical'
-              ? TimelineTone.critical
-              : (t['tone'] == 'neutral' ? TimelineTone.neutral : TimelineTone.action),
-        )).toList(),
-        note: d['note'],
-        noteAuthor: d['noteAuthor'],
-      );
-    } catch (e) {
-      debugPrint('HospitalApiService: getPatientDetail failed ($e)');
-      return null;
-    }
-  }
+  Future<Referral> declineReferral(String id, String reason) async =>
+      Referral.fromJson(_obj(await _send(() => _dio.post('portal/referrals/$id/decline', data: {'reason': reason}))));
 
-  Future<bool> createPatient(StaffPatientRecord r) async {
-    try {
-      await _dio.post('admin/patients', data: {
-        'id': r.id,
-        'name': r.name,
-        'age': r.age,
-        'sex': r.sex,
-        'location': r.location,
-        'status': r.status.name,
-        'diagnosis': r.diagnosis,
-        'allergy': r.allergy,
-        'vitals': r.vitals.map((v) => {'label': v.label, 'value': v.value, 'alert': v.alert}).toList(),
-        'note': r.note,
-        'noteAuthor': r.noteAuthor ?? 'Dr. Kwame Mensah',
-      });
-      return true;
-    } catch (e) {
-      debugPrint('HospitalApiService: createPatient failed ($e)');
-      return false;
-    }
-  }
+  // ─── Cases ───
 
-  Future<bool> addPatientNote(String id, String note, {String author = 'Dr. Kwame Mensah'}) async {
-    try {
-      await _dio.post('admin/patients/$id/notes', data: {
-        'note': note,
-        'author': author,
-      });
-      return true;
-    } catch (e) {
-      debugPrint('HospitalApiService: addPatientNote failed ($e)');
-      return false;
-    }
-  }
+  Future<List<PortalCase>> listCases({String? status, bool mine = false}) async => parseList(
+      await _send(() => _dio.get('portal/cases', queryParameters: {
+            'status': ?status,
+            if (mine) 'mine': true,
+          })),
+      PortalCase.fromJson);
 
-  Future<bool> transferPatient(String id, String newLocation, {String author = 'Dr. Kwame Mensah'}) async {
-    try {
-      await _dio.patch('admin/patients/$id/transfer', data: {
-        'newLocation': newLocation,
-        'author': author,
-      });
-      return true;
-    } catch (e) {
-      debugPrint('HospitalApiService: transferPatient failed ($e)');
-      return false;
-    }
-  }
+  Future<PortalCase> createCase(NewCaseInput input) async =>
+      PortalCase.fromJson(_obj(await _send(() => _dio.post('portal/cases', data: input.toJson()))));
 
-  Future<bool> updatePatientStatus(String id, String status) async {
-    try {
-      await _dio.patch('admin/patients/$id/status', queryParameters: {'status': status});
-      return true;
-    } catch (e) {
-      debugPrint('HospitalApiService: updatePatientStatus failed ($e)');
-      return false;
-    }
-  }
+  Future<PortalCase> getCase(String id) async =>
+      PortalCase.fromJson(_obj(await _send(() => _dio.get('portal/cases/$id'))));
 
-  Future<List<StaffCase>> getCases({String? status}) async {
-    try {
-      final response = await _dio.get(
-        'admin/cases',
-        queryParameters: status != null ? {'status': status} : null,
-      );
-      return (response.data as List).map((c) => StaffCase.fromJson(c)).toList();
-    } catch (e) {
-      debugPrint('HospitalApiService: getCases fallback used ($e)');
-      return [];
-    }
-  }
+  /// PATCH /portal/cases/{id}. Pass `assigneeUid: ''` to unassign and
+  /// `bed: ''` to clear the bed.
+  Future<PortalCase> updateCase(
+    String id, {
+    String? status,
+    int? wardId,
+    bool clearWard = false,
+    String? bed,
+    String? assigneeUid,
+    String? level,
+  }) async =>
+      PortalCase.fromJson(_obj(await _send(() => _dio.patch('portal/cases/$id', data: {
+            'status': ?status,
+            'ward_id': ?wardId,
+            if (clearWard) 'clear_ward': true,
+            'bed': ?bed,
+            'assignee_uid': ?assigneeUid,
+            'level': ?level,
+          }))));
 
-  Future<bool> createCase(StaffCase c) async {
-    try {
-      await _dio.post('admin/cases', data: c.toJson());
-      return true;
-    } catch (e) {
-      debugPrint('HospitalApiService: createCase failed ($e)');
-      return false;
-    }
-  }
+  Future<PortalCase> addNote(String id, String text) async =>
+      PortalCase.fromJson(_obj(await _send(() => _dio.post('portal/cases/$id/notes', data: {'text': text}))));
 
-  Future<bool> updateCase(String id, {String? status, String? assignee}) async {
-    try {
-      await _dio.patch('admin/cases/$id', data: {
-        'status': ?status,
-        'assignee': ?assignee,
-      });
-      return true;
-    } catch (e) {
-      debugPrint('HospitalApiService: updateCase failed ($e)');
-      return false;
-    }
-  }
+  Future<PortalCase> dischargeCase(String id, String summary) async =>
+      PortalCase.fromJson(_obj(await _send(() => _dio.post('portal/cases/$id/discharge', data: {'summary': summary}))));
 
-  Future<List<ClinicalAlert>> getAlerts() async {
-    try {
-      final response = await _dio.get('admin/alerts');
-      return (response.data as List).map((a) => ClinicalAlert(
-        id: a['id'] ?? '',
-        title: a['severity'] == 'urgent' ? 'Urgent Alert' : 'Watch Alert',
-        description: a['message'] ?? '',
-        isCritical: a['severity'] == 'urgent',
-        timestamp: a['created_at'] != null ? DateTime.parse(a['created_at']) : DateTime.now(),
-      )).toList();
-    } catch (e) {
-      debugPrint('HospitalApiService: fallback alerts used ($e)');
-      return [];
-    }
-  }
+  // ─── Alerts, capacity, team, audit ───
 
-  Future<bool> attendAlert(String alertId, {String? note, String staffName = 'Dr. Kwame Mensah'}) async {
-    try {
-      await _dio.post('admin/alerts/$alertId/attend', data: {
-        'note': note,
-        'staffName': staffName,
-      });
-      return true;
-    } catch (e) {
-      debugPrint('HospitalApiService: attendAlert failed ($e)');
-      return false;
-    }
-  }
+  Future<List<PortalAlert>> listAlerts() async =>
+      parseList(await _send(() => _dio.get('portal/alerts')), PortalAlert.fromJson);
 
-  Future<List<WardInfo>> getWards() async {
-    try {
-      final response = await _dio.get('admin/wards');
-      return (response.data as List).map((w) => WardInfo(
-        name: w['name'] ?? '',
-        occupied: w['occupied'] ?? 0,
-        total: w['total'] ?? 0,
-        type: w['type'] ?? '',
-      )).toList();
-    } catch (e) {
-      debugPrint('HospitalApiService: fallback wards used ($e)');
-      return [];
-    }
-  }
+  Future<Capacity> getCapacity() async =>
+      Capacity.fromJson(_obj(await _send(() => _dio.get('portal/capacity'))));
 
-  Future<List<EquipmentInfo>> getEquipment() async {
-    try {
-      final response = await _dio.get('admin/equipment');
-      return (response.data as List).map((e) => EquipmentInfo.fromJson(e)).toList();
-    } catch (e) {
-      debugPrint('HospitalApiService: fallback equipment used ($e)');
-      return [];
-    }
-  }
+  Future<void> addWard(WardInput input) async => _send(() => _dio.post('portal/wards', data: input.toJson()));
 
-  Future<List<StaffInfo>> getStaff() async {
-    try {
-      final response = await _dio.get('admin/staff');
-      return (response.data as List).map((s) => StaffInfo(
-        name: s['name'] ?? '',
-        role: s['role'] ?? '',
-        status: s['status'] ?? '',
-        department: s['department'],
-        patients: s['patients'],
-        shift: s['shift'],
-        phone: s['phone'],
-        license: s['license'],
-        email: s['email'],
-        photo: s['photo'],
-      )).toList();
-    } catch (e) {
-      debugPrint('HospitalApiService: fallback staff used ($e)');
-      return [];
-    }
-  }
+  Future<void> updateWard(int id, WardInput input) async =>
+      _send(() => _dio.put('portal/wards/$id', data: input.toJson()));
+
+  Future<void> deleteWard(int id) async => _send(() => _dio.delete('portal/wards/$id'));
+
+  Future<void> addEquipment(EquipmentInput input) async =>
+      _send(() => _dio.post('portal/equipment', data: input.toJson()));
+
+  Future<void> updateEquipment(int id, EquipmentInput input) async =>
+      _send(() => _dio.put('portal/equipment/$id', data: input.toJson()));
+
+  Future<void> deleteEquipment(int id) async => _send(() => _dio.delete('portal/equipment/$id'));
+
+  Future<TeamMember> setDuty(bool onDuty) async =>
+      TeamMember.fromJson(_obj(await _send(() => _dio.put('portal/me/duty', data: {'on_duty': onDuty}))));
+
+  Future<List<TeamMember>> listTeam() async =>
+      parseList(await _send(() => _dio.get('portal/team')), TeamMember.fromJson);
+
+  Future<List<AuditEntry>> listAudit({int limit = 200}) async => parseList(
+      await _send(() => _dio.get('portal/audit', queryParameters: {'limit': limit})), AuditEntry.fromJson);
 }

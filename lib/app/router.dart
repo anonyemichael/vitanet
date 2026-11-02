@@ -30,8 +30,9 @@ import 'package:vitanet/features/auth/screens/patient_login_screen.dart';
 import 'package:vitanet/features/auth/screens/registration_form_screen.dart';
 import 'package:vitanet/features/auth/screens/patient_completion_screen.dart';
 
-// Admin screens
-import 'package:vitanet/features/admin/screens/admin_main_navigation_screen.dart';
+// Hospital portal
+import 'package:vitanet/features/admin/providers/portal_providers.dart';
+import 'package:vitanet/features/admin/screens/portal_gate_screen.dart';
 
 import 'package:vitanet/features/devices/screens/device_connection_screen.dart';
 import 'package:vitanet/features/assessment/screens/assessment_wizard_screen.dart';
@@ -46,6 +47,10 @@ final _rootNavigatorKey = GlobalKey<NavigatorState>();
 final _routerRefreshStream = Provider<_AuthChangeNotifier>((ref) {
   final notifier = _AuthChangeNotifier();
   ref.listen<AuthState>(authProvider, (_, next) {
+    notifier.notify();
+  });
+  // Re-run redirects when staff access (GET /staff/me) resolves or changes.
+  ref.listen<AsyncValue<StaffAccess>>(staffAccessProvider, (_, next) {
     notifier.notify();
   });
   return notifier;
@@ -64,9 +69,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     refreshListenable: refreshNotifier,
     redirect: (context, state) {
       final authState = ref.read(authProvider);
-      final profile = ref.read(userProfileProvider);
-      final isHealthWorker =
-          profile?.role == 'health_worker' || profile?.role == 'admin';
+      // Portal access comes only from the backend staff account, never from
+      // the Firestore profile role. Null while loading / unavailable.
+      final staffAsync = ref.read(staffAccessProvider);
+      final staffAccess = staffAsync.isLoading ? null : staffAsync.valueOrNull;
 
       final path = state.uri.path;
 
@@ -83,23 +89,20 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         return '/login';
       }
 
-      // Role-based routing
-      if (path.startsWith('/admin') && !isHealthWorker) {
-        return '/home'; // Redirect normal users away from admin
-      }
-      if ((path == '/home' || path == '/chat') && isHealthWorker) {
-        return '/admin'; // Redirect health workers to admin UI
-      }
-      if (path == '/') {
-        return isHealthWorker ? '/admin' : '/home';
-      }
+      // Staff routing: patients away from /admin, staff away from the
+      // patient home/chat. The /admin gate itself shows pending / rejected /
+      // suspended / create-hospital states.
+      if (isUnauthenticated) return null;
+      final staffRedirect = staffRouteRedirect(path, staffAccess);
+      if (staffRedirect != null) return staffRedirect;
+      if (path == '/') return '/home';
 
       return null;
     },
     routes: [
       GoRoute(
         path: '/admin',
-        builder: (context, state) => const AdminMainNavigationScreen(),
+        builder: (context, state) => const PortalGate(),
       ),
       GoRoute(
         path: '/splash',
@@ -285,8 +288,7 @@ class _ScaffoldWithNavBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final profile = ref.watch(userProfileProvider);
-    final isHealthWorker = profile?.role == 'health_worker' || profile?.role == 'admin';
+    // Staff use the hospital portal (/admin); this shell is the patient app.
     final isKeyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
     final isDesktop = MediaQuery.of(context).size.width >= 800;
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -306,11 +308,11 @@ class _ScaffoldWithNavBar extends ConsumerWidget {
       body: isDesktop
           ? Row(
               children: [
-                _buildDesktopSidebar(context, isHealthWorker, ref),
+                _buildDesktopSidebar(context, ref),
                 Expanded(
                   child: Column(
                     children: [
-                      _buildDesktopBreadcrumb(context, isHealthWorker),
+                      _buildDesktopBreadcrumb(context),
                       Expanded(
                         child: NotificationListener<ScrollNotification>(
                           onNotification: (n) => handleScrollNotification(n, ref),
@@ -346,7 +348,6 @@ class _ScaffoldWithNavBar extends ConsumerWidget {
                         ignoring: !showMobileNav,
                         child: _buildFullWidthBottomNavBar(
                           context,
-                          isHealthWorker,
                           activeColor,
                           inactiveColor,
                           isDark,
@@ -364,7 +365,6 @@ class _ScaffoldWithNavBar extends ConsumerWidget {
 
   Widget _buildFullWidthBottomNavBar(
     BuildContext context,
-    bool isHealthWorker,
     Color activeColor,
     Color inactiveColor,
     bool isDark,
@@ -390,7 +390,6 @@ class _ScaffoldWithNavBar extends ConsumerWidget {
               child: Row(
                 children: _buildNavItems(
                   context,
-                  isHealthWorker,
                   activeColor,
                   inactiveColor,
                   isDark,
@@ -403,44 +402,25 @@ class _ScaffoldWithNavBar extends ConsumerWidget {
       ),
     );
   }
+  static final _patientNavItems = [
+    _NavItem(icon: Icons.home_outlined, activeIcon: Icons.home_rounded, label: 'Home'),
+    _NavItem(
+      icon: Icons.chat_bubble_outline_rounded,
+      activeIcon: Icons.chat_bubble_outline_rounded,
+      label: 'AI Chat',
+    ),
+    _NavItem(icon: Icons.menu_book_outlined, activeIcon: Icons.menu_book_rounded, label: 'Resources'),
+    _NavItem(icon: Icons.person_outline_rounded, activeIcon: Icons.person_rounded, label: 'Profile'),
+  ];
+
   List<Widget> _buildNavItems(
     BuildContext context,
-    bool showAdminTabs,
     Color activeColor,
     Color inactiveColor,
     bool isDark,
     WidgetRef ref,
   ) {
-    final items = showAdminTabs
-        ? [
-            _NavItem(icon: Icons.home_outlined, activeIcon: Icons.home, label: 'Home'),
-            _NavItem(icon: Icons.notifications_outlined, activeIcon: Icons.notifications, label: 'Alerts'),
-            _NavItem(icon: Icons.person_outline, activeIcon: Icons.person, label: 'Patients'),
-            _NavItem(icon: Icons.business_outlined, activeIcon: Icons.business, label: 'Hospital'),
-            _NavItem(icon: Icons.settings_outlined, activeIcon: Icons.settings, label: 'Settings'),
-          ]
-        : [
-            _NavItem(
-              icon: Icons.home_outlined,
-              activeIcon: Icons.home_rounded,
-              label: 'Home',
-            ),
-            _NavItem(
-              icon: Icons.chat_bubble_outline_rounded,
-              activeIcon: Icons.chat_bubble_outline_rounded,
-              label: 'AI Chat',
-            ),
-            _NavItem(
-              icon: Icons.menu_book_outlined,
-              activeIcon: Icons.menu_book_rounded,
-              label: 'Resources',
-            ),
-            _NavItem(
-              icon: Icons.person_outline_rounded,
-              activeIcon: Icons.person_rounded,
-              label: 'Profile',
-            ),
-          ];
+    final items = _patientNavItems;
 
     return List.generate(items.length, (index) {
       final isSelected = navigationShell.currentIndex == index;
@@ -463,10 +443,8 @@ class _ScaffoldWithNavBar extends ConsumerWidget {
     });
   }
 
-  Widget _buildDesktopBreadcrumb(BuildContext context, bool isHealthWorker) {
-    final titles = isHealthWorker 
-        ? ['Home', 'Alerts', 'Patients', 'Hospital', 'Settings']
-        : ['Home', 'Chat', 'Resources', 'Profile'];
+  Widget _buildDesktopBreadcrumb(BuildContext context) {
+    const titles = ['Home', 'Chat', 'Resources', 'Profile'];
     
     final currentIndex = navigationShell.currentIndex;
     final currentTitle = currentIndex >= 0 && currentIndex < titles.length 
@@ -514,37 +492,8 @@ class _ScaffoldWithNavBar extends ConsumerWidget {
     );
   }
 
-  Widget _buildDesktopSidebar(BuildContext context, bool showAdminTabs, WidgetRef ref) {
-    final items = showAdminTabs
-        ? [
-            _NavItem(icon: Icons.home_outlined, activeIcon: Icons.home, label: 'Home'),
-            _NavItem(icon: Icons.notifications_outlined, activeIcon: Icons.notifications, label: 'Alerts'),
-            _NavItem(icon: Icons.person_outline, activeIcon: Icons.person, label: 'Patients'),
-            _NavItem(icon: Icons.business_outlined, activeIcon: Icons.business, label: 'Hospital'),
-            _NavItem(icon: Icons.settings_outlined, activeIcon: Icons.settings, label: 'Settings'),
-          ]
-        : [
-            _NavItem(
-              icon: Icons.home_outlined,
-              activeIcon: Icons.home_rounded,
-              label: 'Home',
-            ),
-            _NavItem(
-              icon: Icons.chat_bubble_outline_rounded,
-              activeIcon: Icons.chat_bubble_outline_rounded,
-              label: 'AI Chat',
-            ),
-            _NavItem(
-              icon: Icons.menu_book_outlined,
-              activeIcon: Icons.menu_book_rounded,
-              label: 'Resources',
-            ),
-            _NavItem(
-              icon: Icons.person_outline_rounded,
-              activeIcon: Icons.person_rounded,
-              label: 'Profile',
-            ),
-          ];
+  Widget _buildDesktopSidebar(BuildContext context, WidgetRef ref) {
+    final items = _patientNavItems;
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final activeColor = const Color(0xFF0D9488);
@@ -783,9 +732,7 @@ class _DesktopSidebarUserFooterState
     final rawName = profile?.name.trim() ?? '';
     final displayName = rawName.isNotEmpty ? rawName : 'Anonye';
     final initial = displayName.isNotEmpty ? displayName[0].toUpperCase() : 'A';
-    final isHealthWorker =
-        profile?.role == 'health_worker' || profile?.role == 'admin';
-    final roleText = isHealthWorker ? 'Clinician' : 'Patient';
+    const roleText = 'Patient';
     final isSelected = widget.navigationShell.currentIndex == 3;
 
     final bgColor = isSelected
