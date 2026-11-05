@@ -36,8 +36,11 @@ if (-not (Test-Path $EnvFile)) {
 }
 
 Write-Host "1/5 Uploading code to $release ..."
+python -c "import tarfile, os; f=lambda t: None if '__pycache__' in t.name or t.name.endswith('.pyc') else t; tar=tarfile.open('deploy_pack.tar.gz', 'w:gz'); tar.add('vitanet-backend/app', arcname='app', filter=f); tar.add('vitanet-backend/test_security.py', arcname='test_security.py'); tar.add('vitanet-backend/test_portal.py', arcname='test_portal.py'); tar.add('vitanet-backend/requirements.txt', arcname='requirements.txt'); tar.close()"
 ssh -o BatchMode=yes $SshHost "mkdir -p $release"
-scp -q -r -o BatchMode=yes vitanet-backend/app vitanet-backend/test_security.py vitanet-backend/test_portal.py vitanet-backend/requirements.txt "${SshHost}:$release/"
+scp -q -o BatchMode=yes deploy_pack.tar.gz "${SshHost}:$release/deploy_pack.tar.gz"
+Remove-Item deploy_pack.tar.gz -ErrorAction SilentlyContinue
+ssh -o BatchMode=yes $SshHost "tar -xzf $release/deploy_pack.tar.gz -C $release && rm -f $release/deploy_pack.tar.gz"
 
 # Server .env: fixed settings + keys from the local (git-ignored) file.
 $keys = Get-Content $EnvFile | Where-Object { $_ -match '^\s*[A-Z_]+\s*=' -and $_ -notmatch '^\s*#' }
@@ -100,8 +103,16 @@ sudo systemctl daemon-reload
 echo "5/5 Switching code and restarting ..."
 rm -rf "$LIVE/app.previous"; mv "$LIVE/app" "$LIVE/app.previous"; cp -r "$REL/app" "$LIVE/app"
 sudo systemctl restart vitanet-backend
-sleep 4
-if curl -fsS -m 10 127.0.0.1:8000/ >/dev/null && [ "$(curl -s -o /dev/null -w '%{http_code}' 127.0.0.1:8000/admin/stats)" = "401" ]; then
+echo "Waiting for uvicorn to become healthy (up to 90s)..."
+OK=0
+for i in $(seq 1 45); do
+  if curl -fsS -m 3 127.0.0.1:8000/ >/dev/null 2>&1; then
+    OK=1
+    break
+  fi
+  sleep 2
+done
+if [ "$OK" = "1" ] && [ "$(curl -s -o /dev/null -w '%{http_code}' 127.0.0.1:8000/admin/stats)" = "401" ]; then
   echo "DEPLOYED OK: API up and /admin requires sign-in"
 else
   echo "HEALTH CHECK FAILED - rolling back"
