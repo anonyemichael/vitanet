@@ -335,6 +335,8 @@ class _CredentialsStepState extends ConsumerState<_CredentialsStep> {
         widget.isSignIn
             ? _footerLink(context, 'New to VitaNet?', 'Request access', widget.onSwitch)
             : _footerLink(context, 'Already have an account?', 'Sign in', widget.onSwitch),
+        const SizedBox(height: 8),
+        _footerLink(context, 'Personal user?', 'Go to Patient login', () => context.go('/login/patient')),
       ],
     );
   }

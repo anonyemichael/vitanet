@@ -238,12 +238,26 @@ class AuthNotifier extends StateNotifier<AuthState> {
         googleProvider.addScope('email');
         googleProvider.addScope('profile');
         if (auth.currentUser != null && auth.currentUser!.isAnonymous) {
-          final cred = await auth.currentUser!.linkWithPopup(googleProvider);
-          state = state.copyWith(
-            status: AuthStatus.authenticated,
-            user: cred.user ?? auth.currentUser,
-            errorMessage: null,
-          );
+          try {
+            final cred = await auth.currentUser!.linkWithPopup(googleProvider);
+            state = state.copyWith(
+              status: AuthStatus.authenticated,
+              user: cred.user ?? auth.currentUser,
+              errorMessage: null,
+            );
+          } on FirebaseAuthException catch (e) {
+            if (e.code == 'credential-already-in-use' ||
+                e.code == 'account-exists-with-different-credential') {
+              final cred = await auth.signInWithPopup(googleProvider);
+              state = state.copyWith(
+                status: AuthStatus.authenticated,
+                user: cred.user ?? auth.currentUser,
+                errorMessage: null,
+              );
+            } else {
+              rethrow;
+            }
+          }
         } else {
           final cred = await auth.signInWithPopup(googleProvider);
           state = state.copyWith(
@@ -273,12 +287,26 @@ class AuthNotifier extends StateNotifier<AuthState> {
         );
 
         if (auth.currentUser != null && auth.currentUser!.isAnonymous) {
-          final cred = await auth.currentUser!.linkWithCredential(credential);
-          state = state.copyWith(
-            status: AuthStatus.authenticated,
-            user: cred.user ?? auth.currentUser,
-            errorMessage: null,
-          );
+          try {
+            final cred = await auth.currentUser!.linkWithCredential(credential);
+            state = state.copyWith(
+              status: AuthStatus.authenticated,
+              user: cred.user ?? auth.currentUser,
+              errorMessage: null,
+            );
+          } on FirebaseAuthException catch (e) {
+            if (e.code == 'credential-already-in-use' ||
+                e.code == 'account-exists-with-different-credential') {
+              final cred = await auth.signInWithCredential(credential);
+              state = state.copyWith(
+                status: AuthStatus.authenticated,
+                user: cred.user ?? auth.currentUser,
+                errorMessage: null,
+              );
+            } else {
+              rethrow;
+            }
+          }
         } else {
           final cred = await auth.signInWithCredential(credential);
           state = state.copyWith(

@@ -47,13 +47,12 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyAF3-GOCtf9_lONY_JaEOZwy3ZqSxSQLI8',
-    appId: '1:975976200606:web:bc8be3678a2f37ab0dbe8f',
-    messagingSenderId: '975976200606',
-    projectId: 'vitanet-62e40',
-    authDomain: 'vitanet-62e40.firebaseapp.com',
-    storageBucket: 'vitanet-62e40.firebasestorage.app',
-    measurementId: 'G-2H994QGF7E',
+    apiKey: 'AIzaSyDpY4-1reD-KNByOGCbIzh5njvCvoIZUQQ',
+    appId: '1:613305193154:web:11bc9e548772570139615b',
+    messagingSenderId: '613305193154',
+    projectId: 'vitanet-prod-gh',
+    authDomain: 'vitanet-prod-gh.firebaseapp.com',
+    storageBucket: 'vitanet-prod-gh.firebasestorage.app',
   );
 
   static const FirebaseOptions android = FirebaseOptions(

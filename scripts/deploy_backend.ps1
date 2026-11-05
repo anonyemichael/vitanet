@@ -46,7 +46,8 @@ ssh -o BatchMode=yes $SshHost "tar -xzf $release/deploy_pack.tar.gz -C $release 
 $keys = Get-Content $EnvFile | Where-Object { $_ -match '^\s*[A-Z_]+\s*=' -and $_ -notmatch '^\s*#' }
 $envLines = @(
   "ENVIRONMENT=production",
-  "FIREBASE_PROJECT_ID=vitanet-62e40",
+  "FIREBASE_PROJECT_ID=vitanet-prod-gh",
+  "ALLOWED_FIREBASE_PROJECT_IDS=vitanet-prod-gh,vitanet-62e40",
   "BOOTSTRAP_ADMIN_EMAILS=anonyemichael6@gmail.com"
 ) + $keys
 $tmpEnv = Join-Path $env:TEMP "vitanet-prod-$stamp.env"

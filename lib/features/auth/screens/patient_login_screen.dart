@@ -338,6 +338,19 @@ class _PatientLoginScreenState extends ConsumerState<PatientLoginScreen> {
               ),
             ],
           ),
+          const SizedBox(height: 14),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text('Healthcare worker? ', style: VnText.body(13, color: p.muted)),
+              VnLink(
+                label: 'Clinical staff sign-in',
+                fontSize: 13,
+                weight: FontWeight.w600,
+                onTap: () => context.push('/login/hospital_personnel'),
+              ),
+            ],
+          ),
         ],
       ),
     );

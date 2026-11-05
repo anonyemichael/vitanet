@@ -41,18 +41,33 @@ BOOTSTRAP_ADMIN_EMAILS = {
 
 _google_request = google.auth.transport.requests.Request()
 
+ALLOWED_PROJECT_IDS = [
+    p.strip()
+    for p in os.getenv(
+        "ALLOWED_FIREBASE_PROJECT_IDS",
+        f"{FIREBASE_PROJECT_ID},vitanet-prod-gh,vitanet-62e40",
+    ).split(",")
+    if p.strip()
+]
+
 
 def verify_firebase_id_token(token: str) -> dict:
     """Verify a Firebase ID token's signature, expiry, issuer and audience
-    against Google's public keys. Needs no service-account credentials."""
-    claims = google_id_token.verify_firebase_token(
-        token, _google_request, audience=FIREBASE_PROJECT_ID, clock_skew_in_seconds=10
-    )
-    if not claims or claims.get("iss") != f"https://securetoken.google.com/{FIREBASE_PROJECT_ID}":
-        raise ValueError("wrong issuer")
-    if not claims.get("sub"):
-        raise ValueError("missing subject")
-    return claims
+    against Google's public keys. Supports both primary and secondary project IDs."""
+    last_err = None
+    for project_id in ALLOWED_PROJECT_IDS:
+        try:
+            claims = google_id_token.verify_firebase_token(
+                token, _google_request, audience=project_id, clock_skew_in_seconds=10
+            )
+            if claims and claims.get("iss") == f"https://securetoken.google.com/{project_id}":
+                if not claims.get("sub"):
+                    raise ValueError("missing subject")
+                return claims
+        except Exception as e:
+            last_err = e
+            continue
+    raise ValueError(f"Invalid token: {last_err}")
 
 
 @dataclass
