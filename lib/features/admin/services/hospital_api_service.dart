@@ -201,10 +201,79 @@ class HospitalApiService {
   Future<PortalCase> dischargeCase(String id, String summary) async =>
       PortalCase.fromJson(_obj(await _send(() => _dio.post('portal/cases/$id/discharge', data: {'summary': summary}))));
 
+  /// Prescribe a medication for an admitted inpatient.
+  Future<PortalCase> orderPrescription(
+    String caseId, {
+    required String medication,
+    required String dosage,
+    required String frequency,
+    required String duration,
+    String? instructions,
+  }) async =>
+      PortalCase.fromJson(_obj(await _send(() => _dio.post('portal/cases/$caseId/prescriptions', data: {
+            'medication': medication,
+            'dosage': dosage,
+            'frequency': frequency,
+            'duration': duration,
+            'instructions': instructions,
+          }))));
+
+  /// Record observation vitals during clinical rounds.
+  Future<PortalCase> recordInpatientVitals(
+    String caseId, {
+    int? heartRate,
+    double? bloodOxygen,
+    String? bloodPressure,
+    double? temperature,
+    int? respiratoryRate,
+  }) async =>
+      PortalCase.fromJson(_obj(await _send(() => _dio.post('portal/cases/$caseId/vitals', data: {
+            'heart_rate': ?heartRate,
+            'blood_oxygen': ?bloodOxygen,
+            'blood_pressure': ?bloodPressure,
+            'temperature': ?temperature,
+            'respiratory_rate': ?respiratoryRate,
+          }))));
+
   // ─── Alerts, capacity, team, audit ───
 
   Future<List<PortalAlert>> listAlerts() async =>
       parseList(await _send(() => _dio.get('portal/alerts')), PortalAlert.fromJson);
+
+  /// Broadcast an operational, departmental, or clinical alert across the facility.
+  Future<PortalAlert> createBroadcastAlert({
+    required String title,
+    required String body,
+    String severity = 'warning',
+    String? department,
+  }) async =>
+      PortalAlert.fromJson(_obj(await _send(() => _dio.post('portal/alerts', data: {
+            'title': title,
+            'body': body,
+            'severity': severity,
+            'department': (department ?? '').isEmpty ? null : department,
+          }))));
+
+  // ─── Patient Integration & Emergency Check-In ───
+
+  /// Patient direct pre-arrival emergency check-in to hospital ER.
+  Future<EmergencyCheckinResult> emergencyCheckin(
+    String hospitalId, {
+    required String complaint,
+    int etaMinutes = 15,
+    String triageLevel = 'urgent',
+    Map<String, dynamic>? vitals,
+  }) async =>
+      EmergencyCheckinResult.fromJson(_obj(await _send(() => _dio.post('facilities/$hospitalId/emergency-checkin', data: {
+            'complaint': complaint,
+            'eta_minutes': etaMinutes,
+            'triage_level': triageLevel,
+            'vitals': vitals ?? const {},
+          }))));
+
+  /// Patient view of active and past hospital cases, ward bed stays, and discharge summaries.
+  Future<List<PatientHospitalCase>> getPatientCases() async =>
+      parseList(await _send(() => _dio.get('patient/cases')), PatientHospitalCase.fromJson);
 
   Future<Capacity> getCapacity() async =>
       Capacity.fromJson(_obj(await _send(() => _dio.get('portal/capacity'))));

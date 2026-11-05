@@ -12,6 +12,8 @@ class Facility {
   final bool acceptingReferrals;
   final double? distanceKm;
   final int? etaMinutes;
+  final int bedsTotal;
+  final int bedsFree;
 
   const Facility({
     required this.id,
@@ -24,6 +26,8 @@ class Facility {
     this.acceptingReferrals = false,
     this.distanceKm,
     this.etaMinutes,
+    this.bedsTotal = 0,
+    this.bedsFree = 0,
   });
 
   factory Facility.fromJson(Map<String, dynamic> j) => Facility(
@@ -37,6 +41,8 @@ class Facility {
         acceptingReferrals: j['accepting_referrals'] == true,
         distanceKm: (j['distance_km'] as num?)?.toDouble(),
         etaMinutes: (j['eta_minutes'] as num?)?.toInt(),
+        bedsTotal: (j['beds_total'] as num?)?.toInt() ?? 0,
+        bedsFree: (j['beds_free'] as num?)?.toInt() ?? 0,
       );
 }
 

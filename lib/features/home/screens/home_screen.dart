@@ -9,6 +9,7 @@ import 'package:vitanet/shared/widgets/vn_kit.dart';
 
 import 'package:vitanet/features/home/widgets/active_referral_section.dart';
 import 'package:vitanet/features/home/widgets/header_section.dart';
+import 'package:vitanet/features/home/widgets/hospital_care_section.dart';
 import 'package:vitanet/features/home/widgets/profile_completion_banner.dart';
 import 'package:vitanet/features/home/widgets/urgent_care_alert_banner.dart';
 import 'package:vitanet/features/home/widgets/health_overview_section.dart';
@@ -82,6 +83,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 gap,
                 const ActiveReferralSection(),
                 const UrgentCareAlertBanner(),
+                const HospitalCareSection(),
+                gap,
                 const SymptomCheckHero(),
                 if (completion < 1) ...[
                   gap,

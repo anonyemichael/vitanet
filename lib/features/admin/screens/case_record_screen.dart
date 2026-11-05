@@ -134,6 +134,16 @@ class _CaseRecordScreenState extends ConsumerState<CaseRecordScreen> {
                       success: 'Status updated.'),
             ),
             _ActionChip(
+              icon: Icons.medication_outlined,
+              label: 'Order Medication',
+              onTap: _busy ? null : () => _sheet(OrderPrescriptionSheet(portalCase: c)),
+            ),
+            _ActionChip(
+              icon: Icons.monitor_heart_outlined,
+              label: 'Record Vitals',
+              onTap: _busy ? null : () => _sheet(RecordInpatientVitalsSheet(portalCase: c)),
+            ),
+            _ActionChip(
                 icon: Icons.bed_outlined,
                 label: 'Move ward / bed',
                 onTap: _busy ? null : () => _sheet(MoveCaseSheet(portalCase: c))),
@@ -232,6 +242,9 @@ class _TimelineRow extends StatelessWidget {
       'assign' => (Icons.person_outline_rounded, StaffTone.brand),
       'discharge' => (Icons.logout_rounded, StaffTone.green),
       'referral' => (Icons.move_to_inbox_outlined, StaffTone.brand),
+      'prescription' => (Icons.medication_rounded, StaffTone.brand),
+      'vitals' => (Icons.monitor_heart_rounded, StaffTone.danger),
+      'emergency_checkin' => (Icons.emergency_rounded, StaffTone.danger),
       _ => (Icons.circle_outlined, StaffTone.neutral),
     };
     final t = p.tone(tone);
@@ -476,6 +489,231 @@ class _DischargeCaseSheetState extends ConsumerState<DischargeCaseSheet> {
           label: 'Discharge summary',
           hint: 'Diagnosis, treatment given, follow-up advice…',
           maxLines: 6,
+        ),
+      ],
+    );
+  }
+}
+
+/// Clinician orders medication for an admitted patient.
+class OrderPrescriptionSheet extends ConsumerStatefulWidget {
+  final PortalCase portalCase;
+  const OrderPrescriptionSheet({super.key, required this.portalCase});
+
+  @override
+  ConsumerState<OrderPrescriptionSheet> createState() => _OrderPrescriptionSheetState();
+}
+
+class _OrderPrescriptionSheetState extends ConsumerState<OrderPrescriptionSheet> {
+  final _medication = TextEditingController();
+  final _dosage = TextEditingController(text: '500 mg');
+  final _frequency = TextEditingController(text: 'TID (Three times daily)');
+  final _duration = TextEditingController(text: '5 days');
+  final _instructions = TextEditingController();
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _medication.dispose();
+    _dosage.dispose();
+    _frequency.dispose();
+    _duration.dispose();
+    _instructions.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final med = _medication.text.trim();
+    if (med.isEmpty) {
+      showStaffSnack(context, 'Enter the medication name.');
+      return;
+    }
+    setState(() => _saving = true);
+    final r = await runPortalAction(
+      context,
+      () => ref.read(hospitalApiProvider).orderPrescription(
+            widget.portalCase.id,
+            medication: med,
+            dosage: _dosage.text.trim(),
+            frequency: _frequency.text.trim(),
+            duration: _duration.text.trim(),
+            instructions: _instructions.text.trim().isEmpty ? null : _instructions.text.trim(),
+          ),
+      success: 'Prescription ordered for $med.',
+    );
+    if (!mounted) return;
+    setState(() => _saving = false);
+    if (r != null) Navigator.of(context).pop(true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PortalSheet(
+      title: 'Order Medication',
+      subtitle: 'Prescribe medicine for ${widget.portalCase.patientName}. Appears on chart and discharge.',
+      actions: [
+        StaffButton('Cancel', kind: StaffButtonKind.secondary, onPressed: () => Navigator.of(context).pop()),
+        StaffButton('Sign & Order', loading: _saving, onPressed: _submit),
+      ],
+      children: [
+        PortalTextField(
+          controller: _medication,
+          label: 'Medication Name',
+          hint: 'e.g. Amoxicillin, Ceftriaxone, Paracetamol, Ibuprofen',
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: PortalTextField(
+                controller: _dosage,
+                label: 'Dosage',
+                hint: '500 mg, 1 g, 10 ml',
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: PortalTextField(
+                controller: _duration,
+                label: 'Duration',
+                hint: '5 days, 7 days',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        PortalTextField(
+          controller: _frequency,
+          label: 'Frequency',
+          hint: 'TID, BID, QDS, Once daily, PRN',
+        ),
+        const SizedBox(height: 12),
+        PortalTextField(
+          controller: _instructions,
+          label: 'Special Instructions',
+          hint: 'Take with food after meals, monitor liver enzymes, etc.',
+          maxLines: 2,
+        ),
+      ],
+    );
+  }
+}
+
+/// Clinician or nursing staff records inpatient vitals flow sheet.
+class RecordInpatientVitalsSheet extends ConsumerStatefulWidget {
+  final PortalCase portalCase;
+  const RecordInpatientVitalsSheet({super.key, required this.portalCase});
+
+  @override
+  ConsumerState<RecordInpatientVitalsSheet> createState() => _RecordInpatientVitalsSheetState();
+}
+
+class _RecordInpatientVitalsSheetState extends ConsumerState<RecordInpatientVitalsSheet> {
+  final _hr = TextEditingController();
+  final _spo2 = TextEditingController();
+  final _bp = TextEditingController();
+  final _temp = TextEditingController();
+  final _rr = TextEditingController();
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _hr.dispose();
+    _spo2.dispose();
+    _bp.dispose();
+    _temp.dispose();
+    _rr.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final hr = int.tryParse(_hr.text.trim());
+    final spo2 = double.tryParse(_spo2.text.trim());
+    final bp = _bp.text.trim().isEmpty ? null : _bp.text.trim();
+    final temp = double.tryParse(_temp.text.trim());
+    final rr = int.tryParse(_rr.text.trim());
+
+    if (hr == null && spo2 == null && bp == null && temp == null && rr == null) {
+      showStaffSnack(context, 'Enter at least one vital sign value.');
+      return;
+    }
+
+    setState(() => _saving = true);
+    final r = await runPortalAction(
+      context,
+      () => ref.read(hospitalApiProvider).recordInpatientVitals(
+            widget.portalCase.id,
+            heartRate: hr,
+            bloodOxygen: spo2,
+            bloodPressure: bp,
+            temperature: temp,
+            respiratoryRate: rr,
+          ),
+      success: 'Inpatient vitals recorded.',
+    );
+    if (!mounted) return;
+    setState(() => _saving = false);
+    if (r != null) Navigator.of(context).pop(true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PortalSheet(
+      title: 'Record Inpatient Vitals',
+      subtitle: 'Observation round vitals for ${widget.portalCase.patientName}.',
+      actions: [
+        StaffButton('Cancel', kind: StaffButtonKind.secondary, onPressed: () => Navigator.of(context).pop()),
+        StaffButton('Save Vitals', loading: _saving, onPressed: _submit),
+      ],
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: PortalTextField(
+                controller: _hr,
+                label: 'Heart Rate (bpm)',
+                hint: '72',
+                keyboardType: TextInputType.number,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: PortalTextField(
+                controller: _spo2,
+                label: 'SpO2 (%)',
+                hint: '98',
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: PortalTextField(
+                controller: _bp,
+                label: 'Blood Pressure',
+                hint: '120/80',
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: PortalTextField(
+                controller: _temp,
+                label: 'Temp (°C)',
+                hint: '36.8',
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        PortalTextField(
+          controller: _rr,
+          label: 'Respiratory Rate (/min)',
+          hint: '16',
+          keyboardType: TextInputType.number,
         ),
       ],
     );

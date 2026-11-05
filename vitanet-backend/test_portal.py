@@ -152,3 +152,49 @@ def test_capacity_permissions():
     duty = c.put("/portal/me/duty", headers=h("nurse"), json={"on_duty": True}).json()
     assert duty["on_duty"] is True
     assert c.get("/portal/dashboard", headers=h("boss")).json()["counts"]["staff_on_duty"] == 1
+
+
+def test_portal_extended_features():
+    # 1. Prescriptions and vitals on an active case
+    c_new = c.post("/portal/cases", headers=h("doc"), json={
+        "patient_name": "Adjoa Mensah", "complaint": "Bacterial pneumonia", "level": "urgent"
+    })
+    assert c_new.status_code == 200, c_new.text
+    cid = c_new.json()["id"]
+
+    rx = c.post(f"/portal/cases/{cid}/prescriptions", headers=h("doc"), json={
+        "medication": "Amoxicillin", "dosage": "500mg", "frequency": "TID", "duration": "7 days", "instructions": "Take with meals"
+    })
+    assert rx.status_code == 200, rx.text
+    assert any(e["kind"] == "prescription" for e in rx.json()["timeline"])
+
+    vitals = c.post(f"/portal/cases/{cid}/vitals", headers=h("nurse"), json={
+        "heart_rate": 82, "blood_oxygen": 98.0, "blood_pressure": "120/80", "temperature": 36.8, "respiratory_rate": 16
+    })
+    assert vitals.status_code == 200, vitals.text
+    assert any(e["kind"] == "vitals" for e in vitals.json()["timeline"])
+
+    # 2. Staff broadcast alert
+    bc = c.post("/portal/alerts", headers=h("boss"), json={
+        "title": "Trauma Ward Surge", "message": "High influx of trauma admissions; prep OR 2.", "severity": "urgent", "department": "Trauma"
+    })
+    assert bc.status_code == 200, bc.text
+    alerts = c.get("/portal/alerts", headers=h("doc")).json()
+    assert any(a["title"] == "Trauma Ward Surge" for a in alerts)
+
+    # 3. Direct Emergency Pre-Arrival Checkin
+    chk = c.post(f"/facilities/{S['hid']}/emergency-checkin", headers=h("pat"), json={
+        "complaint": "Acute severe shortness of breath", "vitals": {"blood_oxygen": 88, "heart_rate": 125},
+        "patient_lat": 5.54, "patient_lng": -0.22
+    })
+    assert chk.status_code == 200, chk.text
+    assert chk.json()["triage_level"] == "urgent" and chk.json()["status"] == "new"
+
+    # 4. Patient cases endpoint (inpatient & discharge history)
+    pat_cases = c.get("/patient/cases", headers=h("pat")).json()
+    assert len(pat_cases) >= 1
+    assert any("hospital_name" in pc for pc in pat_cases)
+
+    # 5. Facility capacity in list_facilities
+    fac = c.get("/facilities?lat=5.55&lng=-0.21", headers=h("pat")).json()
+    assert "beds_total" in fac[0] and "beds_free" in fac[0]

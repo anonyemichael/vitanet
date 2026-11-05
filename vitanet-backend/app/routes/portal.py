@@ -24,12 +24,14 @@ from app.models.hospital import Hospital
 from app.models.portal import (
     AuditLog,
     FacilityRegistration,
+    PortalBroadcast,
     PortalCase,
     PortalEquipment,
     PortalWard,
     Referral,
 )
 from app.models.staff_account import StaffAccount, StaffRole, StaffStatus
+from app.models.user import User
 
 router = APIRouter(tags=["portal"])
 
@@ -77,14 +79,19 @@ def _event(case: PortalCase, by: str, kind: str, text: str):
     }]
 
 
-def _hospital_out(h: Hospital, reg: Optional[FacilityRegistration]) -> Dict[str, Any]:
-    return {
+def _hospital_out(h: Hospital, reg: Optional[FacilityRegistration], db: Optional[Session] = None) -> Dict[str, Any]:
+    res = {
         "id": str(h.id), "name": h.name, "address": h.address, "latitude": h.latitude,
         "longitude": h.longitude, "phone_number": h.phone_number,
         "has_emergency_room": bool(h.has_emergency_room), "has_ambulance": bool(h.has_ambulance),
         "ambulance_available": bool(h.ambulance_available),
         "accepting_referrals": bool(reg.accepting_referrals) if reg else False,
     }
+    if db is not None:
+        wards = db.query(PortalWard).filter(PortalWard.hospital_id == h.id).all()
+        res["beds_total"] = sum(w.beds_total for w in wards)
+        res["beds_free"] = sum(max(w.beds_total - w.beds_occupied, 0) for w in wards)
+    return res
 
 
 def _referral_out(r: Referral, h: Optional[Hospital] = None) -> Dict[str, Any]:
@@ -215,6 +222,7 @@ def update_hospital(payload: HospitalIn, staff: StaffAccount = Depends(facility_
 def list_facilities(
     lat: Optional[float] = None, lng: Optional[float] = None, limit: int = 10,
     q: Optional[str] = Query(default=None, max_length=100),
+    emergency_only: bool = False,
     _: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db),
 ):
     """Registered hospitals (for staff sign-up and for patients choosing where
@@ -222,13 +230,15 @@ def list_facilities(
     by name or address."""
     query = (db.query(Hospital, FacilityRegistration)
              .join(FacilityRegistration, FacilityRegistration.hospital_id == Hospital.id))
+    if emergency_only:
+        query = query.filter(Hospital.has_emergency_room.is_(True))
     if q and q.strip():
         like = f"%{q.strip()}%"
         query = query.filter(Hospital.name.ilike(like) | Hospital.address.ilike(like))
     rows = query.all()
     out = []
     for h, reg in rows:
-        item = _hospital_out(h, reg)
+        item = _hospital_out(h, reg, db)
         if lat is not None and lng is not None:
             km = _haversine_km(lat, lng, h.latitude, h.longitude)
             item["distance_km"] = round(km, 1)
@@ -322,6 +332,102 @@ def cancel_referral(referral_id: UUID, me: UUID = Depends(current_user_id), db: 
     r.status = "cancelled"
     db.commit()
     return _referral_out(r, db.query(Hospital).filter(Hospital.id == r.hospital_id).first())
+
+
+# ───────────────────────── patient: hospital care records & direct checkin ─────────────────────────
+
+class EmergencyCheckinIn(BaseModel):
+    complaint: str = Field(..., min_length=2, max_length=300)
+    vitals: Optional[Dict[str, Any]] = None
+    patient_lat: Optional[float] = None
+    patient_lng: Optional[float] = None
+
+
+@router.post("/facilities/{hospital_id}/emergency-checkin")
+def emergency_checkin(
+    hospital_id: UUID,
+    payload: EmergencyCheckinIn,
+    me: UUID = Depends(current_user_id),
+    current: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Direct 1-tap pre-arrival emergency check-in notifying the hospital ER before arrival."""
+    h = db.query(Hospital).filter(Hospital.id == hospital_id).first()
+    if not h:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+
+    reg = db.query(FacilityRegistration).filter(FacilityRegistration.hospital_id == hospital_id).first()
+    if not reg or not reg.accepting_referrals:
+        raise HTTPException(status_code=409, detail="Hospital is not currently accepting incoming emergency cases")
+
+    # Cancel any previous open referral
+    prev = db.query(Referral).filter(Referral.patient_user_id == me, Referral.status == "new").first()
+    if prev:
+        prev.status = "cancelled"
+
+    user = db.query(User).filter(User.id == me).first()
+    patient_name = user.full_name if (user and user.full_name) else (current.email or "Emergency Patient")
+
+    eta = None
+    if payload.patient_lat is not None and payload.patient_lng is not None:
+        km = _haversine_km(payload.patient_lat, payload.patient_lng, h.latitude, h.longitude)
+        eta = _eta_minutes(km)
+
+    summary = {
+        "patient_name": patient_name,
+        "complaint": payload.complaint,
+        "vitals": payload.vitals or {},
+        "is_emergency_checkin": True,
+        "checkin_at": datetime.utcnow().isoformat() + "Z",
+    }
+
+    r = Referral(
+        hospital_id=hospital_id,
+        patient_user_id=me,
+        status="new",
+        triage_level="urgent",
+        summary=summary,
+        consent_at=datetime.utcnow(),
+        patient_lat=payload.patient_lat,
+        patient_lng=payload.patient_lng,
+        eta_minutes=eta,
+    )
+    db.add(r)
+    db.commit()
+    db.refresh(r)
+    return _referral_out(r, h)
+
+
+@router.get("/patient/cases")
+def list_patient_cases(
+    me: UUID = Depends(current_user_id),
+    db: Session = Depends(get_db),
+):
+    """Returns all hospital inpatient/admission cases and discharge summaries for the signed-in patient."""
+    my_referrals = db.query(Referral).filter(Referral.patient_user_id == me).all()
+    ref_case_ids = [r.case_id for r in my_referrals if r.case_id]
+
+    query = db.query(PortalCase).filter(
+        (PortalCase.patient_user_id == me) | (PortalCase.id.in_(ref_case_ids) if ref_case_ids else False)
+    ).order_by(PortalCase.created_at.desc()).limit(50)
+
+    cases = query.all()
+    if not cases:
+        return []
+
+    hids = list({c.hospital_id for c in cases})
+    hospitals = {h.id: h for h in db.query(Hospital).filter(Hospital.id.in_(hids)).all()}
+
+    out = []
+    for c in cases:
+        h = hospitals.get(c.hospital_id)
+        ward_map = _ward_names(db, c.hospital_id)
+        item = _case_out(c, ward_map)
+        item["hospital_name"] = h.name if h else "Medical Facility"
+        item["hospital_phone"] = h.phone_number if h else None
+        item["hospital_address"] = h.address if h else None
+        out.append(item)
+    return out
 
 
 # ───────────────────────── staff: dashboard ─────────────────────────
@@ -545,6 +651,108 @@ def add_note(case_id: UUID, payload: NoteIn, staff: StaffAccount = Depends(facil
     return _case_out(c, _ward_names(db, staff.hospital_id))
 
 
+class PrescriptionIn(BaseModel):
+    drug_name: Optional[str] = Field(default=None, max_length=150)
+    medication: Optional[str] = Field(default=None, max_length=150)
+    dosage: str = Field(..., min_length=1, max_length=60)
+    frequency: str = Field(..., min_length=1, max_length=60)
+    duration: str = Field(..., min_length=1, max_length=60)
+    instructions: Optional[str] = Field(default=None, max_length=300)
+
+    @property
+    def resolved_name(self) -> str:
+        return self.drug_name or self.medication or "Medication"
+
+
+@router.post("/portal/cases/{case_id}/prescriptions")
+def order_prescription(
+    case_id: UUID,
+    payload: PrescriptionIn,
+    staff: StaffAccount = Depends(facility_staff),
+    db: Session = Depends(get_db),
+):
+    """Doctor or clinical staff orders medication for an admitted patient case."""
+    c = _get_case(db, staff, case_id)
+    if c.status == "discharged":
+        raise HTTPException(status_code=409, detail="Cannot order medication for discharged case")
+
+    drug = payload.resolved_name
+    rx_entry = {
+        "drug_name": drug,
+        "medication": drug,
+        "dosage": payload.dosage,
+        "frequency": payload.frequency,
+        "duration": payload.duration,
+        "instructions": payload.instructions or "",
+        "prescribed_by": staff.full_name,
+    }
+    desc = f"Rx: {drug} {payload.dosage} ({payload.frequency} for {payload.duration})"
+    case_timeline = list(c.timeline or [])
+    case_timeline.append({
+        "at": datetime.utcnow().isoformat() + "Z",
+        "by": staff.full_name,
+        "kind": "prescription",
+        "text": desc,
+        "data": rx_entry,
+    })
+    c.timeline = case_timeline
+    _audit(db, staff, "case.prescription", str(c.id), desc)
+    db.commit()
+    return _case_out(c, _ward_names(db, staff.hospital_id))
+
+
+class InpatientVitalsIn(BaseModel):
+    heart_rate: Optional[int] = Field(default=None, ge=30, le=250)
+    blood_oxygen: Optional[float] = Field(default=None, ge=50, le=100)
+    blood_pressure: Optional[str] = Field(default=None, max_length=30)
+    bp_systolic: Optional[int] = Field(default=None, ge=50, le=280)
+    bp_diastolic: Optional[int] = Field(default=None, ge=30, le=180)
+    temperature: Optional[float] = Field(default=None, ge=30.0, le=45.0)
+    respiratory_rate: Optional[int] = Field(default=None, ge=5, le=60)
+    notes: Optional[str] = Field(default=None, max_length=200)
+
+
+@router.post("/portal/cases/{case_id}/vitals")
+def record_inpatient_vitals(
+    case_id: UUID,
+    payload: InpatientVitalsIn,
+    staff: StaffAccount = Depends(facility_staff),
+    db: Session = Depends(get_db),
+):
+    """Records inpatient vital signs observation into the case flow sheet."""
+    c = _get_case(db, staff, case_id)
+    if c.status == "discharged":
+        raise HTTPException(status_code=409, detail="Cannot record vitals for discharged case")
+
+    vitals_data = {
+        k: v for k, v in payload.dict().items() if v is not None and k != "notes"
+    }
+    desc_parts = []
+    if payload.heart_rate: desc_parts.append(f"HR: {payload.heart_rate} bpm")
+    if payload.blood_oxygen: desc_parts.append(f"SpO2: {payload.blood_oxygen}%")
+    if payload.bp_systolic and payload.bp_diastolic: desc_parts.append(f"BP: {payload.bp_systolic}/{payload.bp_diastolic}")
+    elif payload.blood_pressure: desc_parts.append(f"BP: {payload.blood_pressure}")
+    if payload.temperature: desc_parts.append(f"Temp: {payload.temperature}°C")
+    if payload.respiratory_rate: desc_parts.append(f"RR: {payload.respiratory_rate}/min")
+
+    desc = "Recorded vitals: " + (", ".join(desc_parts) if desc_parts else "Routine check")
+    if payload.notes:
+        desc += f" ({payload.notes})"
+
+    case_timeline = list(c.timeline or [])
+    case_timeline.append({
+        "at": datetime.utcnow().isoformat() + "Z",
+        "by": staff.full_name,
+        "kind": "vitals",
+        "text": desc,
+        "data": vitals_data,
+    })
+    c.timeline = case_timeline
+    _audit(db, staff, "case.vitals", str(c.id), desc)
+    db.commit()
+    return _case_out(c, _ward_names(db, staff.hospital_id))
+
+
 @router.post("/portal/cases/{case_id}/discharge")
 def discharge_case(case_id: UUID, payload: DischargeIn, staff: StaffAccount = Depends(facility_staff),
                    db: Session = Depends(get_db)):
@@ -571,6 +779,21 @@ def portal_alerts(staff: StaffAccount = Depends(facility_staff), db: Session = D
     who have an open referral/case with this hospital (they consented)."""
     hid = staff.hospital_id
     out: List[Dict[str, Any]] = []
+
+    # 1. Facility broadcasts
+    for b in db.query(PortalBroadcast).filter(PortalBroadcast.hospital_id == hid).order_by(PortalBroadcast.created_at.desc()).limit(30):
+        out.append({
+            "id": f"bc-{b.id}",
+            "kind": "broadcast",
+            "severity": b.severity,
+            "title": b.title,
+            "body": b.message,
+            "department": b.department,
+            "author_name": b.author_name,
+            "at": b.created_at.isoformat() + "Z",
+        })
+
+    # 2. Urgent incoming referrals
     for r in db.query(Referral).filter(Referral.hospital_id == hid, Referral.status == "new",
                                        Referral.triage_level == "urgent"):
         s = r.summary or {}
@@ -578,6 +801,8 @@ def portal_alerts(staff: StaffAccount = Depends(facility_staff), db: Session = D
                     "title": f"Urgent referral · {s.get('patient_name', 'Patient')}",
                     "body": s.get("complaint"), "referral_id": str(r.id),
                     "at": r.created_at.isoformat() + "Z"})
+
+    # 3. Consented patient vital alerts
     patient_ids = [r.patient_user_id for r in db.query(Referral).filter(
         Referral.hospital_id == hid, Referral.status.in_(["new", "accepted"]))]
     if patient_ids:
@@ -590,6 +815,47 @@ def portal_alerts(staff: StaffAccount = Depends(facility_staff), db: Session = D
                         "at": a.created_at.isoformat() + "Z"})
     out.sort(key=lambda x: x["at"], reverse=True)
     return out
+
+
+class CreateAlertIn(BaseModel):
+    title: str = Field(..., min_length=3, max_length=150)
+    message: str = Field(..., min_length=5, max_length=500)
+    severity: str = Field(default="warning")  # critical|warning|info
+    department: Optional[str] = Field(default=None, max_length=100)
+
+
+@router.post("/portal/alerts")
+def create_portal_alert(
+    payload: CreateAlertIn,
+    staff: StaffAccount = Depends(facility_staff),
+    db: Session = Depends(get_db),
+):
+    """Staff broadcasts an operational or departmental clinical alert for the hospital."""
+    hid = staff.hospital_id
+    b = PortalBroadcast(
+        hospital_id=hid,
+        title=payload.title,
+        message=payload.message,
+        severity=payload.severity if payload.severity in ("critical", "warning", "info") else "warning",
+        department=payload.department,
+        author_name=staff.full_name,
+        created_at=datetime.utcnow(),
+        at=datetime.utcnow(),
+    )
+    db.add(b)
+    _audit(db, staff, "alert.broadcast", payload.title, payload.severity)
+    db.commit()
+    db.refresh(b)
+    return {
+        "id": f"bc-{b.id}",
+        "kind": "broadcast",
+        "severity": b.severity,
+        "title": b.title,
+        "body": b.message,
+        "department": b.department,
+        "author_name": b.author_name,
+        "at": b.created_at.isoformat() + "Z",
+    }
 
 
 # ───────────────────────── staff: capacity & team ─────────────────────────

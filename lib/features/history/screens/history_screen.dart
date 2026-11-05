@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:vitanet/core/constants/app_colors.dart';
 import 'package:vitanet/data/models/triage_result.dart';
 import 'package:vitanet/data/providers/providers.dart';
 import 'package:vitanet/features/triage_result/screens/triage_result_screen.dart';
@@ -138,7 +139,46 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
               ),
           ],
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 14),
+        Material(
+          color: p.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: BorderSide(color: p.line),
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: () => context.push('/patient/visits'),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(
+                children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: const Color(0x1F2DD4BF),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.local_hospital_rounded, size: 18, color: AppColors.brandDark),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Hospital Admissions & Inpatient Care', style: VnText.body(14, weight: FontWeight.w700, color: p.ink)),
+                        Text('Track hospital stays, ER check-ins & doctor discharge orders', style: VnText.body(11, color: p.muted)),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.chevron_right_rounded, color: p.muted, size: 20),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
         if (sessions.isEmpty)
           _EmptyHistory(onStart: () {
             try {

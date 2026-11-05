@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vitanet/core/constants/app_colors.dart';
 import 'package:vitanet/data/providers/providers.dart';
+import 'package:vitanet/features/admin/providers/portal_providers.dart';
 import 'package:vitanet/features/home/screens/home_search_screen.dart';
 import 'package:vitanet/features/notifications/screens/notifications_screen.dart';
 import 'package:vitanet/shared/widgets/vn_kit.dart';
@@ -49,6 +50,7 @@ class HeaderSection extends ConsumerWidget {
     final profile = ref.watch(userProfileProvider);
     final authState = ref.watch(authProvider);
     final unread = ref.watch(notificationsUnreadProvider);
+    final staffAccess = ref.watch(staffAccessProvider).valueOrNull;
     final fullName = (profile?.name.trim().isNotEmpty ?? false)
         ? profile!.name.trim()
         : (authState.user?.displayName ?? '');
@@ -119,6 +121,65 @@ class HeaderSection extends ConsumerWidget {
             ],
           ),
         ),
+        if (staffAccess?.isPortalUser == true) ...[
+          const SizedBox(height: 14),
+          Material(
+            color: AppColors.staffNavy,
+            borderRadius: BorderRadius.circular(14),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(14),
+              onTap: () => context.go('/admin'),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: const Color(0x1F2DD4BF),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.local_hospital_rounded, size: 18, color: AppColors.mintLight),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Hospital Portal · ${staffAccess!.me?.role.label ?? "Staff"} Workspace',
+                            style: VnText.body(13, weight: FontWeight.w700, color: const Color(0xFFF1F5F9)),
+                          ),
+                          Text(
+                            'Switch to clinical ER, triage & inpatient dashboard',
+                            style: VnText.body(11, color: const Color(0xFF94A3B8)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: const Color(0x2E2DD4BF),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Text('Open', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.mintLight)),
+                          SizedBox(width: 3),
+                          Icon(Icons.arrow_forward_rounded, size: 13, color: AppColors.mintLight),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
         const SizedBox(height: 22),
         Hero(
           tag: 'home_search_bar',

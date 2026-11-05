@@ -99,3 +99,17 @@ class AuditLog(Base):
     target = Column(String(80), nullable=True)
     detail = Column(Text, nullable=True)
     at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+
+class PortalBroadcast(Base):
+    __tablename__ = "portal_broadcasts"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    hospital_id = Column(UUID(as_uuid=True), ForeignKey("hospitals.id"), nullable=False, index=True)
+    title = Column(String(150), nullable=False)
+    message = Column(Text, nullable=False)
+    severity = Column(String(20), nullable=False, default="warning")  # critical|warning|info
+    department = Column(String(100), nullable=True)
+    author_name = Column(String(150), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)

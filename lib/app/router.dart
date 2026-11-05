@@ -39,6 +39,8 @@ import 'package:vitanet/features/assessment/screens/assessment_wizard_screen.dar
 import 'package:vitanet/features/pharmacy/screens/pharmacy_screen.dart';
 import 'package:vitanet/features/first_aid/screens/first_aid_screen.dart';
 import 'package:vitanet/features/history/screens/history_screen.dart';
+import 'package:vitanet/features/history/screens/patient_visits_screen.dart';
+import 'package:vitanet/features/home/screens/hospital_directory_screen.dart';
 import 'package:vitanet/features/notifications/screens/notifications_screen.dart';
 import 'package:vitanet/features/health_trends/screens/health_trends_screen.dart';
 
@@ -93,8 +95,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       // patient home/chat. The /admin gate itself shows pending / rejected /
       // suspended / create-hospital states.
       if (isUnauthenticated) return null;
-      final staffRedirect = staffRouteRedirect(path, staffAccess);
-      if (staffRedirect != null) return staffRedirect;
+      final isPersonal = state.uri.queryParameters['personal'] == '1';
+      if (!isPersonal) {
+        final staffRedirect = staffRouteRedirect(path, staffAccess);
+        if (staffRedirect != null) return staffRedirect;
+      }
       if (path == '/') return '/home';
 
       return null;
@@ -192,6 +197,16 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootNavigatorKey,
         path: '/history',
         builder: (context, state) => const HistoryScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: '/hospitals',
+        builder: (context, state) => const HospitalDirectoryScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: '/patient/visits',
+        builder: (context, state) => const PatientVisitsScreen(),
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,

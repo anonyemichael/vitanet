@@ -59,6 +59,14 @@ String? staffRouteRedirect(String path, StaffAccess? access) {
 
 // ─── Portal data ───
 
+final patientCasesProvider = FutureProvider.autoDispose<List<PatientHospitalCase>>(
+  (ref) async {
+    final uid = ref.watch(authProvider.select((s) => s.user?.uid));
+    if (uid == null) return const [];
+    return ref.watch(hospitalApiProvider).getPatientCases();
+  },
+);
+
 final facilitiesProvider = FutureProvider.autoDispose<List<Facility>>(
   (ref) => ref.watch(hospitalApiProvider).listFacilities(),
 );

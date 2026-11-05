@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:vitanet/core/constants/app_colors.dart';
 import 'package:vitanet/features/admin/models/portal_models.dart';
 import 'package:vitanet/features/admin/providers/portal_providers.dart';
@@ -177,20 +178,32 @@ class _MoreScreen extends ConsumerWidget {
             padding: const EdgeInsets.all(16),
             children: [
               StaffContent(
-                child: StaffGroup(children: [
-                  for (final t in tabs)
-                    StaffNavRow(
-                      title: t.label,
-                      subtitle: sub(t),
-                      icon: t.icon,
-                      onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                        builder: (ctx) => Scaffold(
-                          backgroundColor: p.bg,
-                          body: screen(t, true, onBack: () => Navigator.of(ctx).pop()),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    StaffGroup(children: [
+                      for (final t in tabs)
+                        StaffNavRow(
+                          title: t.label,
+                          subtitle: sub(t),
+                          icon: t.icon,
+                          onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                            builder: (ctx) => Scaffold(
+                              backgroundColor: p.bg,
+                              body: screen(t, true, onBack: () => Navigator.of(ctx).pop()),
+                            ),
+                          )),
                         ),
-                      )),
+                    ]),
+                    const SizedBox(height: 16),
+                    StaffButton(
+                      'Switch to Personal Health App',
+                      kind: StaffButtonKind.secondary,
+                      icon: Icons.person_rounded,
+                      onPressed: () => context.go('/home?personal=1'),
                     ),
-                ]),
+                  ],
+                ),
               ),
             ],
           ),
@@ -286,6 +299,37 @@ class _SideNav extends StatelessWidget {
                   ),
                 ),
               const Spacer(),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Material(
+                  color: const Color(0x1A2DD4BF),
+                  borderRadius: BorderRadius.circular(12),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () => context.go('/home?personal=1'),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      child: Row(
+                        children: const [
+                          Icon(Icons.arrow_back_rounded, size: 16, color: AppColors.mintLight),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Personal Health App',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                          Icon(Icons.open_in_new_rounded, size: 14, color: AppColors.mintLight),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(color: const Color(0x14FFFFFF), borderRadius: BorderRadius.circular(14)),

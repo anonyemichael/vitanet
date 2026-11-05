@@ -93,6 +93,9 @@ class Facility {
   final bool ambulanceAvailable;
   final bool acceptingReferrals;
   final double? distanceKm;
+  final int bedsTotal;
+  final int bedsFree;
+  final int? etaMinutes;
 
   const Facility({
     this.id,
@@ -106,6 +109,9 @@ class Facility {
     this.ambulanceAvailable = false,
     this.acceptingReferrals = true,
     this.distanceKm,
+    this.bedsTotal = 0,
+    this.bedsFree = 0,
+    this.etaMinutes,
   });
 
   factory Facility.fromJson(Map<String, dynamic> j) => Facility(
@@ -120,6 +126,9 @@ class Facility {
         ambulanceAvailable: _bool(j['ambulance_available']),
         acceptingReferrals: _bool(j['accepting_referrals']),
         distanceKm: _double(j['distance_km']),
+        bedsTotal: _int(j['beds_total']) ?? 0,
+        bedsFree: _int(j['beds_free']) ?? 0,
+        etaMinutes: _int(j['eta_minutes']),
       );
 
   Map<String, dynamic> toJson() => {
@@ -493,10 +502,12 @@ class Capacity {
 
 class PortalAlert {
   final String id;
-  final String kind; // referral | vitals
+  final String kind; // referral | vitals | broadcast
   final String severity; // critical | warning
   final String title;
   final String? body;
+  final String? department;
+  final String? authorName;
   final String? referralId;
   final String? patientUserId;
   final String at;
@@ -507,6 +518,8 @@ class PortalAlert {
     required this.severity,
     required this.title,
     this.body,
+    this.department,
+    this.authorName,
     this.referralId,
     this.patientUserId,
     required this.at,
@@ -518,6 +531,8 @@ class PortalAlert {
         severity: _str(j['severity']) ?? 'warning',
         title: _str(j['title']) ?? '',
         body: _str(j['body']),
+        department: _str(j['department']),
+        authorName: _str(j['author_name']),
         referralId: _str(j['referral_id']),
         patientUserId: _str(j['patient_user_id']),
         at: _str(j['at']) ?? '',
@@ -582,4 +597,171 @@ class NewCaseInput {
         'assignee_uid': (assigneeUid ?? '').isEmpty ? null : assigneeUid,
         'allergies': (allergies ?? '').isEmpty ? null : allergies,
       };
+}
+
+/// A prescription ordered for a hospital case.
+class PrescriptionOrder {
+  final String medication;
+  final String dosage;
+  final String frequency;
+  final String duration;
+  final String? instructions;
+  final String? orderedBy;
+  final String? orderedAt;
+
+  const PrescriptionOrder({
+    required this.medication,
+    required this.dosage,
+    required this.frequency,
+    required this.duration,
+    this.instructions,
+    this.orderedBy,
+    this.orderedAt,
+  });
+
+  factory PrescriptionOrder.fromJson(Map<String, dynamic> j) => PrescriptionOrder(
+        medication: _str(j['medication']) ?? '',
+        dosage: _str(j['dosage']) ?? '',
+        frequency: _str(j['frequency']) ?? '',
+        duration: _str(j['duration']) ?? '',
+        instructions: _str(j['instructions']),
+        orderedBy: _str(j['ordered_by']),
+        orderedAt: _str(j['ordered_at']),
+      );
+
+  Map<String, dynamic> toJson() => {
+        'medication': medication,
+        'dosage': dosage,
+        'frequency': frequency,
+        'duration': duration,
+        if (instructions != null && instructions!.isNotEmpty) 'instructions': instructions,
+      };
+}
+
+/// Inpatient vitals recorded during clinical observation rounds.
+class InpatientVitals {
+  final int? heartRate;
+  final double? bloodOxygen;
+  final String? bloodPressure;
+  final double? temperature;
+  final int? respiratoryRate;
+  final String? recordedBy;
+  final String? recordedAt;
+
+  const InpatientVitals({
+    this.heartRate,
+    this.bloodOxygen,
+    this.bloodPressure,
+    this.temperature,
+    this.respiratoryRate,
+    this.recordedBy,
+    this.recordedAt,
+  });
+
+  factory InpatientVitals.fromJson(Map<String, dynamic> j) => InpatientVitals(
+        heartRate: _int(j['heart_rate']),
+        bloodOxygen: _double(j['blood_oxygen']),
+        bloodPressure: _str(j['blood_pressure']),
+        temperature: _double(j['temperature']),
+        respiratoryRate: _int(j['respiratory_rate']),
+        recordedBy: _str(j['recorded_by']),
+        recordedAt: _str(j['recorded_at']),
+      );
+
+  Map<String, dynamic> toJson() => {
+        if (heartRate != null) 'heart_rate': heartRate,
+        if (bloodOxygen != null) 'blood_oxygen': bloodOxygen,
+        if (bloodPressure != null) 'blood_pressure': bloodPressure,
+        if (temperature != null) 'temperature': temperature,
+        if (respiratoryRate != null) 'respiratory_rate': respiratoryRate,
+      };
+}
+
+/// Patient-facing view of a hospital admission / visit.
+class PatientHospitalCase {
+  final String id;
+  final String hospitalId;
+  final String hospitalName;
+  final String? hospitalPhone;
+  final String? ward;
+  final String? bed;
+  final String? attendingDoctor;
+  final String status;
+  final String level;
+  final String complaint;
+  final String? dischargeSummary;
+  final List<TimelineEvent> timeline;
+  final String createdAt;
+  final String updatedAt;
+
+  const PatientHospitalCase({
+    required this.id,
+    required this.hospitalId,
+    required this.hospitalName,
+    this.hospitalPhone,
+    this.ward,
+    this.bed,
+    this.attendingDoctor,
+    required this.status,
+    required this.level,
+    required this.complaint,
+    this.dischargeSummary,
+    this.timeline = const [],
+    required this.createdAt,
+    required this.updatedAt,
+  });
+
+  bool get isDischarged => status == 'discharged';
+  bool get isInTreatment => status == 'treatment';
+  bool get isWaiting => status == 'waiting';
+
+  factory PatientHospitalCase.fromJson(Map<String, dynamic> j) => PatientHospitalCase(
+        id: _str(j['id']) ?? '',
+        hospitalId: _str(j['hospital_id']) ?? '',
+        hospitalName: _str(j['hospital_name']) ?? 'VitaNet Hospital',
+        hospitalPhone: _str(j['hospital_phone']),
+        ward: _str(j['ward']),
+        bed: _str(j['bed']),
+        attendingDoctor: _str(j['attending_doctor']),
+        status: _str(j['status']) ?? 'waiting',
+        level: _str(j['level']) ?? 'routine',
+        complaint: _str(j['complaint']) ?? '',
+        dischargeSummary: _str(j['discharge_summary']),
+        timeline: (j['timeline'] is List)
+            ? (j['timeline'] as List)
+                .whereType<Map>()
+                .map((e) => TimelineEvent.fromJson(Map<String, dynamic>.from(e)))
+                .toList()
+            : const [],
+        createdAt: _str(j['created_at']) ?? '',
+        updatedAt: _str(j['updated_at']) ?? '',
+      );
+}
+
+/// Result returned from pre-arrival emergency check-in.
+class EmergencyCheckinResult {
+  final String referralId;
+  final String caseId;
+  final String hospitalId;
+  final String status;
+  final int etaMinutes;
+  final String message;
+
+  const EmergencyCheckinResult({
+    required this.referralId,
+    required this.caseId,
+    required this.hospitalId,
+    required this.status,
+    required this.etaMinutes,
+    required this.message,
+  });
+
+  factory EmergencyCheckinResult.fromJson(Map<String, dynamic> j) => EmergencyCheckinResult(
+        referralId: _str(j['referral_id']) ?? '',
+        caseId: _str(j['case_id']) ?? '',
+        hospitalId: _str(j['hospital_id']) ?? '',
+        status: _str(j['status']) ?? 'arriving',
+        etaMinutes: _int(j['eta_minutes']) ?? 15,
+        message: _str(j['message']) ?? 'Emergency check-in confirmed.',
+      );
 }
