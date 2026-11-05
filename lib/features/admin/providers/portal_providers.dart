@@ -5,6 +5,11 @@ import 'package:vitanet/features/admin/services/hospital_api_service.dart';
 
 final hospitalApiProvider = Provider<HospitalApiService>((ref) => HospitalApiService());
 
+/// Active workspace preference: personal health vs clinical hospital portal.
+enum AppWorkspace { personal, hospital }
+
+final preferredWorkspaceProvider = StateProvider<AppWorkspace>((ref) => AppWorkspace.personal);
+
 /// Where a signed-in user stands with the hospital portal.
 enum StaffAccessKind { none, pending, rejected, suspended, needsHospital, approved }
 

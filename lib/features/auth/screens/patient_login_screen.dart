@@ -8,6 +8,7 @@ import 'package:vitanet/core/constants/app_colors.dart';
 import 'package:vitanet/core/extensions/context_ext.dart';
 import 'package:vitanet/data/models/user_profile.dart';
 import 'package:vitanet/data/providers/providers.dart';
+import 'package:vitanet/features/admin/providers/portal_providers.dart';
 import 'package:vitanet/shared/widgets/vitanet_logo.dart';
 import 'package:vitanet/shared/widgets/vn_kit.dart';
 
@@ -79,6 +80,7 @@ class _PatientLoginScreenState extends ConsumerState<PatientLoginScreen> {
     ref.listen<AuthState>(authProvider, (previous, next) async {
       if (next.status == AuthStatus.authenticated ||
           next.status == AuthStatus.anonymous) {
+        ref.read(preferredWorkspaceProvider.notifier).state = AppWorkspace.personal;
         if (next.status == AuthStatus.anonymous) {
           const profile = UserProfile(name: 'Guest User', role: 'user');
           ref.read(userProfileProvider.notifier).updateProfile(profile);

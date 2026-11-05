@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:vitanet/data/models/user_profile.dart';
-import 'package:vitanet/data/providers/providers.dart';
 import 'package:vitanet/features/auth/screens/patient_login_screen.dart';
 import 'package:vitanet/features/auth/screens/role_selection_screen.dart';
 

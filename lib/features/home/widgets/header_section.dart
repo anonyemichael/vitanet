@@ -128,7 +128,10 @@ class HeaderSection extends ConsumerWidget {
             borderRadius: BorderRadius.circular(14),
             child: InkWell(
               borderRadius: BorderRadius.circular(14),
-              onTap: () => context.go('/admin'),
+              onTap: () {
+                ref.read(preferredWorkspaceProvider.notifier).state = AppWorkspace.hospital;
+                context.go('/admin');
+              },
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 child: Row(

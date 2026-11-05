@@ -200,7 +200,10 @@ class _MoreScreen extends ConsumerWidget {
                       'Switch to Personal Health App',
                       kind: StaffButtonKind.secondary,
                       icon: Icons.person_rounded,
-                      onPressed: () => context.go('/home?personal=1'),
+                      onPressed: () {
+                        ref.read(preferredWorkspaceProvider.notifier).state = AppWorkspace.personal;
+                        context.go('/home');
+                      },
                     ),
                   ],
                 ),
@@ -213,7 +216,7 @@ class _MoreScreen extends ConsumerWidget {
   }
 }
 
-class _SideNav extends StatelessWidget {
+class _SideNav extends ConsumerWidget {
   final List<PortalTab> tabs;
   final PortalTab selected;
   final StaffMe me;
@@ -229,7 +232,7 @@ class _SideNav extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       width: 248,
       color: AppColors.staffNavy,
@@ -306,7 +309,10 @@ class _SideNav extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                   child: InkWell(
                     borderRadius: BorderRadius.circular(12),
-                    onTap: () => context.go('/home?personal=1'),
+                    onTap: () {
+                      ref.read(preferredWorkspaceProvider.notifier).state = AppWorkspace.personal;
+                      context.go('/home');
+                    },
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                       child: Row(

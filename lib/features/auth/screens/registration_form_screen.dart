@@ -49,6 +49,7 @@ class _RegistrationFormScreenState extends ConsumerState<RegistrationFormScreen>
       final a = next.valueOrNull;
       if (next.isLoading || a == null || !mounted) return;
       if (a.kind != StaffAccessKind.none && a.kind != StaffAccessKind.rejected) {
+        ref.read(preferredWorkspaceProvider.notifier).state = AppWorkspace.hospital;
         context.go('/admin');
       }
     });

@@ -91,17 +91,33 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         return '/login';
       }
 
-      // Staff routing: patients away from /admin, staff away from the
-      // patient home/chat. The /admin gate itself shows pending / rejected /
-      // suspended / create-hospital states.
+      // Staff routing & workspace preference handling:
       if (isUnauthenticated) return null;
-      final isPersonal = state.uri.queryParameters['personal'] == '1';
-      if (!isPersonal) {
-        final staffRedirect = staffRouteRedirect(path, staffAccess);
-        if (staffRedirect != null) return staffRedirect;
-      }
-      if (path == '/') return '/home';
 
+      final prefWorkspace = ref.read(preferredWorkspaceProvider);
+
+      // Non-staff patients are never allowed in /admin
+      if (path == '/admin' || path.startsWith('/admin/')) {
+        if (staffAccess?.kind == StaffAccessKind.none) {
+          return '/home';
+        }
+        return null;
+      }
+
+      // If user preferred workspace is personal, always allow personal routes
+      if (prefWorkspace == AppWorkspace.personal) {
+        if (path == '/') return '/home';
+        return null;
+      }
+
+      // If user preferred workspace is hospital and they are staff, route home/chat to /admin
+      if (prefWorkspace == AppWorkspace.hospital && (staffAccess?.isPortalUser ?? false)) {
+        if (path == '/home' || path == '/chat' || path == '/') {
+          return '/admin';
+        }
+      }
+
+      if (path == '/') return '/home';
       return null;
     },
     routes: [

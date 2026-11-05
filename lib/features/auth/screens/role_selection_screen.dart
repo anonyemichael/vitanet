@@ -1,7 +1,9 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vitanet/core/constants/app_colors.dart';
+import 'package:vitanet/features/admin/providers/portal_providers.dart';
 import 'package:vitanet/shared/widgets/vitanet_logo.dart';
 import 'package:vitanet/shared/widgets/vn_kit.dart';
 
@@ -11,14 +13,14 @@ import 'package:vitanet/shared/widgets/vn_kit.dart';
 /// - Desktop / Wide (>= 960px): Executive split-screen with enterprise clinical
 ///   hero showcase on the left and workspace cards on the right.
 /// - Mobile / Tablet (< 960px): Clean centered high-density card layout.
-class RoleSelectionScreen extends StatefulWidget {
+class RoleSelectionScreen extends ConsumerStatefulWidget {
   const RoleSelectionScreen({super.key});
 
   @override
-  State<RoleSelectionScreen> createState() => _RoleSelectionScreenState();
+  ConsumerState<RoleSelectionScreen> createState() => _RoleSelectionScreenState();
 }
 
-class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
+class _RoleSelectionScreenState extends ConsumerState<RoleSelectionScreen> {
   late final TapGestureRecognizer _privacyTap;
   late final TapGestureRecognizer _disclaimerTap;
 
@@ -147,7 +149,10 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
             'Inpatient hospital stay records & discharge notes',
           ],
           isPrimary: true,
-          onTap: () => context.push('/login/patient'),
+          onTap: () {
+            ref.read(preferredWorkspaceProvider.notifier).state = AppWorkspace.personal;
+            context.push('/login/patient');
+          },
         ),
         const SizedBox(height: 16),
 
@@ -164,7 +169,10 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
             'Physician prescription orders & facility broadcasts',
           ],
           isPrimary: false,
-          onTap: () => context.push('/login/hospital_personnel'),
+          onTap: () {
+            ref.read(preferredWorkspaceProvider.notifier).state = AppWorkspace.hospital;
+            context.push('/login/hospital_personnel');
+          },
         ),
         const SizedBox(height: 28),
 
@@ -179,7 +187,10 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                 label: 'Sign in directly',
                 fontSize: 13,
                 weight: FontWeight.w600,
-                onTap: () => context.push('/login/patient'),
+                onTap: () {
+                  ref.read(preferredWorkspaceProvider.notifier).state = AppWorkspace.personal;
+                  context.push('/login/patient');
+                },
               ),
             ],
           ),
