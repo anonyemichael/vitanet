@@ -108,9 +108,12 @@ class _VideoShortsScreenState extends State<VideoShortsScreen> {
                   scrollDirection: Axis.vertical,
                   physics: const ClampingScrollPhysics(),
                   controller: _pageController,
-                  itemCount: widget.shorts.length,
+                  itemCount: null,
                   onPageChanged: _onPageChanged,
-                  itemBuilder: (context, index) => _buildShort(widget.shorts[index], index),
+                  itemBuilder: (context, index) {
+                    final video = widget.shorts[index % widget.shorts.length];
+                    return _buildShort(video, index);
+                  },
                 ),
               ),
       ),

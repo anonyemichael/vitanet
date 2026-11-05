@@ -1,6 +1,8 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:vitanet/core/network/backend.dart';
 import '../models/health_article.dart';
 import '../widgets/resource_media.dart';
 import 'medical_image_resolver.dart';
@@ -52,15 +54,34 @@ class EuropePmcFeedService {
       return EuropePmcFeedPage.empty();
     }
 
-    final uri = Uri.parse(
-      '$_baseUrl?query=${Uri.encodeComponent(cleanQuery)}&resultType=core&cursorMark=${Uri.encodeComponent(cursorMark)}&pageSize=$pageSize&format=json',
-    );
+    final Uri uri = kIsWeb
+        ? BackendConfig.uri(
+            'api/health-feed?query=${Uri.encodeComponent(cleanQuery)}&cursorMark=${Uri.encodeComponent(cursorMark)}&pageSize=$pageSize',
+          )
+        : Uri.parse(
+            '$_baseUrl?query=${Uri.encodeComponent(cleanQuery)}&resultType=core&cursorMark=${Uri.encodeComponent(cursorMark)}&pageSize=$pageSize&format=json',
+          );
 
     try {
       final response = await _client.get(uri).timeout(const Duration(seconds: 10));
 
       if (response.statusCode != 200) {
         debugPrint('Europe PMC API returned status ${response.statusCode}');
+        // Fallback to direct URL if web proxy failed, or vice versa
+        if (kIsWeb) {
+          final fallbackUri = Uri.parse(
+            '$_baseUrl?query=${Uri.encodeComponent(cleanQuery)}&resultType=core&cursorMark=${Uri.encodeComponent(cursorMark)}&pageSize=$pageSize&format=json',
+          );
+          try {
+            final fbResp = await _client.get(fallbackUri).timeout(const Duration(seconds: 6));
+            if (fbResp.statusCode == 200) {
+              final dynamic decoded = json.decode(fbResp.body);
+              if (decoded is Map<String, dynamic>) {
+                return _processResponse(decoded, cleanQuery, cursorMark);
+              }
+            }
+          } catch (_) {}
+        }
         return EuropePmcFeedPage.empty();
       }
 
@@ -69,36 +90,40 @@ class EuropePmcFeedService {
         return EuropePmcFeedPage.empty();
       }
 
-      final hitCount = (decoded['hitCount'] as num?)?.toInt() ?? 0;
-      final nextCursor = decoded['nextCursorMark'] as String?;
-      final rawResults = decoded['resultList']?['result'] as List? ?? [];
-
-      final articles = <HealthArticle>[];
-      for (final item in rawResults) {
-        if (item is Map<String, dynamic>) {
-          final article = _parseEuropePmcArticle(item, cleanQuery);
-          if (article != null) {
-            articles.add(article);
-          }
-        }
-      }
-
-      // Check if more results remain
-      final hasMore = nextCursor != null &&
-          nextCursor.isNotEmpty &&
-          nextCursor != cursorMark &&
-          articles.isNotEmpty;
-
-      return EuropePmcFeedPage(
-        articles: articles,
-        nextCursorMark: nextCursor,
-        hitCount: hitCount,
-        hasMore: hasMore,
-      );
+      return _processResponse(decoded, cleanQuery, cursorMark);
     } catch (e) {
       debugPrint('Europe PMC fetch exception: $e');
       return EuropePmcFeedPage.empty();
     }
+  }
+
+  EuropePmcFeedPage _processResponse(Map<String, dynamic> decoded, String cleanQuery, String cursorMark) {
+    final hitCount = (decoded['hitCount'] as num?)?.toInt() ?? 0;
+    final nextCursor = decoded['nextCursorMark'] as String?;
+    final rawResults = decoded['resultList']?['result'] as List? ?? [];
+
+    final articles = <HealthArticle>[];
+    for (final item in rawResults) {
+      if (item is Map<String, dynamic>) {
+        final article = _parseEuropePmcArticle(item, cleanQuery);
+        if (article != null) {
+          articles.add(article);
+        }
+      }
+    }
+
+    // Check if more results remain
+    final hasMore = nextCursor != null &&
+        nextCursor.isNotEmpty &&
+        nextCursor != cursorMark &&
+        articles.isNotEmpty;
+
+    return EuropePmcFeedPage(
+      articles: articles,
+      nextCursorMark: nextCursor,
+      hitCount: hitCount,
+      hasMore: hasMore,
+    );
   }
 
   /// Parses raw Europe PMC JSON item into [HealthArticle].

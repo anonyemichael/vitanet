@@ -605,7 +605,7 @@ class _MedicineThumbnailState extends State<_MedicineThumbnail> {
   void _checkImage() {
     final direct = widget.medicine.heroImageUrl;
     if (direct != null && direct.isNotEmpty) {
-      _imageUrl = direct;
+      _imageUrl = DailyMedService.safeImageUrl(direct);
       return;
     }
     final cached = DailyMedService.instance.getCachedImageUrl(
@@ -613,7 +613,7 @@ class _MedicineThumbnailState extends State<_MedicineThumbnail> {
       drugName: widget.medicine.genericName ?? widget.medicine.name,
     );
     if (cached != null) {
-      _imageUrl = cached;
+      _imageUrl = DailyMedService.safeImageUrl(cached);
       return;
     }
 
@@ -622,7 +622,7 @@ class _MedicineThumbnailState extends State<_MedicineThumbnail> {
       drugName: widget.medicine.genericName ?? widget.medicine.name,
     ).then((url) {
       if (mounted && url != null) {
-        setState(() => _imageUrl = url);
+        setState(() => _imageUrl = DailyMedService.safeImageUrl(url));
       }
     }).catchError((_) {});
   }

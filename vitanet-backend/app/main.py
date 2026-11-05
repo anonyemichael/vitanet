@@ -23,6 +23,7 @@ from app.routes import (
     staff,
     ai_proxy,
     portal,
+    media_proxy,
 )
 from app.dependencies.security import DEV_BYPASS_AUTH
 
@@ -62,12 +63,14 @@ _extra_origins = [
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        "https://vitanet-prod-gh.web.app",
+        "https://vitanet-prod-gh.firebaseapp.com",
         "https://vitanet-62e40.web.app",
         "https://vitanet-62e40.firebaseapp.com",
         *_extra_origins,
     ],
     allow_origin_regex=(
-        r"https://vitanet-62e40--[a-z0-9-]+\.web\.app"
+        r"https://vitanet-(?:prod-gh|62e40)--[a-z0-9-]+\.web\.app"
         r"|http://(localhost|127\.0\.0\.1)(:\d+)?"
     ),
     allow_credentials=False,
@@ -90,6 +93,7 @@ app.include_router(triage.router)
 app.include_router(staff.router)
 app.include_router(ai_proxy.router)
 app.include_router(portal.router)
+app.include_router(media_proxy.router)
 
 
 @app.get("/")

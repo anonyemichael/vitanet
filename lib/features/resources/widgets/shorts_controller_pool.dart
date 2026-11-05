@@ -36,8 +36,9 @@ class ShortsControllerPool {
   }
 
   void _updateWindow(int current) {
+    if (shorts.isEmpty) return;
     final activeRange = {current - 1, current, current + 1}
-        .where((idx) => idx >= 0 && idx < shorts.length)
+        .where((idx) => idx >= 0)
         .toSet();
 
     // 1. Strictly dispose and close any controller where (index - current).abs() > 1
@@ -55,7 +56,7 @@ class ShortsControllerPool {
     // 2. Pre-initialize missing controllers within window [current - 1, current, current + 1]
     for (final idx in activeRange) {
       if (!_pool.containsKey(idx)) {
-        final video = shorts[idx];
+        final video = shorts[idx % shorts.length];
         final isCurrent = idx == current;
         if (_controllerFactory != null) {
           _pool[idx] = _controllerFactory(video.youtubeId, isCurrent);

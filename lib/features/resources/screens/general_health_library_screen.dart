@@ -131,6 +131,22 @@ class _HealthLibraryScreenState extends ConsumerState<HealthLibraryScreen> {
 
     if (!mounted) return;
     if (page.articles.isEmpty) {
+      // If live feed reached the end of this query stream, seamlessly rotate to next discovery domain
+      _feedMixer.reseed();
+      final broaderQuery = _feedMixer.buildQuery(selectedCategory: _selectedCategory, searchQuery: '');
+      final backupPage = await service.fetchFeedPage(query: broaderQuery, cursorMark: '*', pageSize: 12);
+      if (!mounted) return;
+      if (backupPage.articles.isNotEmpty) {
+        final currentIds = _articles.map((a) => a.id).toSet();
+        final newUnique = backupPage.articles.where((a) => !currentIds.contains(a.id)).toList();
+        setState(() {
+          _articles.addAll(newUnique);
+          _nextCursorMark = backupPage.nextCursorMark;
+          _hasMore = true;
+          _isLoadingMore = false;
+        });
+        return;
+      }
       setState(() {
         _isLoadingMore = false;
         _hasMore = false;

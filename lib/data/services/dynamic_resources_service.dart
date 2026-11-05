@@ -296,6 +296,8 @@ class DynamicResourcesService {
       color: const Color(0xFFF97316),
       icon: Icons.medication_rounded,
       isFdaApproved: true,
+      heroImageUrl: 'https://dailymed.nlm.nih.gov/dailymed/image.cfm?setid=12202ef3-c65e-45a6-88ed-5d945d8fd41c&name=Remedy_Label.jpg',
+      splSetId: '12202ef3-c65e-45a6-88ed-5d945d8fd41c',
       details: const [
         MedicineAccordionItem(
           title: 'Typical Dosage',
@@ -313,6 +315,8 @@ class DynamicResourcesService {
       color: const Color(0xFFEF4444),
       icon: Icons.monitor_heart_rounded,
       isFdaApproved: true,
+      heroImageUrl: 'https://dailymed.nlm.nih.gov/dailymed/image.cfm?setid=b3773f02-02a9-33c8-e053-2995a90a2235&name=5004-100GB-IFC+14992_12-20-.jpg',
+      splSetId: 'b3773f02-02a9-33c8-e053-2995a90a2235',
       details: const [
         MedicineAccordionItem(
           title: 'Typical Dosage',
@@ -329,6 +333,8 @@ class DynamicResourcesService {
       color: const Color(0xFF10B981),
       icon: Icons.healing_rounded,
       isFdaApproved: true,
+      heroImageUrl: 'https://dailymed.nlm.nih.gov/dailymed/image.cfm?setid=5ee63ebc-45e8-fab8-e063-6294a90a7b23&name=65862-642-30+AZITHROMYCIN+500MG_67046-1698-30.jpg',
+      splSetId: '5ee63ebc-45e8-fab8-e063-6294a90a7b23',
       details: const [
         MedicineAccordionItem(
           title: 'Typical Dosage',
@@ -345,6 +351,8 @@ class DynamicResourcesService {
       color: const Color(0xFF10B981),
       icon: Icons.healing_rounded,
       isFdaApproved: true,
+      heroImageUrl: 'https://dailymed.nlm.nih.gov/dailymed/image.cfm?setid=3e3c3813-7dd2-4655-9b0a-1fa7ff0e4dc1&name=carton-label.jpg',
+      splSetId: '3e3c3813-7dd2-4655-9b0a-1fa7ff0e4dc1',
       details: const [
         MedicineAccordionItem(
           title: 'Typical Dosage',
@@ -361,6 +369,8 @@ class DynamicResourcesService {
       color: const Color(0xFF10B981),
       icon: Icons.healing_rounded,
       isFdaApproved: true,
+      heroImageUrl: 'https://dailymed.nlm.nih.gov/dailymed/image.cfm?setid=294c6fc3-e7ca-46ea-b062-a27dd7b0bc97&name=72789309.jpg',
+      splSetId: '294c6fc3-e7ca-46ea-b062-a27dd7b0bc97',
       details: const [
         MedicineAccordionItem(
           title: 'Typical Dosage',
@@ -377,6 +387,8 @@ class DynamicResourcesService {
       color: const Color(0xFFEF4444),
       icon: Icons.monitor_heart_rounded,
       isFdaApproved: true,
+      heroImageUrl: 'https://dailymed.nlm.nih.gov/dailymed/image.cfm?setid=5f4e3bc8-2810-f1ae-e063-6394a90a9725&name=68180-518-02+LISIN-HCTZ10-12.5MG_67046-686-30.jpg',
+      splSetId: '5f4e3bc8-2810-f1ae-e063-6394a90a9725',
       details: const [
         MedicineAccordionItem(
           title: 'Typical Dosage',
@@ -393,6 +405,8 @@ class DynamicResourcesService {
       color: const Color(0xFFEF4444),
       icon: Icons.monitor_heart_rounded,
       isFdaApproved: true,
+      heroImageUrl: 'https://dailymed.nlm.nih.gov/dailymed/image.cfm?setid=02e233c4-48d1-456d-8fc8-f99a06ef854a&name=72789412.jpg',
+      splSetId: '02e233c4-48d1-456d-8fc8-f99a06ef854a',
       details: const [
         MedicineAccordionItem(
           title: 'Typical Dosage',
@@ -409,6 +423,8 @@ class DynamicResourcesService {
       color: const Color(0xFFEF4444),
       icon: Icons.monitor_heart_rounded,
       isFdaApproved: true,
+      heroImageUrl: 'https://dailymed.nlm.nih.gov/dailymed/image.cfm?setid=5d5977a5-98f2-a90d-e063-6394a90a5892&name=atorvastatinfigure1.jpg',
+      splSetId: '5d5977a5-98f2-a90d-e063-6394a90a5892',
       details: const [
         MedicineAccordionItem(
           title: 'Typical Dosage',
@@ -425,6 +441,8 @@ class DynamicResourcesService {
       color: const Color(0xFFEF4444),
       icon: Icons.monitor_heart_rounded,
       isFdaApproved: true,
+      heroImageUrl: 'https://dailymed.nlm.nih.gov/dailymed/image.cfm?setid=8b315ecf-ff79-4792-88a6-4ce707a326b0&name=lbl713353191.jpg',
+      splSetId: '8b315ecf-ff79-4792-88a6-4ce707a326b0',
       details: const [
         MedicineAccordionItem(
           title: 'Typical Dosage',
@@ -441,6 +459,8 @@ class DynamicResourcesService {
       color: const Color(0xFF0D9488),
       icon: Icons.medication_rounded,
       isFdaApproved: true,
+      heroImageUrl: 'https://dailymed.nlm.nih.gov/dailymed/image.cfm?setid=0ff1ba75-3c86-4baf-a6b1-1bb883839866&name=metformin-er-500mg-90tab1.jpg',
+      splSetId: '0ff1ba75-3c86-4baf-a6b1-1bb883839866',
       details: const [
         MedicineAccordionItem(
           title: 'Typical Dosage',

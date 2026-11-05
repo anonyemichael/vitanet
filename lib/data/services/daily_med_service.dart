@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vitanet/core/network/backend.dart';
 import 'package:vitanet/features/resources/models/medicine.dart';
 
 /// Service for resolving real pharmaceutical package and pill photographs
@@ -55,17 +56,30 @@ class DailyMedService {
     }
   }
 
+  /// Returns a web-safe, CORS-friendly URL for DailyMed images.
+  ///
+  /// DailyMed server omits `Access-Control-Allow-Origin: *` headers, causing
+  /// HTML5 CanvasKit to reject rendering on web. We route DailyMed URLs through
+  /// the VitaNet server-side `/media/proxy` caching proxy on web.
+  static String safeImageUrl(String url) {
+    if (url.isEmpty) return url;
+    if (kIsWeb && (url.contains('dailymed.nlm.nih.gov') || url.contains('nlm.nih.gov'))) {
+      return BackendConfig.uri('media/proxy?url=${Uri.encodeComponent(url)}').toString();
+    }
+    return url;
+  }
+
   /// Synchronous cache lookup for instant widget rendering
   String? getCachedImageUrl({String? splSetId, String? drugName}) {
     if (splSetId != null && splSetId.isNotEmpty) {
       final key = 'setid:$splSetId';
       final cached = _imageCache[key] ?? _checkDiskSync(key);
-      if (cached != null) return cached;
+      if (cached != null) return safeImageUrl(cached);
     }
     if (drugName != null && drugName.isNotEmpty) {
       final key = 'name:${_normalizeDrugName(drugName)}';
       final cached = _imageCache[key] ?? _checkDiskSync(key);
-      if (cached != null) return cached;
+      if (cached != null) return safeImageUrl(cached);
     }
     return null;
   }
@@ -180,8 +194,9 @@ class DailyMedService {
       final imageUrl = await _fetchMediaForSetId(targetSetId);
 
       if (imageUrl != null && imageUrl.isNotEmpty) {
-        cacheImageUrl(splSetId: targetSetId, drugName: drugName, url: imageUrl);
-        return imageUrl;
+        final safe = safeImageUrl(imageUrl);
+        cacheImageUrl(splSetId: targetSetId, drugName: drugName, url: safe);
+        return safe;
       } else {
         _negativeCache.add(dedupeKey);
         return null;

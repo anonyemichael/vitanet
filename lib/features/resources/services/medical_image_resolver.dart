@@ -150,6 +150,8 @@ class MedicalImageResolver {
   };
 
   /// Matches article text metadata to one of the 12 granular sub-buckets.
+  /// Prioritizes declared category and title keywords to avoid misclassifications
+  /// caused by incidental terms in medical abstracts.
   static String matchBucket({
     required String title,
     required String category,
@@ -157,186 +159,180 @@ class MedicalImageResolver {
     String abstractText = '',
   }) {
     final lowerTitle = title.toLowerCase();
-    final lowerCat = category.toLowerCase();
-    final lowerAbstract = abstractText.toLowerCase();
-    final lowerMesh = meshHeadings.map((h) => h.toLowerCase()).join(' ');
+    final lowerCat = category.toLowerCase().trim();
 
-    final combined = '$lowerTitle $lowerCat $lowerMesh $lowerAbstract';
+    // 1. Direct Category Match (highest fidelity)
+    if (lowerCat == 'cardiology' || lowerCat == 'cardio' || lowerCat == 'heart') return 'cardiology';
+    if (lowerCat == 'nutrition' || lowerCat == 'diet' || lowerCat == 'fasting') return 'nutrition_fasting';
+    if (lowerCat == 'sleep' || lowerCat == 'neurology' || lowerCat == 'neuro') return 'sleep_neurology';
+    if (lowerCat == 'fitness' || lowerCat == 'exercise' || lowerCat == 'resistance') return 'resistance_fitness';
+    if (lowerCat == 'immunology' || lowerCat == 'immunity') return 'immunology_lab';
+    if (lowerCat == 'pharmacology' || lowerCat == 'medicines' || lowerCat == 'medication') return 'pharmacology';
+    if (lowerCat == 'mental health' || lowerCat == 'psychology' || lowerCat == 'psychiatry') return 'mental_health';
+    if (lowerCat == 'pediatrics' || lowerCat == "children's health" || lowerCat == 'pediatric') return 'pediatrics';
+    if (lowerCat == 'endocrinology' || lowerCat == 'diabetes') return 'endocrinology_diabetes';
+    if (lowerCat == 'oncology' || lowerCat == 'cancer') return 'oncology';
+    if (lowerCat == 'dermatology' || lowerCat == 'skin') return 'dermatology';
+    if (lowerCat == 'respiratory' || lowerCat == 'pulmonology' || lowerCat == 'breathing') return 'respiratory';
+    if (lowerCat.contains('women') || lowerCat == 'obstetrics') return 'women_health';
 
-    // 1. Oncology
-    if (combined.contains('cancer') ||
-        combined.contains('tumor') ||
-        combined.contains('tumour') ||
-        combined.contains('oncolog') ||
-        combined.contains('carcinoma') ||
-        combined.contains('melanoma') ||
-        combined.contains('chemotherapy') ||
-        combined.contains('leukemia') ||
-        combined.contains('neoplasm')) {
-      return 'oncology';
-    }
+    // 2. High-confidence Title & MeSH Semantic Match
+    final titleAndMesh = '$lowerTitle ${meshHeadings.map((h) => h.toLowerCase()).join(' ')}';
 
-    // 2. Dermatology
-    if (combined.contains('skin') ||
-        combined.contains('dermatol') ||
-        combined.contains('epiderm') ||
-        combined.contains('psoriasis') ||
-        combined.contains('eczema') ||
-        combined.contains('cutaneous') ||
-        combined.contains('acne')) {
-      return 'dermatology';
-    }
-
-    // 3. Pediatrics
-    if (combined.contains('pediatric') ||
-        combined.contains('paediatric') ||
-        combined.contains('infant') ||
-        combined.contains('neonat') ||
-        combined.contains('child') ||
-        combined.contains('adolescent') ||
-        combined.contains('postpartum') ||
-        combined.contains('maternal')) {
-      return 'pediatrics';
-    }
-
-    // 4. Endocrinology & Diabetes
-    if (combined.contains('diabetes') ||
-        combined.contains('insulin') ||
-        combined.contains('glucose') ||
-        combined.contains('glycemic') ||
-        combined.contains('endocrin') ||
-        combined.contains('metabolic syndrome') ||
-        combined.contains('thyroid') ||
-        combined.contains('pancreas')) {
-      return 'endocrinology_diabetes';
-    }
-
-    // 5. Cardiology
-    if (combined.contains('cardio') ||
-        combined.contains('heart') ||
-        combined.contains('coronary') ||
-        combined.contains('myocardial') ||
-        combined.contains('arrhythmia') ||
-        combined.contains('hypertension') ||
-        combined.contains('vascular') ||
-        combined.contains('blood pressure') ||
-        combined.contains('angina') ||
-        combined.contains('atherosclerosis') ||
-        lowerCat == 'cardiology') {
+    // Cardiology
+    if (titleAndMesh.contains('cardio') ||
+        titleAndMesh.contains('heart') ||
+        titleAndMesh.contains('coronary') ||
+        titleAndMesh.contains('myocardial') ||
+        titleAndMesh.contains('arrhythmia') ||
+        titleAndMesh.contains('hypertension') ||
+        titleAndMesh.contains('blood pressure') ||
+        titleAndMesh.contains('angina') ||
+        titleAndMesh.contains('vascular') ||
+        titleAndMesh.contains('atherosclerosis')) {
       return 'cardiology';
     }
 
-    // 6. Sleep & Neurology
-    if (combined.contains('sleep') ||
-        combined.contains('insomnia') ||
-        combined.contains('circadian') ||
-        combined.contains('eeg') ||
-        combined.contains('neuro') ||
-        combined.contains('brain') ||
-        combined.contains('cognitive decline') ||
-        combined.contains('alzheimer') ||
-        combined.contains('parkinson') ||
-        combined.contains('stroke') ||
-        lowerCat == 'sleep') {
-      return 'sleep_neurology';
-    }
-
-    // 7. Nutrition & Fasting
-    if (combined.contains('nutrition') ||
-        combined.contains('diet') ||
-        combined.contains('fasting') ||
-        combined.contains('micronutrient') ||
-        combined.contains('calorie') ||
-        combined.contains('vitamin') ||
-        combined.contains('omega-3') ||
-        combined.contains('microbiome') ||
-        combined.contains('food intake') ||
-        lowerCat == 'nutrition') {
+    // Nutrition & Fasting
+    if (titleAndMesh.contains('nutrition') ||
+        titleAndMesh.contains('diet') ||
+        titleAndMesh.contains('fasting') ||
+        titleAndMesh.contains('micronutrient') ||
+        titleAndMesh.contains('calorie') ||
+        titleAndMesh.contains('vitamin') ||
+        titleAndMesh.contains('omega-3') ||
+        titleAndMesh.contains('microbiome') ||
+        titleAndMesh.contains('food')) {
       return 'nutrition_fasting';
     }
 
-    // 8. Resistance & Fitness
-    if (combined.contains('fitness') ||
-        combined.contains('resistance training') ||
-        combined.contains('exercise') ||
-        combined.contains('hypertrophy') ||
-        combined.contains('physical activity') ||
-        combined.contains('muscle') ||
-        combined.contains('kinesiology') ||
-        combined.contains('athletic') ||
-        combined.contains('biomechanic') ||
-        lowerCat == 'fitness') {
+    // Sleep & Neurology
+    if (titleAndMesh.contains('sleep') ||
+        titleAndMesh.contains('insomnia') ||
+        titleAndMesh.contains('circadian') ||
+        titleAndMesh.contains('eeg') ||
+        titleAndMesh.contains('brain') ||
+        titleAndMesh.contains('neuro') ||
+        titleAndMesh.contains('alzheimer') ||
+        titleAndMesh.contains('parkinson') ||
+        titleAndMesh.contains('stroke') ||
+        titleAndMesh.contains('cognitive')) {
+      return 'sleep_neurology';
+    }
+
+    // Fitness & Exercise
+    if (titleAndMesh.contains('fitness') ||
+        titleAndMesh.contains('exercise') ||
+        titleAndMesh.contains('resistance training') ||
+        titleAndMesh.contains('hypertrophy') ||
+        titleAndMesh.contains('physical activity') ||
+        titleAndMesh.contains('muscle') ||
+        titleAndMesh.contains('athletic') ||
+        titleAndMesh.contains('biomechanic')) {
       return 'resistance_fitness';
     }
 
-    // 9. Mental Health & Psychology
-    if (combined.contains('mental health') ||
-        combined.contains('depression') ||
-        combined.contains('anxiety') ||
-        combined.contains('psychiatr') ||
-        combined.contains('psycholog') ||
-        combined.contains('stress') ||
-        combined.contains('mood') ||
-        combined.contains('therapy') ||
-        combined.contains('mindfulness')) {
+    // Mental Health
+    if (titleAndMesh.contains('mental health') ||
+        titleAndMesh.contains('depression') ||
+        titleAndMesh.contains('anxiety') ||
+        titleAndMesh.contains('psychiatr') ||
+        titleAndMesh.contains('psycholog') ||
+        titleAndMesh.contains('stress') ||
+        titleAndMesh.contains('mood') ||
+        titleAndMesh.contains('mindfulness')) {
       return 'mental_health';
     }
 
-    // 10. Immunology & Lab
-    if (combined.contains('immun') ||
-        combined.contains('antibody') ||
-        combined.contains('vaccine') ||
-        combined.contains('cytokine') ||
-        combined.contains('infection') ||
-        combined.contains('pathogen') ||
-        combined.contains('virus') ||
-        combined.contains('t-cell') ||
-        combined.contains('autoimmune') ||
-        lowerCat == 'immunology') {
-      return 'immunology_lab';
+    // Endocrinology & Diabetes
+    if (titleAndMesh.contains('diabet') ||
+        titleAndMesh.contains('insulin') ||
+        titleAndMesh.contains('glucose') ||
+        titleAndMesh.contains('glycemic') ||
+        titleAndMesh.contains('endocrin') ||
+        titleAndMesh.contains('thyroid') ||
+        titleAndMesh.contains('metabolic syndrome')) {
+      return 'endocrinology_diabetes';
     }
 
-    // 11. Pharmacology
-    if (combined.contains('drug') ||
-        combined.contains('pharmac') ||
-        combined.contains('dosage') ||
-        combined.contains('statin') ||
-        combined.contains('tablet') ||
-        combined.contains('capsule') ||
-        combined.contains('inhibitor') ||
-        combined.contains('compound') ||
-        combined.contains('therapeutics')) {
-      return 'pharmacology';
+    // Pediatrics & Infant (checked before Respiratory so pediatric respiratory cases map to pediatrics)
+    if (titleAndMesh.contains('pediatric') ||
+        titleAndMesh.contains('paediatric') ||
+        titleAndMesh.contains('infant') ||
+        titleAndMesh.contains('neonat') ||
+        titleAndMesh.contains('child') ||
+        titleAndMesh.contains('adolescent')) {
+      return 'pediatrics';
     }
 
-    // 12. Respiratory & Pulmonology
-    if (combined.contains('respirat') ||
-        combined.contains('asthma') ||
-        combined.contains('copd') ||
-        combined.contains('lung') ||
-        combined.contains('pulmonary') ||
-        combined.contains('bronch') ||
-        combined.contains('inhaler') ||
-        combined.contains('breathing') ||
-        lowerCat == 'respiratory' ||
-        lowerCat == 'breathing') {
+    // Respiratory
+    if (titleAndMesh.contains('respirat') ||
+        titleAndMesh.contains('asthma') ||
+        titleAndMesh.contains('copd') ||
+        titleAndMesh.contains('lung') ||
+        titleAndMesh.contains('pulmonary') ||
+        titleAndMesh.contains('bronch') ||
+        titleAndMesh.contains('inhaler') ||
+        titleAndMesh.contains('breathing')) {
       return 'respiratory';
     }
 
-    // 13. Women's Health
-    if (combined.contains('women') ||
-        combined.contains('pregnan') ||
-        combined.contains('maternal') ||
-        combined.contains('menopaus') ||
-        combined.contains('postpartum') ||
-        combined.contains('breastfeed') ||
-        combined.contains('contracept') ||
-        combined.contains('endometriosis') ||
-        lowerCat.contains('women')) {
+    // Dermatology
+    if (titleAndMesh.contains('skin') ||
+        titleAndMesh.contains('dermat') ||
+        titleAndMesh.contains('epiderm') ||
+        titleAndMesh.contains('cutaneous') ||
+        titleAndMesh.contains('psoriasis') ||
+        titleAndMesh.contains('eczema') ||
+        titleAndMesh.contains('acne')) {
+      return 'dermatology';
+    }
+
+    // Oncology (Cancer)
+    if (titleAndMesh.contains('cancer') ||
+        titleAndMesh.contains('tumor') ||
+        titleAndMesh.contains('tumour') ||
+        titleAndMesh.contains('oncolog') ||
+        titleAndMesh.contains('carcinoma') ||
+        titleAndMesh.contains('melanoma') ||
+        titleAndMesh.contains('chemotherapy') ||
+        titleAndMesh.contains('leukemia') ||
+        titleAndMesh.contains('neoplasm')) {
+      return 'oncology';
+    }
+
+    // Women's Health
+    if (titleAndMesh.contains('women') ||
+        titleAndMesh.contains('pregnan') ||
+        titleAndMesh.contains('maternal') ||
+        titleAndMesh.contains('menopaus') ||
+        titleAndMesh.contains('breastfeed') ||
+        titleAndMesh.contains('endometriosis')) {
       return 'women_health';
     }
 
-    // 14. General Clinical
+    // Pharmacology
+    if (titleAndMesh.contains('drug') ||
+        titleAndMesh.contains('pharmac') ||
+        titleAndMesh.contains('dosage') ||
+        titleAndMesh.contains('statin') ||
+        titleAndMesh.contains('tablet') ||
+        titleAndMesh.contains('inhibitor') ||
+        titleAndMesh.contains('therapeutics')) {
+      return 'pharmacology';
+    }
+
+    // Immunology
+    if (titleAndMesh.contains('immun') ||
+        titleAndMesh.contains('antibody') ||
+        titleAndMesh.contains('vaccin') ||
+        titleAndMesh.contains('cytokine') ||
+        titleAndMesh.contains('infection') ||
+        titleAndMesh.contains('virus') ||
+        titleAndMesh.contains('autoimmune')) {
+      return 'immunology_lab';
+    }
+
     return 'general_clinical';
   }
 

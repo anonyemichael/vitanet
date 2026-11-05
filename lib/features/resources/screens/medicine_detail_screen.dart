@@ -48,7 +48,7 @@ class _MedicineDetailScreenState extends ConsumerState<MedicineDetailScreen> {
   void _resolveHeroImage() {
     final direct = widget.medicine.heroImageUrl;
     if (direct != null && direct.isNotEmpty) {
-      _heroImageUrl = direct;
+      _heroImageUrl = DailyMedService.safeImageUrl(direct);
       _isLoadingImage = false;
       return;
     }
@@ -58,7 +58,7 @@ class _MedicineDetailScreenState extends ConsumerState<MedicineDetailScreen> {
       drugName: widget.medicine.genericName ?? widget.medicine.name,
     );
     if (cached != null) {
-      _heroImageUrl = cached;
+      _heroImageUrl = DailyMedService.safeImageUrl(cached);
       _isLoadingImage = false;
       return;
     }
@@ -70,7 +70,7 @@ class _MedicineDetailScreenState extends ConsumerState<MedicineDetailScreen> {
     ).then((url) {
       if (mounted) {
         setState(() {
-          _heroImageUrl = url;
+          _heroImageUrl = url != null ? DailyMedService.safeImageUrl(url) : null;
           _isLoadingImage = false;
         });
       }
