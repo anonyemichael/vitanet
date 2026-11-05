@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 
 import 'package:firebase_core/firebase_core.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:vitanet/firebase_options.dart';
 import 'package:vitanet/app/router.dart';
@@ -41,9 +42,19 @@ Future<void> main() async {
     debugPrint('Firebase initialization failed: $e');
   }
 
+  SharedPreferences? prefs;
+  try {
+    prefs = await SharedPreferences.getInstance();
+  } catch (e) {
+    debugPrint('SharedPreferences initialization failed: $e');
+  }
+
   runApp(
-    const ProviderScope(
-      child: VitaNetApp(),
+    ProviderScope(
+      overrides: [
+        if (prefs != null) sharedPreferencesProvider.overrideWith((ref) => prefs),
+      ],
+      child: const VitaNetApp(),
     ),
   );
 }

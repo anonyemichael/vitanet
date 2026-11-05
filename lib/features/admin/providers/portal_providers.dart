@@ -8,7 +8,29 @@ final hospitalApiProvider = Provider<HospitalApiService>((ref) => HospitalApiSer
 /// Active workspace preference: personal health vs clinical hospital portal.
 enum AppWorkspace { personal, hospital }
 
-final preferredWorkspaceProvider = StateProvider<AppWorkspace>((ref) => AppWorkspace.personal);
+class ActiveWorkspaceNotifier extends Notifier<AppWorkspace> {
+  static const _key = 'vitanet_active_workspace';
+
+  @override
+  AppWorkspace build() {
+    final prefs = ref.watch(sharedPreferencesProvider);
+    final val = prefs?.getString(_key);
+    if (val == 'hospital') return AppWorkspace.hospital;
+    return AppWorkspace.personal;
+  }
+
+  Future<void> setWorkspace(AppWorkspace ws) async {
+    state = ws;
+    final prefs = ref.read(sharedPreferencesProvider);
+    await prefs?.setString(_key, ws == AppWorkspace.hospital ? 'hospital' : 'personal');
+  }
+}
+
+final activeWorkspaceProvider =
+    NotifierProvider<ActiveWorkspaceNotifier, AppWorkspace>(ActiveWorkspaceNotifier.new);
+
+final preferredWorkspaceProvider =
+    Provider<AppWorkspace>((ref) => ref.watch(activeWorkspaceProvider));
 
 /// Where a signed-in user stands with the hospital portal.
 enum StaffAccessKind { none, pending, rejected, suspended, needsHospital, approved }

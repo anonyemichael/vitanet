@@ -80,7 +80,7 @@ class _PatientLoginScreenState extends ConsumerState<PatientLoginScreen> {
     ref.listen<AuthState>(authProvider, (previous, next) async {
       if (next.status == AuthStatus.authenticated ||
           next.status == AuthStatus.anonymous) {
-        ref.read(preferredWorkspaceProvider.notifier).state = AppWorkspace.personal;
+        await ref.read(activeWorkspaceProvider.notifier).setWorkspace(AppWorkspace.personal);
         if (next.status == AuthStatus.anonymous) {
           const profile = UserProfile(name: 'Guest User', role: 'user');
           ref.read(userProfileProvider.notifier).updateProfile(profile);

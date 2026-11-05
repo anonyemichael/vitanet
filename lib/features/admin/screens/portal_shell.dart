@@ -201,7 +201,7 @@ class _MoreScreen extends ConsumerWidget {
                       kind: StaffButtonKind.secondary,
                       icon: Icons.person_rounded,
                       onPressed: () {
-                        ref.read(preferredWorkspaceProvider.notifier).state = AppWorkspace.personal;
+                        ref.read(activeWorkspaceProvider.notifier).setWorkspace(AppWorkspace.personal);
                         context.go('/home');
                       },
                     ),
@@ -310,7 +310,7 @@ class _SideNav extends ConsumerWidget {
                   child: InkWell(
                     borderRadius: BorderRadius.circular(12),
                     onTap: () {
-                      ref.read(preferredWorkspaceProvider.notifier).state = AppWorkspace.personal;
+                      ref.read(activeWorkspaceProvider.notifier).setWorkspace(AppWorkspace.personal);
                       context.go('/home');
                     },
                     child: Padding(

@@ -138,6 +138,8 @@ class _RoleSelectionScreenState extends ConsumerState<RoleSelectionScreen> {
 
         // Workspace Card 1: Personal User
         _WorkspaceCard(
+          image: 'assets/images/photos/doctor_with_patient.jpg',
+          imageAlt: 'Doctor consulting with smiling patient in clinical room',
           badgeText: 'PATIENTS & CAREGIVERS',
           title: 'Personal Health',
           subtitle: 'Assess symptoms, track vitals, send ER pre-arrivals, and review hospital admission summaries.',
@@ -150,14 +152,16 @@ class _RoleSelectionScreenState extends ConsumerState<RoleSelectionScreen> {
           ],
           isPrimary: true,
           onTap: () {
-            ref.read(preferredWorkspaceProvider.notifier).state = AppWorkspace.personal;
+            ref.read(activeWorkspaceProvider.notifier).setWorkspace(AppWorkspace.personal);
             context.push('/login/patient');
           },
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 18),
 
         // Workspace Card 2: Hospital Personnel
         _WorkspaceCard(
+          image: 'assets/images/photos/medical_team.jpg',
+          imageAlt: 'Clinical staff and surgical healthcare team in hospital corridor',
           badgeText: 'CLINICAL STAFF & HMS',
           title: 'Hospital Personnel',
           subtitle: 'Manage ward bed occupancy, emergency triage cases, physician medication orders, and vital signs flow sheets.',
@@ -170,7 +174,7 @@ class _RoleSelectionScreenState extends ConsumerState<RoleSelectionScreen> {
           ],
           isPrimary: false,
           onTap: () {
-            ref.read(preferredWorkspaceProvider.notifier).state = AppWorkspace.hospital;
+            ref.read(activeWorkspaceProvider.notifier).setWorkspace(AppWorkspace.hospital);
             context.push('/login/hospital_personnel');
           },
         ),
@@ -188,7 +192,7 @@ class _RoleSelectionScreenState extends ConsumerState<RoleSelectionScreen> {
                 fontSize: 13,
                 weight: FontWeight.w600,
                 onTap: () {
-                  ref.read(preferredWorkspaceProvider.notifier).state = AppWorkspace.personal;
+                  ref.read(activeWorkspaceProvider.notifier).setWorkspace(AppWorkspace.personal);
                   context.push('/login/patient');
                 },
               ),
@@ -386,6 +390,8 @@ class _HeroFeature extends StatelessWidget {
 
 /// High-density clinical workspace card.
 class _WorkspaceCard extends StatelessWidget {
+  final String image;
+  final String imageAlt;
   final String badgeText;
   final String title;
   final String subtitle;
@@ -396,6 +402,8 @@ class _WorkspaceCard extends StatelessWidget {
   final VoidCallback onTap;
 
   const _WorkspaceCard({
+    required this.image,
+    required this.imageAlt,
     required this.badgeText,
     required this.title,
     required this.subtitle,
@@ -415,7 +423,7 @@ class _WorkspaceCard extends StatelessWidget {
       child: Material(
         color: p.surface,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(14),
           side: BorderSide(
             color: isPrimary ? AppColors.brand : p.line,
             width: isPrimary ? 1.5 : 1.0,
@@ -425,122 +433,161 @@ class _WorkspaceCard extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           hoverColor: p.brandWash.withValues(alpha: 0.4),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Top row: Icon + Role Badge + Arrow
-                Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Full-bleed Image Header with dark cinematic gradient & floating badges
+              SizedBox(
+                height: 145,
+                width: double.infinity,
+                child: Stack(
+                  fit: StackFit.expand,
                   children: [
-                    Container(
-                      width: 36,
-                      height: 36,
+                    Image.asset(
+                      image,
+                      fit: BoxFit.cover,
+                      alignment: const Alignment(0, -0.3),
+                      semanticLabel: imageAlt,
+                    ),
+                    DecoratedBox(
                       decoration: BoxDecoration(
-                        color: isPrimary ? AppColors.brandWash : p.surfaceAlt,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: isPrimary ? p.brandBorder : p.line,
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.black.withValues(alpha: 0.1),
+                            Colors.black.withValues(alpha: 0.72),
+                          ],
                         ),
                       ),
-                      child: Icon(
-                        icon,
-                        size: 20,
-                        color: isPrimary ? AppColors.brand : p.ink,
-                      ),
                     ),
-                    const SizedBox(width: 12),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: isPrimary ? AppColors.brandWash : p.surfaceAlt,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        badgeText,
-                        style: VnText.heading(10,
-                            weight: FontWeight.w700,
-                            color: isPrimary ? AppColors.brandDark : p.muted),
-                      ),
-                    ),
-                    const Spacer(),
-                    Icon(
-                      Icons.arrow_forward_rounded,
-                      size: 18,
-                      color: isPrimary ? AppColors.brand : p.muted,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-
-                // Title
-                Text(
-                  title,
-                  style: VnText.heading(18, weight: FontWeight.w700, color: p.ink),
-                ),
-                const SizedBox(height: 6),
-
-                // Subtitle
-                Text(
-                  subtitle,
-                  style: VnText.body(13, color: p.muted, height: 1.45),
-                ),
-                const SizedBox(height: 14),
-
-                // Feature checkmarks
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: p.surfaceAlt.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Column(
-                    children: bullets.map((bullet) {
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 2.5),
+                    Positioned(
+                      top: 12,
+                      left: 12,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.7),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.25),
+                          ),
+                        ),
                         child: Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(
-                              Icons.check_circle_outline_rounded,
-                              size: 15,
-                              color: AppColors.brand,
+                            Icon(
+                              icon,
+                              size: 13,
+                              color: isPrimary ? AppColors.mintLight : Colors.white,
                             ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                bullet,
-                                style: VnText.body(12,
-                                    weight: FontWeight.w500, color: p.ink),
-                              ),
+                            const SizedBox(width: 6),
+                            Text(
+                              badgeText,
+                              style: VnText.heading(10,
+                                  weight: FontWeight.w700,
+                                  color: isPrimary ? AppColors.mintLight : Colors.white),
                             ),
                           ],
                         ),
-                      );
-                    }).toList(),
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Bottom CTA button
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Text(
-                      actionLabel,
-                      style: VnText.heading(13,
-                          weight: FontWeight.w700,
-                          color: isPrimary ? AppColors.brand : p.ink),
+                      ),
                     ),
-                    const SizedBox(width: 4),
-                    Icon(
-                      Icons.arrow_forward_rounded,
-                      size: 14,
-                      color: isPrimary ? AppColors.brand : p.ink,
+                    Positioned(
+                      top: 12,
+                      right: 12,
+                      child: Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          color: isPrimary ? AppColors.brand : Colors.black.withValues(alpha: 0.65),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.arrow_forward_rounded,
+                          size: 14,
+                          color: Colors.white,
+                        ),
+                      ),
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Title
+                    Text(
+                      title,
+                      style: VnText.heading(18, weight: FontWeight.w700, color: p.ink),
+                    ),
+                    const SizedBox(height: 6),
+
+                    // Subtitle
+                    Text(
+                      subtitle,
+                      style: VnText.body(13, color: p.muted, height: 1.45),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Feature checkmarks
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: p.surfaceAlt.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        children: bullets.map((bullet) {
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 2.5),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.check_circle_outline_rounded,
+                                  size: 15,
+                                  color: AppColors.brand,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    bullet,
+                                    style: VnText.body(12,
+                                        weight: FontWeight.w500, color: p.ink),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Bottom CTA button
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Text(
+                          actionLabel,
+                          style: VnText.heading(13,
+                              weight: FontWeight.w700,
+                              color: isPrimary ? AppColors.brand : p.ink),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.arrow_forward_rounded,
+                          size: 14,
+                          color: isPrimary ? AppColors.brand : p.ink,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),

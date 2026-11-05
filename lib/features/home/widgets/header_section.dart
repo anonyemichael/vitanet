@@ -129,7 +129,7 @@ class HeaderSection extends ConsumerWidget {
             child: InkWell(
               borderRadius: BorderRadius.circular(14),
               onTap: () {
-                ref.read(preferredWorkspaceProvider.notifier).state = AppWorkspace.hospital;
+                ref.read(activeWorkspaceProvider.notifier).setWorkspace(AppWorkspace.hospital);
                 context.go('/admin');
               },
               child: Padding(

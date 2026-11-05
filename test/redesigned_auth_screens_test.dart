@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:vitanet/features/admin/providers/portal_providers.dart';
 import 'package:vitanet/features/auth/screens/patient_login_screen.dart';
 import 'package:vitanet/features/auth/screens/role_selection_screen.dart';
 
@@ -121,6 +122,23 @@ void main() {
       await tester.tap(find.text('Sign In').first);
       await tester.pumpAndSettle();
       expect(find.text('Welcome back'), findsOneWidget);
+    });
+
+    testWidgets('ActiveWorkspaceNotifier persists and isolates personal and hospital modes',
+        (WidgetTester tester) async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      // Default is personal
+      expect(container.read(activeWorkspaceProvider), AppWorkspace.personal);
+
+      // Switch to hospital
+      await container.read(activeWorkspaceProvider.notifier).setWorkspace(AppWorkspace.hospital);
+      expect(container.read(activeWorkspaceProvider), AppWorkspace.hospital);
+
+      // Switch to personal
+      await container.read(activeWorkspaceProvider.notifier).setWorkspace(AppWorkspace.personal);
+      expect(container.read(activeWorkspaceProvider), AppWorkspace.personal);
     });
   });
 }

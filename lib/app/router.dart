@@ -55,6 +55,10 @@ final _routerRefreshStream = Provider<_AuthChangeNotifier>((ref) {
   ref.listen<AsyncValue<StaffAccess>>(staffAccessProvider, (_, next) {
     notifier.notify();
   });
+  // Re-run redirects when active workspace preference changes.
+  ref.listen<AppWorkspace>(activeWorkspaceProvider, (_, next) {
+    notifier.notify();
+  });
   return notifier;
 });
 
