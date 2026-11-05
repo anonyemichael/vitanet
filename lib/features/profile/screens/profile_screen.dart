@@ -108,26 +108,24 @@ class ProfileScreen extends ConsumerWidget {
     final image = profileImageProvider(profile?.profileImagePath) ??
         (auth.user?.photoURL != null ? NetworkImage(auth.user!.photoURL!) : null);
 
-    final menu = <(String, String, IconData, Color, Color, VoidCallback)>[
+    final menu = <(String, String, IconData, VoidCallback)>[
       ('Update medical info', 'Blood type, allergies, conditions, medications',
-          Icons.note_add_outlined, const Color(0xFFCCFBF1), const Color(0xFF0F766E),
-          () => context.push('/edit-profile?tab=medical')),
+          Icons.note_add_outlined, () => context.push('/edit-profile?tab=medical')),
       ('Check history', 'All your past triage results', Icons.history_rounded,
-          const Color(0xFFFEF3C7), const Color(0xFFB45309), () => context.push('/history')),
+          () => context.push('/history')),
       ('Devices & data', 'Watch, Health Connect, permissions', Icons.watch_outlined,
-          const Color(0xFFE0E7FF), const Color(0xFF4338CA),
           () => context.push('/device-connection/heart_rate')),
       ('App settings', 'Notifications, appearance and privacy', Icons.tune_rounded,
-          const Color(0xFFF1F5F9), const Color(0xFF334155), () => context.push('/settings')),
+          () => context.push('/settings')),
       ('Help center', 'FAQs, guides and contact support', Icons.help_outline_rounded,
-          const Color(0xFFE0F2FE), const Color(0xFF0369A1), () => context.push('/help-center')),
+          () => context.push('/help-center')),
       ('About VitaNet', 'Version, disclaimers and team', Icons.info_outline_rounded,
-          const Color(0xFFF5F3FF), const Color(0xFF6D28D9), () => context.push('/about')),
+          () => context.push('/about')),
     ];
 
     Widget statTile(String value, String label, VoidCallback onTap) => Expanded(
           child: VnCard(
-            radius: 18,
+            radius: 12,
             padding: const EdgeInsets.all(14),
             onTap: onTap,
             semanticLabel: '$value $label',
@@ -150,6 +148,7 @@ class ProfileScreen extends ConsumerWidget {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 720),
             child: ListView(
+              physics: const VnAlwaysScrollablePhysics(),
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 110),
               children: [
                 SizedBox(
@@ -254,10 +253,19 @@ class ProfileScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 18),
                 VnListGroup(
+                  radius: 12,
                   children: [
-                    for (final (title, sub, icon, bg, fg, onTap) in menu)
+                    for (final (title, sub, icon, onTap) in menu)
                       VnListRow(
-                        leading: VnIconTile(icon: icon, bg: bg, fg: fg, size: 40),
+                        leading: Container(
+                          width: 32,
+                          alignment: Alignment.centerLeft,
+                          child: Icon(
+                            icon,
+                            size: 20,
+                            color: p.isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+                          ),
+                        ),
                         title: title,
                         subtitle: sub,
                         onTap: onTap,
@@ -326,7 +334,7 @@ class _MedicalIdCard extends StatelessWidget {
 
     return Material(
       color: p.isDark ? const Color(0xFF0B1220) : AppColors.ink,
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: BorderRadius.circular(12),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () => context.push('/edit-profile?tab=medical'),

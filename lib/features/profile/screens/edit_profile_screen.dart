@@ -355,8 +355,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         : (warm ? const Color(0xFFFFEDD5) : const Color(0xFFFEE2E2));
     return Container(
       height: 36,
-      padding: const EdgeInsets.only(left: 14, right: 2),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(999)),
+      padding: const EdgeInsets.only(left: 12, right: 2),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         Text(label, style: VnText.body(14, weight: FontWeight.w600, color: fg)),
         IconButton(
@@ -375,9 +375,12 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         excludeSemantics: true,
         child: Material(
           color: Colors.transparent,
-          shape: StadiumBorder(side: BorderSide(color: p.faint)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+            side: BorderSide(color: p.line),
+          ),
           child: InkWell(
-            customBorder: const StadiumBorder(),
+            customBorder: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             onTap: onTap,
             child: Container(
               height: 36,
@@ -397,9 +400,12 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         selected: on,
         child: Material(
           color: on ? p.brandTint : p.surface,
-          shape: StadiumBorder(side: BorderSide(color: on ? p.brand : p.line)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+            side: BorderSide(color: on ? p.brand : p.line),
+          ),
           child: InkWell(
-            customBorder: const StadiumBorder(),
+            customBorder: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             onTap: onTap,
             child: Container(
               height: 40,
@@ -474,6 +480,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 720),
                 child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
                   controller: _scroll,
                   padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
                   children: [

@@ -102,6 +102,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _focusNode.addListener(_handleFocusChange);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(navBarVisibleProvider.notifier).state = true;
       if (ref.read(chatMessagesProvider).isEmpty) {
         ref.read(aiServiceProvider).reset();
       }
@@ -109,7 +110,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   void _handleFocusChange() {
-    if (mounted) {
+    if (mounted && _isFocused != _focusNode.hasFocus) {
       setState(() {
         _isFocused = _focusNode.hasFocus;
       });
@@ -337,21 +338,27 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   void _scrollToBottom({bool force = false}) {
+    if (!_scrollController.hasClients) return;
+    // Don't auto-scroll if user has intentionally scrolled up to read earlier history
+    final isNearBottom =
+        (_scrollController.position.maxScrollExtent - _scrollController.offset) < 160;
+    if (!force && !isNearBottom) return;
+
     final now = DateTime.now();
-    if (!force && now.difference(_lastScrollTime).inMilliseconds < 120) {
+    if (!force && now.difference(_lastScrollTime).inMilliseconds < 100) {
       return;
     }
     _lastScrollTime = now;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
-        final target = _scrollController.position.maxScrollExtent + 40;
-        if ((_scrollController.offset - target).abs() > 300) {
+        final target = _scrollController.position.maxScrollExtent;
+        if (force) {
           _scrollController.jumpTo(target);
         } else {
           _scrollController.animateTo(
             target,
-            duration: const Duration(milliseconds: 140),
-            curve: Curves.easeOut,
+            duration: const Duration(milliseconds: 90),
+            curve: Curves.easeOutCubic,
           );
         }
       }
@@ -588,6 +595,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             ),
             Flexible(
               child: SingleChildScrollView(
+                physics: const VnAlwaysScrollablePhysics(),
                 child: VnListGroup(
                   children: [
                     for (final (icon, title, sub, prompt) in protocols)
@@ -726,6 +734,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             ),
             Flexible(
               child: SingleChildScrollView(
+                physics: const VnAlwaysScrollablePhysics(),
                 child: VnListGroup(
                   children: [
                     for (final (k, v) in rows)
@@ -1000,9 +1009,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               excludeSemantics: true,
               child: Material(
                 color: p.surfaceAlt,
-                shape: const StadiumBorder(),
+                borderRadius: BorderRadius.circular(8),
+                clipBehavior: Clip.antiAlias,
                 child: InkWell(
-                  customBorder: const StadiumBorder(),
                   onTap: onTap,
                   child: Container(
                     height: 44,
@@ -1032,12 +1041,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Widget _buildComposer(BuildContext context) {
     final p = VnPalette.of(context);
     final isDark = p.isDark;
-    final navVisible = ref.watch(navBarVisibleProvider);
     final keyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
     final isDesktop = MediaQuery.sizeOf(context).width >= 800;
-    // Leave room for the shell's floating bottom navigation bar.
+    // Leave room for the shell's floating bottom navigation bar without layout thrashing.
     final navInset =
-        (!isDesktop && navVisible && !keyboardOpen && !Navigator.of(context).canPop()) ? 74.0 : 0.0;
+        (!isDesktop && !keyboardOpen && !Navigator.of(context).canPop()) ? 74.0 : 0.0;
 
     return Container(
       decoration: BoxDecoration(
@@ -1114,7 +1122,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       icon: Icons.add_rounded,
                       tooltip: 'Attach a photo, PDF or lab result',
                       size: 46,
-                      radius: 23,
+                      radius: 10,
                       background: p.surfaceAlt,
                       onPressed: () => _showAttachmentOptionsSheet(context),
                     ),
@@ -1126,7 +1134,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         padding: const EdgeInsets.only(left: 16, right: 1),
                         decoration: BoxDecoration(
                           color: p.surfaceAlt,
-                          borderRadius: BorderRadius.circular(23),
+                          borderRadius: BorderRadius.circular(10),
                           border: Border.all(
                             color: _isFocused ? p.brand : Colors.transparent,
                             width: 1.5,
@@ -1178,7 +1186,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       icon: Icons.send_rounded,
                       tooltip: 'Send',
                       size: 46,
-                      radius: 23,
+                      radius: 10,
                       iconSize: 20,
                       background: _isComposing ? p.brand : p.surfaceAlt,
                       foreground: _isComposing ? p.onBrand : p.faint,
@@ -1233,6 +1241,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               child: (messages.isEmpty && !isTyping)
                   ? Center(
                       child: SingleChildScrollView(
+                        physics: const VnAlwaysScrollablePhysics(),
                         padding: const EdgeInsets.symmetric(vertical: 24),
                         child: ConstrainedBox(
                           constraints: const BoxConstraints(maxWidth: 680),
@@ -1246,7 +1255,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         constraints: const BoxConstraints(maxWidth: 720),
                         child: ListView.builder(
                           controller: _scrollController,
-                          physics: const AlwaysScrollableScrollPhysics(),
+                          physics: const VnAlwaysScrollablePhysics(),
                           padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
                           itemCount: messages.length + (isTyping ? 1 : 0) + 1,
                           itemBuilder: (context, index) {
@@ -1260,7 +1269,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                     decoration: BoxDecoration(
                                       color: p.surfaceAlt,
-                                      borderRadius: BorderRadius.circular(999),
+                                      borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: Text(stamp(first),
                                         style: VnText.body(12, weight: FontWeight.w600, color: p.muted)),
@@ -1281,11 +1290,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                               );
                             }
                             final message = messages[i];
+                            final isRecent = DateTime.now().difference(message.timestamp).inMilliseconds < 1200;
                             return Padding(
                               padding: const EdgeInsets.only(bottom: 16),
                               child: RepaintBoundary(
                                 child: _MessageEntrance(
                                   key: ValueKey(message.id),
+                                  animate: isRecent,
                                   child: message.role == MessageRole.user
                                       ? UserMessageBubble(message: message)
                                       : AiMessageCard(message: message),
@@ -1316,11 +1327,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 }
 
-/// Fade + slight rise entrance for new messages.
+/// Fade + slight rise entrance for newly received messages.
 class _MessageEntrance extends StatefulWidget {
-  const _MessageEntrance({super.key, required this.child});
+  const _MessageEntrance({super.key, required this.child, this.animate = true});
 
   final Widget child;
+  final bool animate;
 
   @override
   State<_MessageEntrance> createState() => _MessageEntranceState();
@@ -1328,26 +1340,36 @@ class _MessageEntrance extends StatefulWidget {
 
 class _MessageEntranceState extends State<_MessageEntrance>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 220),
-  )..forward();
+  AnimationController? _controller;
+  Animation<double>? _curve;
 
-  late final Animation<double> _curve =
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic);
+  @override
+  void initState() {
+    super.initState();
+    if (widget.animate) {
+      _controller = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 200),
+      )..forward();
+      _curve = CurvedAnimation(parent: _controller!, curve: Curves.easeOutCubic);
+    }
+  }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _controller?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    if (!widget.animate || _controller == null || _curve == null) {
+      return widget.child;
+    }
     return FadeTransition(
-      opacity: _curve,
+      opacity: _curve!,
       child: SlideTransition(
-        position: Tween<Offset>(begin: const Offset(0, 0.04), end: Offset.zero).animate(_curve),
+        position: Tween<Offset>(begin: const Offset(0, 0.04), end: Offset.zero).animate(_curve!),
         child: widget.child,
       ),
     );
@@ -1373,12 +1395,16 @@ class _QuickReplyRow extends StatelessWidget {
         itemBuilder: (context, i) => Center(
           child: Material(
             color: p.surface,
-            shape: StadiumBorder(side: BorderSide(color: p.brand)),
+            borderRadius: BorderRadius.circular(8),
+            clipBehavior: Clip.antiAlias,
             child: InkWell(
-              customBorder: const StadiumBorder(),
               onTap: () => onSelected(replies[i]),
               child: Container(
                 height: 44,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: p.brand),
+                ),
                 padding: const EdgeInsets.symmetric(horizontal: 14),
                 alignment: Alignment.center,
                 child: Text(replies[i],

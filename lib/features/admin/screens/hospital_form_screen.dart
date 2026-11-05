@@ -128,6 +128,7 @@ class _HospitalFormScreenState extends ConsumerState<HospitalFormScreen> {
           ),
           Expanded(
             child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
               children: [
                 StaffContent(

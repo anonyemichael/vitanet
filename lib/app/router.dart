@@ -289,17 +289,14 @@ class _ScaffoldWithNavBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // Staff use the hospital portal (/admin); this shell is the patient app.
-    final isKeyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
     final isDesktop = MediaQuery.of(context).size.width >= 800;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     const topLevelPaths = {'/home', '/chat', '/resources', '/profile'};
     final isTopLevel = topLevelPaths.contains(currentPath);
-    final isNavVisible = ref.watch(navBarVisibleProvider);
 
     const activeColor = AppColors.brand;
     final inactiveColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
-    final showMobileNav = isTopLevel && !isKeyboardOpen && isNavVisible;
 
     return Scaffold(
       resizeToAvoidBottomInset: false,
@@ -336,25 +333,33 @@ class _ScaffoldWithNavBar extends ConsumerWidget {
                   left: 0,
                   right: 0,
                   bottom: 0,
-                  child: AnimatedSlide(
-                    offset: showMobileNav ? Offset.zero : const Offset(0, 1.2),
-                    duration: const Duration(milliseconds: 250),
-                    curve: Curves.easeInOutCubic,
-                    child: AnimatedOpacity(
-                      opacity: showMobileNav ? 1.0 : 0.0,
-                      duration: const Duration(milliseconds: 200),
-                      curve: Curves.easeInOutCubic,
-                      child: IgnorePointer(
-                        ignoring: !showMobileNav,
-                        child: _buildFullWidthBottomNavBar(
-                          context,
-                          activeColor,
-                          inactiveColor,
-                          isDark,
-                          ref,
+                  child: Consumer(
+                    builder: (context, ref, _) {
+                      final isKeyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
+                      final isNavVisible = ref.watch(navBarVisibleProvider);
+                      final showMobileNav = isTopLevel && !isKeyboardOpen && isNavVisible;
+
+                      return AnimatedSlide(
+                        offset: showMobileNav ? Offset.zero : const Offset(0, 1.2),
+                        duration: const Duration(milliseconds: 250),
+                        curve: Curves.easeInOutCubic,
+                        child: AnimatedOpacity(
+                          opacity: showMobileNav ? 1.0 : 0.0,
+                          duration: const Duration(milliseconds: 200),
+                          curve: Curves.easeInOutCubic,
+                          child: IgnorePointer(
+                            ignoring: !showMobileNav,
+                            child: _buildFullWidthBottomNavBar(
+                              context,
+                              activeColor,
+                              inactiveColor,
+                              isDark,
+                              ref,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
+                      );
+                    },
                   ),
                 ),
               ],

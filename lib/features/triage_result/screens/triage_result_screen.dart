@@ -117,6 +117,7 @@ class TriageResultScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: p.page,
       body: SingleChildScrollView(
+        physics: const VnAlwaysScrollablePhysics(),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [

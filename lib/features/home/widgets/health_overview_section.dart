@@ -35,7 +35,7 @@ class _HealthOverviewSectionState extends ConsumerState<HealthOverviewSection> {
 
   void _startLiveUpdates() {
     _fetchAndUpdateVitals();
-    _timer = Timer.periodic(const Duration(seconds: 10), (_) {
+    _timer = Timer.periodic(const Duration(minutes: 2), (_) {
       _fetchAndUpdateVitals();
       // Re-evaluate freshness so a stale source stops showing as "Live".
       if (mounted) setState(() {});
@@ -299,13 +299,10 @@ class _VitalCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              VnIconTile(
-                icon: spec.icon,
-                bg: spec.bg,
-                fg: spec.fg,
-                size: 34,
-                radius: 10,
-                iconSize: 18,
+              Icon(
+                spec.icon,
+                size: 18,
+                color: p.isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
               ),
               const Spacer(),
               Text(

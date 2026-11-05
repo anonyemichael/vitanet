@@ -41,7 +41,7 @@ class _TypingIndicatorState extends State<TypingIndicator>
           color: isDark
               ? context.colorScheme.surfaceContainerHighest.withValues(alpha: 0.7)
               : Colors.white,
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: context.colorScheme.outlineVariant.withValues(alpha: 0.3),
             width: 1,

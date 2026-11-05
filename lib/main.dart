@@ -10,14 +10,19 @@ import 'package:vitanet/firebase_options.dart';
 import 'package:vitanet/app/router.dart';
 import 'package:vitanet/app/theme.dart';
 import 'package:vitanet/data/providers/providers.dart';
+import 'package:vitanet/data/services/daily_med_service.dart';
 import 'package:vitanet/features/settings/settings_providers.dart';
+import 'package:vitanet/shared/widgets/vn_kit.dart';
 
 Future<void> main() async {
   final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
 
-  // Cap uncompressed image cache size to prevent device memory bloat and GC stutters
-  PaintingBinding.instance.imageCache.maximumSize = 150;
-  PaintingBinding.instance.imageCache.maximumSizeBytes = 50 * 1024 * 1024; // 50 MB cap
+  // High-capacity image cache to prevent image re-loading and GC stutters
+  PaintingBinding.instance.imageCache.maximumSize = 600;
+  PaintingBinding.instance.imageCache.maximumSizeBytes = 120 * 1024 * 1024; // 120 MB cap
+
+  // Initialize persistent DailyMed image cache
+  DailyMedService.instance.init().catchError((_) {});
 
   // Only preserve native window splash on mobile platforms (Android/iOS).
   // On Web, remove it immediately so the HTML splash logo never covers the screen.
@@ -56,7 +61,13 @@ class AppScrollBehavior extends MaterialScrollBehavior {
 
   @override
   ScrollPhysics getScrollPhysics(BuildContext context) {
-    return const AlwaysScrollableScrollPhysics();
+    switch (getPlatform(context)) {
+      case TargetPlatform.iOS:
+      case TargetPlatform.macOS:
+        return const BouncingScrollPhysics();
+      default:
+        return const VnScrollPhysics();
+    }
   }
 }
 

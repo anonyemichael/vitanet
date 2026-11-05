@@ -87,3 +87,7 @@ run_web.bat
 run_web.ps1
 # Widget Preview related
 .widget_preview/
+.firebase/
+*.db
+.agent/
+.agents/

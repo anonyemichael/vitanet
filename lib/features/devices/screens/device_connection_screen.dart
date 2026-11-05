@@ -206,12 +206,13 @@ class _DeviceConnectionScreenState extends ConsumerState<DeviceConnectionScreen>
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 640),
             child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
               children: [
                 VnTopBar(title: 'Devices & data', onBack: _back),
                 const SizedBox(height: 18),
                 VnCard(
-                  radius: 22,
+                  radius: 12,
                   padding: const EdgeInsets.all(18),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -219,10 +220,10 @@ class _DeviceConnectionScreenState extends ConsumerState<DeviceConnectionScreen>
                       Row(
                         children: [
                           ClipRRect(
-                            borderRadius: BorderRadius.circular(18),
+                            borderRadius: BorderRadius.circular(10),
                             child: const SizedBox(
-                              width: 56,
-                              height: 56,
+                              width: 52,
+                              height: 52,
                               child: VnPhoto(VnPhotos.smartwatchWrist, alignment: Alignment(-0.1, 0), cacheWidth: 200),
                             ),
                           ),
@@ -257,20 +258,9 @@ class _DeviceConnectionScreenState extends ConsumerState<DeviceConnectionScreen>
                       ),
                       const SizedBox(height: 14),
                       if (chips.isNotEmpty)
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
-                          children: [
-                            for (final c in chips)
-                              VnTag(
-                                label: c.$1,
-                                bg: c.$2,
-                                fg: c.$3,
-                                fontSize: 12,
-                                weight: FontWeight.w600,
-                                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                              ),
-                          ],
+                        Text(
+                          '${chips.length} metrics synced · ${chips.map((c) => c.$1).join(' · ')}',
+                          style: VnText.body(13, color: p.muted),
                         )
                       else
                         Text(
@@ -283,8 +273,8 @@ class _DeviceConnectionScreenState extends ConsumerState<DeviceConnectionScreen>
                           Expanded(
                             child: VnButton(
                               label: 'Sync now',
-                              height: 44,
-                              radius: 12,
+                              height: 40,
+                              radius: 8,
                               fontSize: 14,
                               loading: _isSyncing,
                               background: p.surfaceAlt,
@@ -296,8 +286,8 @@ class _DeviceConnectionScreenState extends ConsumerState<DeviceConnectionScreen>
                           Expanded(
                             child: VnOutlineButton(
                               label: 'Disconnect',
-                              height: 44,
-                              radius: 12,
+                              height: 40,
+                              radius: 8,
                               fontSize: 14,
                               borderColor: p.isDark ? const Color(0xFF5B1D1D) : const Color(0xFFFECACA),
                               foreground: _connected ? p.danger : p.faint,
@@ -311,11 +301,16 @@ class _DeviceConnectionScreenState extends ConsumerState<DeviceConnectionScreen>
                 ),
                 const SizedBox(height: 18),
                 Semantics(header: true, child: Text('Health platforms', style: VnText.heading(17, weight: FontWeight.w700, color: p.ink))),
-                const SizedBox(height: 18),
+                const SizedBox(height: 14),
                 VnListGroup(
+                  radius: 12,
                   children: [
                     VnListRow(
-                      leading: const VnIconTile(icon: Icons.favorite_border_rounded, bg: Color(0xFFD1FAE5), fg: Color(0xFF047857), size: 40),
+                      leading: Container(
+                        width: 28,
+                        alignment: Alignment.centerLeft,
+                        child: Icon(Icons.favorite_border_rounded, size: 20, color: p.brand),
+                      ),
                       title: 'Health Connect',
                       subtitle: _isAndroid
                           ? (_connected ? 'Android · ${_syncedKeys.length} data types shared' : 'Android · not connected')
@@ -328,7 +323,11 @@ class _DeviceConnectionScreenState extends ConsumerState<DeviceConnectionScreen>
                       ),
                     ),
                     VnListRow(
-                      leading: const VnIconTile(icon: Icons.favorite_border_rounded, bg: Color(0xFFFFE4E6), fg: Color(0xFFBE123C), size: 40),
+                      leading: Container(
+                        width: 28,
+                        alignment: Alignment.centerLeft,
+                        child: Icon(Icons.favorite_border_rounded, size: 20, color: p.brand),
+                      ),
                       title: 'Apple Health',
                       subtitle: _isIos
                           ? (_connected ? 'iPhone · ${_syncedKeys.length} data types shared' : 'iPhone · not connected')
@@ -341,7 +340,11 @@ class _DeviceConnectionScreenState extends ConsumerState<DeviceConnectionScreen>
                       ),
                     ),
                     VnListRow(
-                      leading: const VnIconTile(icon: Icons.bluetooth_rounded, bg: Color(0xFFE0F2FE), fg: Color(0xFF0369A1), size: 40),
+                      leading: Container(
+                        width: 28,
+                        alignment: Alignment.centerLeft,
+                        child: Icon(Icons.bluetooth_rounded, size: 20, color: p.brand),
+                      ),
                       title: 'Bluetooth BP cuff',
                       subtitle: 'Omron, Withings and more',
                       chevron: false,

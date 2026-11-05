@@ -212,6 +212,7 @@ class _LabValuesSheetState extends State<_LabValuesSheet> {
               const SizedBox(height: 14),
               Expanded(
                 child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
                   children: [
                     for (final t in tests) ...[
                       Container(

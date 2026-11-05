@@ -445,6 +445,7 @@ class _EmergencyProtocolDetailScreenState
       body: NotificationListener<ScrollNotification>(
         onNotification: (n) => handleScrollNotification(n, ref),
         child: CustomScrollView(
+          physics: const VnAlwaysScrollablePhysics(),
           slivers: [
             SliverToBoxAdapter(
               child: Stack(

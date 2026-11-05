@@ -62,12 +62,14 @@ class _WellnessInsightCardState extends State<WellnessInsightCard> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const VnIconTile(
-            icon: Icons.water_drop_outlined,
-            bg: Color(0xFFE0F2FE),
-            fg: Color(0xFF0369A1),
-            size: 44,
-            radius: 14,
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: p.surfaceAlt,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.water_drop_outlined, color: Color(0xFF0284C7), size: 20),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -142,8 +144,8 @@ class HomeQuickLinks extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            VnIconTile(icon: icon, bg: bg, fg: fg, size: 40),
-            const SizedBox(height: 10),
+            Icon(icon, size: 22, color: fg),
+            const SizedBox(height: 12),
             Text(title, style: VnText.body(15, weight: FontWeight.w700, color: p.ink)),
             const SizedBox(height: 10),
             Text(sub, style: VnText.body(13, color: p.muted)),

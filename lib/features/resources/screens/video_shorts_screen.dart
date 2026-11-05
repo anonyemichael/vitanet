@@ -30,6 +30,8 @@ class _VideoShortsScreenState extends State<VideoShortsScreen> {
   late final ShortsControllerPool _pool;
   final _store = VideoEngagementStore.instance;
   int _current = 0;
+  bool _isMuted = true;
+  bool _isPaused = false;
 
   @override
   void initState() {
@@ -49,8 +51,42 @@ class _VideoShortsScreenState extends State<VideoShortsScreen> {
   void _onPageChanged(int index) {
     setState(() {
       _current = index;
+      _isPaused = false;
       _pool.onPageChanged(index);
     });
+    final ctrl = _pool.getController(index);
+    if (ctrl != null) {
+      if (!_isMuted) {
+        ctrl.unMute();
+      } else {
+        ctrl.mute();
+      }
+      ctrl.playVideo();
+    }
+  }
+
+  void _toggleMute() {
+    setState(() => _isMuted = !_isMuted);
+    final ctrl = _pool.getController(_current);
+    if (ctrl != null) {
+      if (_isMuted) {
+        ctrl.mute();
+      } else {
+        ctrl.unMute();
+      }
+    }
+  }
+
+  void _togglePlayPause() {
+    final ctrl = _pool.getController(_current);
+    if (ctrl == null) return;
+    setState(() => _isPaused = !_isPaused);
+    if (_isPaused) {
+      ctrl.pauseVideo();
+    } else {
+      ctrl.playVideo();
+      if (!_isMuted) ctrl.unMute();
+    }
   }
 
   String _handle(String channel) =>
@@ -70,6 +106,7 @@ class _VideoShortsScreenState extends State<VideoShortsScreen> {
                 listenable: _store,
                 builder: (context, _) => PageView.builder(
                   scrollDirection: Axis.vertical,
+                  physics: const ClampingScrollPhysics(),
                   controller: _pageController,
                   itemCount: widget.shorts.length,
                   onPageChanged: _onPageChanged,
@@ -91,7 +128,7 @@ class _VideoShortsScreenState extends State<VideoShortsScreen> {
       children: [
         // Cover photo stays underneath while the embed loads.
         VnNetworkPhoto(url: short.shortsThumbnailUrl, fallbackAsset: videoFallbackPhoto(short)),
-        if (controller != null)
+        if (controller != null && index == _current)
           Center(
             child: AspectRatio(
               aspectRatio: 9 / 16,
@@ -111,6 +148,27 @@ class _VideoShortsScreenState extends State<VideoShortsScreen> {
           ),
         ),
 
+        // Full-screen tap to play / pause
+        Positioned.fill(
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: _togglePlayPause,
+            child: _isPaused && index == _current
+                ? Center(
+                    child: Container(
+                      width: 72,
+                      height: 72,
+                      decoration: const BoxDecoration(
+                        color: Color(0x8C000000),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 48),
+                    ),
+                  )
+                : const SizedBox.shrink(),
+          ),
+        ),
+
         // Top bar
         Positioned(
           top: topPad + 12,
@@ -127,9 +185,23 @@ class _VideoShortsScreenState extends State<VideoShortsScreen> {
               ),
               Expanded(child: Text('Shorts', style: VnText.heading(20, color: Colors.white))),
               VnIconButton(
+                icon: _isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+                tooltip: _isMuted ? 'Turn sound on' : 'Turn sound off',
+                iconSize: 24,
+                foreground: Colors.white,
+                onPressed: _toggleMute,
+              ),
+              VnIconButton(
+                icon: Icons.open_in_new_rounded,
+                tooltip: 'Open in YouTube',
+                iconSize: 22,
+                foreground: Colors.white,
+                onPressed: () => LaunchHelpers.openWeb(context, youtubeUrl(short)),
+              ),
+              VnIconButton(
                 icon: Icons.search_rounded,
                 tooltip: 'Search',
-                iconSize: 26,
+                iconSize: 24,
                 foreground: Colors.white,
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const VideoSearchScreen()),
@@ -138,6 +210,32 @@ class _VideoShortsScreenState extends State<VideoShortsScreen> {
             ],
           ),
         ),
+
+        // Muted helper badge
+        if (_isMuted && index == _current)
+          Positioned(
+            top: topPad + 60,
+            left: 16,
+            child: GestureDetector(
+              onTap: _toggleMute,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0x99000000),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0x33FFFFFF)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.volume_off_rounded, color: Colors.white, size: 16),
+                    const SizedBox(width: 6),
+                    Text('Muted · Tap for sound', style: VnText.body(12, weight: FontWeight.w600, color: Colors.white)),
+                  ],
+                ),
+              ),
+            ),
+          ),
 
         // Right action rail
         Positioned(
@@ -151,6 +249,13 @@ class _VideoShortsScreenState extends State<VideoShortsScreen> {
                 label: liked ? 'Liked' : 'Like',
                 tooltip: liked ? 'Remove like' : 'Like',
                 onTap: () => _store.toggleLike(short.youtubeId),
+              ),
+              const SizedBox(height: 18),
+              _RailAction(
+                icon: _isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+                label: _isMuted ? 'Muted' : 'Sound',
+                tooltip: _isMuted ? 'Unmute' : 'Mute',
+                onTap: _toggleMute,
               ),
               const SizedBox(height: 18),
               _RailAction(
@@ -203,7 +308,7 @@ class _VideoShortsScreenState extends State<VideoShortsScreen> {
                     toggled: subscribed,
                     child: Material(
                       color: subscribed ? const Color(0x33FFFFFF) : Colors.white,
-                      shape: const StadiumBorder(),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       clipBehavior: Clip.antiAlias,
                       child: InkWell(
                         onTap: () => _store.toggleSubscribe(short.channelName),

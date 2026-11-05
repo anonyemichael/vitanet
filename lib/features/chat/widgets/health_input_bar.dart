@@ -56,6 +56,9 @@ class _HealthInputBarState extends ConsumerState<HealthInputBar> {
     _focusNode.removeListener(_onFocusChange);
     _focusNode.dispose();
     widget.controller.removeListener(_onTextChanged);
+    try {
+      ref.read(voiceServiceProvider).removeListener(_onVoiceServiceChanged);
+    } catch (_) {}
     super.dispose();
   }
 
@@ -63,6 +66,7 @@ class _HealthInputBarState extends ConsumerState<HealthInputBar> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     final voiceService = ref.read(voiceServiceProvider);
+    voiceService.removeListener(_onVoiceServiceChanged);
     voiceService.addListener(_onVoiceServiceChanged);
   }
 
@@ -81,9 +85,12 @@ class _HealthInputBarState extends ConsumerState<HealthInputBar> {
   }
 
   void _onTextChanged() {
-    setState(() {
-      _isComposing = widget.controller.text.trim().isNotEmpty || _selectedImagePath != null;
-    });
+    final composing = widget.controller.text.trim().isNotEmpty || _selectedImagePath != null;
+    if (composing != _isComposing) {
+      setState(() {
+        _isComposing = composing;
+      });
+    }
   }
 
   Future<void> _pickImage() async {

@@ -134,15 +134,19 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
     final filtered = _filteredCategories;
     final picked = _pickedArticle();
 
-    return vnReadableWidth(Scaffold(
+    return Scaffold(
       backgroundColor: p.page,
       body: SafeArea(
         bottom: false,
-        child: NotificationListener<ScrollNotification>(
-          onNotification: (n) => handleScrollNotification(n, ref),
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 22, 20, 120),
-            children: [
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1100),
+            child: NotificationListener<ScrollNotification>(
+              onNotification: (n) => handleScrollNotification(n, ref),
+              child: ListView(
+                physics: const VnAlwaysScrollablePhysics(),
+                padding: const EdgeInsets.fromLTRB(20, 22, 20, 120),
+                children: [
               Semantics(
                 header: true,
                 child: Text('Resources', style: VnText.heading(28, color: p.ink)),
@@ -223,7 +227,9 @@ class _ResourcesScreenState extends ConsumerState<ResourcesScreen> {
           ),
         ),
       ),
-    ), maxWidth: 1100, background: p.page);
+    ),
+  ),
+);
   }
 
   Widget _buildSearch(VnPalette p) {
@@ -311,13 +317,13 @@ class _EmergencyBanner extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 48,
-            height: 48,
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
               color: const Color(0xFFB91C1C),
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 24),
+            child: const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 20),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -359,7 +365,7 @@ class _PhotoCategoryCard extends StatelessWidget {
       label: '${category.title}. ${category.subtitle}',
       excludeSemantics: true,
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(12),
         child: Material(
           color: Colors.black,
           child: InkWell(

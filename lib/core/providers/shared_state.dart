@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final searchActionProvider = StateProvider<String?>((ref) => null);
@@ -38,15 +37,12 @@ bool handleScrollNotification(ScrollNotification notification, WidgetRef ref) {
         }
       }
     }
-  } else if (notification is UserScrollNotification) {
-    if (notification.direction == ScrollDirection.reverse) {
-      if (ref.read(navBarVisibleProvider)) {
-        ref.read(navBarVisibleProvider.notifier).state = false;
-      }
-    } else if (notification.direction == ScrollDirection.forward) {
-      if (!ref.read(navBarVisibleProvider)) {
-        ref.read(navBarVisibleProvider.notifier).state = true;
-      }
+  }
+
+  // Also reveal navbar when reaching the bottom of the content
+  if (notification.metrics.pixels >= notification.metrics.maxScrollExtent - 20.0) {
+    if (!ref.read(navBarVisibleProvider)) {
+      ref.read(navBarVisibleProvider.notifier).state = true;
     }
   }
   return false;

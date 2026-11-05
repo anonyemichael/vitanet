@@ -308,6 +308,7 @@ class _VideoSearchScreenState extends ConsumerState<VideoSearchScreen> {
   Widget _body(VnPalette p, List<ClinicalVideo> visible) {
     if (_query.isEmpty) {
       return ListView(
+        physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
         padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
         children: [
           Text('Popular topics', style: VnText.body(14, weight: FontWeight.w700, color: p.ink)),
@@ -357,6 +358,7 @@ class _VideoSearchScreenState extends ConsumerState<VideoSearchScreen> {
         const ['first aid basics', 'heart health', 'stress relief'];
 
     return ListView(
+      physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
       padding: const EdgeInsets.only(bottom: 24),
       children: [
         if (topChannelEntry.value >= 2)

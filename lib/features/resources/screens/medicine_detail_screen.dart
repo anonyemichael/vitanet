@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:vitanet/core/providers/shared_state.dart';
 import 'package:vitanet/data/providers/providers.dart';
+import 'package:vitanet/data/services/daily_med_service.dart';
 import 'package:vitanet/data/services/drug_synonyms.dart';
 import 'package:vitanet/features/pharmacy/screens/pharmacy_screen.dart';
 import 'package:vitanet/shared/widgets/vn_kit.dart';
@@ -24,8 +25,61 @@ class MedicineDetailScreen extends ConsumerStatefulWidget {
 
 class _MedicineDetailScreenState extends ConsumerState<MedicineDetailScreen> {
   int _tab = 0;
+  String? _heroImageUrl;
+  bool _isLoadingImage = false;
 
   Medicine get m => widget.medicine;
+
+  @override
+  void initState() {
+    super.initState();
+    _resolveHeroImage();
+  }
+
+  @override
+  void didUpdateWidget(MedicineDetailScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.medicine.id != widget.medicine.id ||
+        oldWidget.medicine.heroImageUrl != widget.medicine.heroImageUrl) {
+      _resolveHeroImage();
+    }
+  }
+
+  void _resolveHeroImage() {
+    final direct = widget.medicine.heroImageUrl;
+    if (direct != null && direct.isNotEmpty) {
+      _heroImageUrl = direct;
+      _isLoadingImage = false;
+      return;
+    }
+
+    final cached = DailyMedService.instance.getCachedImageUrl(
+      splSetId: widget.medicine.splSetId,
+      drugName: widget.medicine.genericName ?? widget.medicine.name,
+    );
+    if (cached != null) {
+      _heroImageUrl = cached;
+      _isLoadingImage = false;
+      return;
+    }
+
+    _isLoadingImage = true;
+    DailyMedService.instance.resolveMedicineImageUrl(
+      splSetId: widget.medicine.splSetId,
+      drugName: widget.medicine.genericName ?? widget.medicine.name,
+    ).then((url) {
+      if (mounted) {
+        setState(() {
+          _heroImageUrl = url;
+          _isLoadingImage = false;
+        });
+      }
+    }).catchError((_) {
+      if (mounted) {
+        setState(() => _isLoadingImage = false);
+      }
+    });
+  }
 
   // ── Label parsing (real monograph text) ──────────────────────────────────
 
@@ -227,15 +281,12 @@ class _MedicineDetailScreenState extends ConsumerState<MedicineDetailScreen> {
       body: NotificationListener<ScrollNotification>(
         onNotification: (n) => handleScrollNotification(n, ref),
         child: CustomScrollView(
+          physics: const VnAlwaysScrollablePhysics(),
           slivers: [
             SliverToBoxAdapter(
               child: Stack(
                 children: [
-                  SizedBox(
-                    height: 210 + MediaQuery.paddingOf(context).top,
-                    width: double.infinity,
-                    child: const VnPhoto(VnPhotos.blisterPacks, semanticLabel: 'Tablets and blister packs'),
-                  ),
+                  _buildHeroSection(context, p),
                   Positioned(
                     top: MediaQuery.paddingOf(context).top + 16,
                     left: 16,
@@ -243,8 +294,8 @@ class _MedicineDetailScreenState extends ConsumerState<MedicineDetailScreen> {
                       icon: Icons.chevron_left_rounded,
                       tooltip: 'Back',
                       iconSize: 26,
-                      background: Colors.white,
-                      foreground: const Color(0xFF0F172A),
+                      background: p.isDark ? const Color(0xFF1E293B) : Colors.white,
+                      foreground: p.ink,
                       onPressed: () => Navigator.of(context).maybePop(),
                     ),
                   ),
@@ -254,8 +305,8 @@ class _MedicineDetailScreenState extends ConsumerState<MedicineDetailScreen> {
                     child: VnIconButton(
                       icon: Icons.ios_share_rounded,
                       tooltip: 'Share medicine summary',
-                      background: Colors.white,
-                      foreground: const Color(0xFF0F172A),
+                      background: p.isDark ? const Color(0xFF1E293B) : Colors.white,
+                      foreground: p.ink,
                       onPressed: _share,
                     ),
                   ),
@@ -391,6 +442,141 @@ class _MedicineDetailScreenState extends ConsumerState<MedicineDetailScreen> {
         ),
       ),
     ), maxWidth: 900, background: p.page);
+  }
+
+  Widget _buildHeroSection(BuildContext context, VnPalette p) {
+    final topPadding = MediaQuery.paddingOf(context).top;
+    final heroHeight = 220 + topPadding;
+
+    if (_heroImageUrl != null && _heroImageUrl!.isNotEmpty) {
+      return Container(
+        height: heroHeight,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: p.isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+        ),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: p.isDark
+                        ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
+                        : [const Color(0xFFE2E8F0), const Color(0xFFF8FAFC)],
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.only(
+                top: topPadding + 14,
+                bottom: 34,
+                left: 36,
+                right: 36,
+              ),
+              child: Image.network(
+                _heroImageUrl!,
+                fit: BoxFit.contain,
+                alignment: Alignment.center,
+                loadingBuilder: (context, child, progress) {
+                  if (progress == null) return child;
+                  return Center(
+                    child: SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: p.ink),
+                    ),
+                  );
+                },
+                errorBuilder: (_, _, _) => _buildFallbackHero(context, p),
+              ),
+            ),
+            Positioned(
+              bottom: 32,
+              right: 18,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: (p.isDark ? const Color(0xFF1E293B) : Colors.white).withValues(alpha: 0.92),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: p.isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.verified_rounded, size: 12, color: Color(0xFF0D9488)),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Official SPL Packaging',
+                      style: VnText.body(11, weight: FontWeight.w600, color: p.isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_isLoadingImage) {
+      return Container(
+        height: heroHeight,
+        width: double.infinity,
+        color: p.isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+        child: Center(
+          child: SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(strokeWidth: 2, color: p.ink),
+          ),
+        ),
+      );
+    }
+
+    return _buildFallbackHero(context, p);
+  }
+
+  Widget _buildFallbackHero(BuildContext context, VnPalette p) {
+    final topPadding = MediaQuery.paddingOf(context).top;
+    final heroHeight = 220 + topPadding;
+    return Container(
+      height: heroHeight,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: p.isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: p.isDark
+              ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
+              : [const Color(0xFFE2E8F0), const Color(0xFFF8FAFC)],
+        ),
+      ),
+      padding: EdgeInsets.only(top: topPadding + 16, bottom: 34, left: 24, right: 24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(m.icon, size: 48, color: const Color(0xFF0D9488)),
+          const SizedBox(height: 8),
+          Text(
+            m.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: VnText.body(16, weight: FontWeight.w700, color: p.ink),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '${m.route} Monograph · FDA Verified',
+            style: VnText.body(12, weight: FontWeight.w500, color: p.muted),
+          ),
+        ],
+      ),
+    );
   }
 }
 

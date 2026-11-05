@@ -123,7 +123,22 @@ class MedicalImageResolver {
       'photo-1508214751196-bcfd4ca60f91', // Cellular epidermis health
     ],
 
-    // 12. General Clinical (Hospital wards, Multi-specialty rounds, Clinical trials)
+    // 12. Respiratory & Pulmonology (Lungs, Asthma, COPD, Airway histology)
+    'respiratory': [
+      'photo-1584515979956-d9f6e5d09982', // Clinical pulmonary diagnostics
+      'photo-1579684385127-1ef15d508118', // Respiratory medical assessment
+      'photo-1505751172876-fa1923c5c528', // Stethoscope lung examination
+      'photo-1584036561566-baf8f5f1b144', // Cellular bronchial airway model
+    ],
+
+    // 13. Women's Health (Maternal, Obstetrics, Gynecology)
+    'women_health': [
+      'photo-1584515933487-779824d29309', // Female healthcare consultation
+      'photo-1576765608535-5f04d1e3f289', // Maternal & women's wellness
+      'photo-1516549655169-df83a0774514', // Women's health clinical center
+    ],
+
+    // 14. General Clinical (Hospital wards, Multi-specialty rounds, Clinical trials)
     'general_clinical': [
       'photo-1631815589968-fdb09a223b1e', // Modern hospital care ward
       'photo-1519494026892-80bbd2d6fd0d', // Medical center corridor
@@ -294,7 +309,34 @@ class MedicalImageResolver {
       return 'pharmacology';
     }
 
-    // 12. General Clinical
+    // 12. Respiratory & Pulmonology
+    if (combined.contains('respirat') ||
+        combined.contains('asthma') ||
+        combined.contains('copd') ||
+        combined.contains('lung') ||
+        combined.contains('pulmonary') ||
+        combined.contains('bronch') ||
+        combined.contains('inhaler') ||
+        combined.contains('breathing') ||
+        lowerCat == 'respiratory' ||
+        lowerCat == 'breathing') {
+      return 'respiratory';
+    }
+
+    // 13. Women's Health
+    if (combined.contains('women') ||
+        combined.contains('pregnan') ||
+        combined.contains('maternal') ||
+        combined.contains('menopaus') ||
+        combined.contains('postpartum') ||
+        combined.contains('breastfeed') ||
+        combined.contains('contracept') ||
+        combined.contains('endometriosis') ||
+        lowerCat.contains('women')) {
+      return 'women_health';
+    }
+
+    // 14. General Clinical
     return 'general_clinical';
   }
 

@@ -42,5 +42,16 @@ void main() {
       expect(VnTopics.photoForArticle('Dietary patterns', 'Nutrition'),
           anyOf(VnPhotos.healthyPlate, VnPhotos.saladBowl));
     });
+
+    test('Respiratory, Endocrinology, and Women\'s Health get dedicated topic photos', () {
+      expect(VnTopics.categorize('Asthma control and pulmonary function'), equals('Respiratory'));
+      expect(VnTopics.photoForArticle('Asthma control and pulmonary function', 'Respiratory'), equals(VnPhotos.respiratoryHealth));
+
+      expect(VnTopics.categorize('Insulin resistance and glucose metabolism in type 2 diabetes'), equals('Endocrinology'));
+      expect(VnTopics.photoForArticle('Glucose monitoring in type 2 diabetes', 'Endocrinology'), equals(VnPhotos.glucoseMonitoring));
+
+      expect(VnTopics.categorize('Maternal health and prenatal care guidelines'), equals("Women's Health"));
+      expect(VnTopics.photoForArticle('Maternal health assessment', "Women's Health"), equals(VnPhotos.clinicianFemale));
+    });
   });
 }

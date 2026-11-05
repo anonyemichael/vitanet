@@ -15,10 +15,12 @@ import 'health_article_detail_screen.dart';
 /// Clean alias for backward compatibility across navigation routes
 typedef GeneralHealthLibraryScreen = HealthLibraryScreen;
 
-/// Topic photo for an article. The photo always follows the article's
-/// category, so tag and image agree; unknown categories get a neutral photo.
+/// Topic photo for an article. Uses curated/live image URL if available,
+/// with the exact matching local clinical topic photo as instant 0ms fallback.
 ({String asset, String url}) articlePhoto(HealthArticle a) {
-  return (asset: VnTopics.photoForArticle(a.title, a.category), url: '');
+  final fallbackAsset = VnTopics.photoForArticle(a.title, a.category);
+  final directUrl = a.imageUrls.isNotEmpty ? a.imageUrls.first : '';
+  return (asset: fallbackAsset, url: directUrl);
 }
 
 /// Health library: Europe PMC live literature interleaved with curated
@@ -213,7 +215,7 @@ class _HealthLibraryScreenState extends ConsumerState<HealthLibraryScreen> {
             onRefresh: _onPullToRefresh,
             child: CustomScrollView(
               controller: _scrollController,
-              physics: const AlwaysScrollableScrollPhysics(),
+              physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
               slivers: [
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),

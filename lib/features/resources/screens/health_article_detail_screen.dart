@@ -176,6 +176,7 @@ class _HealthArticleDetailScreenState extends State<HealthArticleDetailScreen> {
                 ),
                 Expanded(
                   child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
                     controller: _scroll,
                     padding: EdgeInsets.fromLTRB(22, 20, 22, MediaQuery.paddingOf(context).bottom + 120),
                     children: [

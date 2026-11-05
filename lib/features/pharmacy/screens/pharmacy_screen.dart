@@ -194,6 +194,7 @@ class _PharmacyScreenState extends State<PharmacyScreen> {
     return vnReadableWidth(Scaffold(
       backgroundColor: p.page,
       body: CustomScrollView(
+        physics: const VnAlwaysScrollablePhysics(),
         slivers: [
           SliverToBoxAdapter(
             child: SizedBox(

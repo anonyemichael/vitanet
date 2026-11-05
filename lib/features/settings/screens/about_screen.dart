@@ -33,6 +33,7 @@ class AboutScreen extends StatelessWidget {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 640),
             child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
               children: [
                 const VnTopBar(title: 'About'),

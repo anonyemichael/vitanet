@@ -121,6 +121,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   Widget _buildList(VnPalette p, List<TriageResult> sessions, bool wide, TriageResult? selected) {
     final counts = {for (final l in TriageLevel.values) l: sessions.where((s) => s.level == l).length};
     return ListView(
+      physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
       children: [
         VnTopBar(
@@ -322,7 +323,16 @@ class _EmptyHistory extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 48),
       child: Column(
         children: [
-          VnIconTile(icon: Icons.history_rounded, bg: const Color(0xFFCCFBF1), fg: const Color(0xFF0F766E), size: 64, radius: 20, iconSize: 30),
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: p.surfaceAlt,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: p.line),
+            ),
+            child: Icon(Icons.history_rounded, color: p.muted, size: 28),
+          ),
           const SizedBox(height: 16),
           Text('No checks yet', style: VnText.heading(20, color: p.ink)),
           const SizedBox(height: 6),
@@ -358,13 +368,14 @@ Future<bool> confirmDeleteCheck(BuildContext context, TriageResult session) asyn
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const VnIconTile(
-                  icon: Icons.delete_outline_rounded,
-                  bg: Color(0xFFFEE2E2),
-                  fg: Color(0xFFB91C1C),
-                  size: 56,
-                  radius: 18,
-                  iconSize: 26,
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: p.dangerTint,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.delete_outline_rounded, color: p.danger, size: 24),
                 ),
                 const SizedBox(height: 14),
                 Text('Delete this check?', textAlign: TextAlign.center, style: VnText.heading(20, color: p.ink)),
@@ -444,13 +455,14 @@ class _ClearHistoryDialogState extends State<_ClearHistoryDialog> {
     final n = widget.count;
     return VnDialog(
       children: [
-        const VnIconTile(
-          icon: Icons.warning_amber_rounded,
-          bg: Color(0xFFFEE2E2),
-          fg: Color(0xFFB91C1C),
-          size: 56,
-          radius: 18,
-          iconSize: 26,
+        Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: p.dangerTint,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(Icons.warning_amber_rounded, color: p.danger, size: 24),
         ),
         Text('Clear all triage history?', style: VnText.heading(21, color: p.ink)),
         Text.rich(

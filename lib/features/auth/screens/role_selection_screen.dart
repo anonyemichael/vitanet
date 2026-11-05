@@ -60,6 +60,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
           child: ConstrainedBox(
             constraints: BoxConstraints(maxWidth: wide ? 880 : 560),
             child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
               slivers: [
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:vitanet/core/constants/app_colors.dart';
 import 'package:vitanet/core/extensions/context_ext.dart';
@@ -37,12 +38,10 @@ class AiMessageCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                decoration: BoxDecoration(
-                  color: p.surface,
-                  border: Border.all(color: p.line),
+              Material(
+                color: p.surface,
+                shape: RoundedRectangleBorder(
+                  side: BorderSide(color: p.line),
                   borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(6),
                     topRight: Radius.circular(20),
@@ -50,27 +49,43 @@ class AiMessageCard extends StatelessWidget {
                     bottomRight: Radius.circular(20),
                   ),
                 ),
-                child: MarkdownBody(
-                  data: message.text,
-                  selectable: true,
-                  styleSheet: MarkdownStyleSheet(
-                    p: body,
-                    strong: body.copyWith(fontWeight: FontWeight.w700),
-                    em: body.copyWith(fontStyle: FontStyle.italic),
-                    listBullet: body.copyWith(color: p.brand, fontWeight: FontWeight.w800),
-                    a: body.copyWith(color: p.brand, fontWeight: FontWeight.w600),
-                    h1: VnText.heading(18, color: p.ink),
-                    h2: VnText.heading(17, weight: FontWeight.w700, color: p.ink),
-                    h3: VnText.heading(16, weight: FontWeight.w700, color: p.ink),
-                  ),
-                  onTapLink: (text, href, title) async {
-                    final url = href == null ? null : Uri.tryParse(href);
-                    if (url != null) {
-                      try {
-                        await launchUrl(url, mode: LaunchMode.externalApplication);
-                      } catch (_) {}
-                    }
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onLongPress: () {
+                    Clipboard.setData(ClipboardData(text: message.text));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('AI response copied to clipboard'),
+                        behavior: SnackBarBehavior.floating,
+                        duration: Duration(seconds: 1),
+                      ),
+                    );
                   },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    child: MarkdownBody(
+                      data: message.text,
+                      selectable: false,
+                      styleSheet: MarkdownStyleSheet(
+                        p: body,
+                        strong: body.copyWith(fontWeight: FontWeight.w700),
+                        em: body.copyWith(fontStyle: FontStyle.italic),
+                        listBullet: body.copyWith(color: p.brand, fontWeight: FontWeight.w800),
+                        a: body.copyWith(color: p.brand, fontWeight: FontWeight.w600),
+                        h1: VnText.heading(18, color: p.ink),
+                        h2: VnText.heading(17, weight: FontWeight.w700, color: p.ink),
+                        h3: VnText.heading(16, weight: FontWeight.w700, color: p.ink),
+                      ),
+                      onTapLink: (text, href, title) async {
+                        final url = href == null ? null : Uri.tryParse(href);
+                        if (url != null) {
+                          try {
+                            await launchUrl(url, mode: LaunchMode.externalApplication);
+                          } catch (_) {}
+                        }
+                      },
+                    ),
+                  ),
                 ),
               ),
               if (message.widgetType != null)
@@ -160,7 +175,7 @@ class AiMessageCard extends StatelessWidget {
         minimumSize: const Size(44, 44),
         side: BorderSide(color: VnPalette.of(context).brand),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(8),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       ),

@@ -51,6 +51,7 @@ class Medicine {
   final bool isHomeopathic;
   final String? brandName;
   final String? genericName;
+  final String? splSetId;
 
   const Medicine({
     required this.id,
@@ -68,6 +69,7 @@ class Medicine {
     this.isHomeopathic = false,
     this.brandName,
     this.genericName,
+    this.splSetId,
   });
 
   /// Active ingredients commonly sold over the counter (at standard OTC
@@ -169,6 +171,45 @@ class Medicine {
       isHomeopathic: json['is_homeopathic'] as bool? ?? false,
       brandName: json['brand_name'] as String?,
       genericName: json['generic_name'] as String?,
+      splSetId: json['spl_set_id'] as String?,
+    );
+  }
+
+  Medicine copyWith({
+    String? id,
+    String? name,
+    String? type,
+    String? description,
+    Color? color,
+    IconData? icon,
+    String? heroImageUrl,
+    List<MedicineAccordionItem>? details,
+    String? relatedVideoId,
+    bool? isFdaApproved,
+    String? route,
+    bool? isRx,
+    bool? isHomeopathic,
+    String? brandName,
+    String? genericName,
+    String? splSetId,
+  }) {
+    return Medicine(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      type: type ?? this.type,
+      description: description ?? this.description,
+      color: color ?? this.color,
+      icon: icon ?? this.icon,
+      heroImageUrl: heroImageUrl ?? this.heroImageUrl,
+      details: details ?? this.details,
+      relatedVideoId: relatedVideoId ?? this.relatedVideoId,
+      isFdaApproved: isFdaApproved ?? this.isFdaApproved,
+      route: route ?? this.route,
+      isRx: isRx ?? this.isRx,
+      isHomeopathic: isHomeopathic ?? this.isHomeopathic,
+      brandName: brandName ?? this.brandName,
+      genericName: genericName ?? this.genericName,
+      splSetId: splSetId ?? this.splSetId,
     );
   }
 
@@ -193,6 +234,7 @@ class Medicine {
       'is_homeopathic': isHomeopathic,
       'brand_name': brandName,
       'generic_name': genericName,
+      'spl_set_id': splSetId,
     };
   }
 }

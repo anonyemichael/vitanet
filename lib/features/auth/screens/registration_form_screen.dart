@@ -91,6 +91,7 @@ class _RegistrationFormScreenState extends ConsumerState<RegistrationFormScreen>
       child: Scaffold(
         backgroundColor: p.dark ? p.bg : AppColors.pageBg,
         body: ListView(
+          physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
           padding: EdgeInsets.zero,
           children: [
             Container(

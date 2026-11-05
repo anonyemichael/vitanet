@@ -399,7 +399,7 @@ class _VideoTutorialsScreenState extends ConsumerState<VideoTutorialsScreen> {
               constraints: const BoxConstraints(maxWidth: kVideoContentMaxWidth),
               child: CustomScrollView(
           controller: _scrollController,
-          physics: const AlwaysScrollableScrollPhysics(),
+          physics: const VnAlwaysScrollablePhysics(),
           slivers: [
             SliverToBoxAdapter(child: _buildHeader(p)),
             SliverToBoxAdapter(
@@ -716,6 +716,7 @@ class _ChannelsTab extends StatelessWidget {
         return sa != sb ? sa - sb : a.compareTo(b);
       });
     return ListView(
+      physics: const VnAlwaysScrollablePhysics(),
       padding: videoListPadding(context),
       children: [
         Padding(
@@ -801,6 +802,7 @@ class _SavedTab extends StatelessWidget {
     }
 
     return ListView(
+      physics: const VnAlwaysScrollablePhysics(),
       padding: videoListPadding(context),
       children: [
         Padding(

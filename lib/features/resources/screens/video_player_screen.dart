@@ -60,9 +60,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   ClinicalVideo? _source;
   YoutubePlayerController? _controller;
   StreamSubscription<YoutubeVideoState>? _stateSub;
-  Duration _position = Duration.zero;
+  final ValueNotifier<Duration> _positionNotifier = ValueNotifier(Duration.zero);
+  List<ClinicalVideo>? _cachedUpNext;
   bool _captions = false;
   bool _expanded = false;
+  bool _hasPlaybackError = false;
   double _rate = 1;
 
   @override
@@ -70,12 +72,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     super.initState();
     _video = widget.video;
     _source = widget.source;
+    _startPlayback();
   }
 
   @override
   void dispose() {
     _stateSub?.cancel();
     _controller?.close();
+    _positionNotifier.dispose();
     super.dispose();
   }
 
@@ -118,6 +122,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     try {
       _stateSub?.cancel();
       _controller?.close();
+      setState(() => _hasPlaybackError = false);
       final ctrl = YoutubePlayerController.fromVideoId(
         videoId: _video.videoId,
         autoPlay: true,
@@ -127,11 +132,18 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           showFullscreenButton: true,
           enableCaption: _captions,
           mute: false,
+          privacyEnhancedMode: true,
           strictRelatedVideos: true,
-          origin: 'https://www.youtube.com',
+          origin: 'https://www.youtube-nocookie.com',
         ),
       );
       _stateSub = ctrl.videoStateStream.listen(_onState);
+      ctrl.listen((value) {
+        if (!mounted) return;
+        if (value.hasError && !_hasPlaybackError) {
+          setState(() => _hasPlaybackError = true);
+        }
+      });
       setState(() => _controller = ctrl);
     } catch (_) {
       _watchOnYouTube();
@@ -140,7 +152,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   void _onState(YoutubeVideoState state) {
     if (!mounted) return;
-    setState(() => _position = state.position);
+    _positionNotifier.value = state.position;
     final total = _clip.durationSeconds;
     if (total > 0) {
       _store.setProgress(_video.videoId, state.position.inSeconds / total);
@@ -156,18 +168,20 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _controller?.close();
     setState(() {
       _controller = null;
+      _hasPlaybackError = false;
       _source = next;
       _video = next.toHealthVideo();
-      _position = Duration.zero;
+      _cachedUpNext = null;
       _expanded = false;
     });
+    _positionNotifier.value = Duration.zero;
     _startPlayback();
   }
 
 
   void _toggleCaptions() {
     setState(() => _captions = !_captions);
-    if (_controller != null) _startPlayback(startSeconds: _position.inSeconds.toDouble());
+    if (_controller != null) _startPlayback(startSeconds: _positionNotifier.value.inSeconds.toDouble());
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(_captions ? 'Captions on' : 'Captions off'),
@@ -204,6 +218,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   }
 
   List<ClinicalVideo> get _upNext {
+    if (_cachedUpNext != null) return _cachedUpNext!;
     final id = _video.videoId;
     final pool = widget.related.isNotEmpty
         ? widget.related
@@ -222,15 +237,16 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       final bm = b.category.toLowerCase() == cat ? 0 : 1;
       return am - bm;
     });
-    return list.take(8).toList();
+    _cachedUpNext = list.take(8).toList();
+    return _cachedUpNext!;
   }
 
-  int get _activeChapter {
+  int _activeChapter(Duration pos) {
     final steps = _video.keySteps;
     var active = -1;
     for (var i = 0; i < steps.length; i++) {
       final s = _parseDuration(steps[i].time);
-      if (s <= _position.inSeconds && (steps[i].time.contains(':'))) active = i;
+      if (s <= pos.inSeconds && (steps[i].time.contains(':'))) active = i;
     }
     return _controller == null ? -1 : active;
   }
@@ -258,6 +274,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   _buildPlayer(p),
                   Expanded(
                     child: ListView(
+                      physics: const VnAlwaysScrollablePhysics(),
                       padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 20),
                       children: [
                         _buildTitle(p),
@@ -283,10 +300,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   Widget _buildPlayer(VnPalette p) {
     final clip = _clip;
     final total = Duration(seconds: clip.durationSeconds);
-    final progress = clip.durationSeconds > 0
-        ? (_position.inMilliseconds / total.inMilliseconds).clamp(0.0, 1.0)
-        : _store.progressOf(clip.youtubeId);
-
 
     return AspectRatio(
       aspectRatio: 390 / 219,
@@ -296,8 +309,38 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           fit: StackFit.expand,
           children: [
             if (_controller != null)
-              YoutubePlayer(controller: _controller!, aspectRatio: 16 / 9)
-            else ...[
+              YoutubePlayer(controller: _controller!, aspectRatio: 16 / 9),
+            if (_hasPlaybackError)
+              ColoredBox(
+                color: const Color(0xEE0F172A),
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.play_circle_outline_rounded, color: Colors.white, size: 48),
+                        const SizedBox(height: 10),
+                        Text('Watch this video on YouTube',
+                            style: VnText.heading(15, color: Colors.white)),
+                        const SizedBox(height: 4),
+                        Text('Playback is restricted in embedded mode by the creator.',
+                            textAlign: TextAlign.center,
+                            style: VnText.body(12, color: const Color(0xFF94A3B8))),
+                        const SizedBox(height: 14),
+                        VnButton(
+                          label: 'Open YouTube',
+                          icon: Icons.open_in_new_rounded,
+                          height: 38,
+                          radius: 8,
+                          onPressed: _watchOnYouTube,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              )
+            else if (_controller == null) ...[
               Opacity(
                 opacity: 0.85,
                 child: isCprVideo(clip)
@@ -347,12 +390,15 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 child: Row(
                   children: [
                     Expanded(
-                      child: Text(
-                        '${_fmt(_position)} / ${clip.formattedDuration.isEmpty ? '--:--' : clip.formattedDuration}'
-                        '${_video.keySteps.isNotEmpty ? ' · ${_video.keySteps.first.action}' : ''}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: VnText.body(12, weight: FontWeight.w600, color: Colors.white),
+                      child: ValueListenableBuilder<Duration>(
+                        valueListenable: _positionNotifier,
+                        builder: (context, pos, _) => Text(
+                          '${_fmt(pos)} / ${clip.formattedDuration.isEmpty ? '--:--' : clip.formattedDuration}'
+                          '${_video.keySteps.isNotEmpty ? ' · ${_video.keySteps.first.action}' : ''}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: VnText.body(12, weight: FontWeight.w600, color: Colors.white),
+                        ),
                       ),
                     ),
                     VnIconButton(
@@ -409,13 +455,21 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               bottom: 0,
               height: 3,
               child: IgnorePointer(
-                child: ColoredBox(
-                  color: const Color(0x4DFFFFFF),
-                  child: FractionallySizedBox(
-                    alignment: Alignment.centerLeft,
-                    widthFactor: progress,
-                    child: const ColoredBox(color: Color(0xFF2DD4BF)),
-                  ),
+                child: ValueListenableBuilder<Duration>(
+                  valueListenable: _positionNotifier,
+                  builder: (context, pos, _) {
+                    final progress = clip.durationSeconds > 0
+                        ? (pos.inMilliseconds / total.inMilliseconds).clamp(0.0, 1.0)
+                        : _store.progressOf(clip.youtubeId);
+                    return ColoredBox(
+                      color: const Color(0x4DFFFFFF),
+                      child: FractionallySizedBox(
+                        alignment: Alignment.centerLeft,
+                        widthFactor: progress,
+                        child: const ColoredBox(color: Color(0xFF2DD4BF)),
+                      ),
+                    );
+                  },
                 ),
               ),
             ),
@@ -595,57 +649,63 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   Widget _buildChapters(VnPalette p) {
     final steps = _video.keySteps;
     if (steps.isEmpty) return const SizedBox.shrink();
-    final active = _activeChapter;
     final fg = p.isDark ? const Color(0xFFCCFBF1) : const Color(0xFF134E4A);
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: p.brandWash,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: p.brandBorder),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+
+    return ValueListenableBuilder<Duration>(
+      valueListenable: _positionNotifier,
+      builder: (context, pos, _) {
+        final active = _activeChapter(pos);
+        return Container(
+          margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: p.brandWash,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: p.brandBorder),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.auto_awesome_rounded, size: 16, color: p.brandDeep),
-              const SizedBox(width: 6),
-              Text('AI summary · chapters', style: VnText.body(13, weight: FontWeight.w800, color: p.brandDeep)),
+              Row(
+                children: [
+                  Icon(Icons.auto_awesome_rounded, size: 16, color: p.brandDeep),
+                  const SizedBox(width: 6),
+                  Text('AI summary · chapters', style: VnText.body(13, weight: FontWeight.w800, color: p.brandDeep)),
+                ],
+              ),
+              const SizedBox(height: 8),
+              for (var i = 0; i < steps.length; i++)
+                InkWell(
+                  onTap: _controller != null && steps[i].time.contains(':')
+                      ? () => _controller!.seekTo(seconds: _parseDuration(steps[i].time).toDouble(), allowSeekAhead: true)
+                      : null,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 3),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(
+                          width: 46,
+                          child: Text(
+                            steps[i].time,
+                            style: VnText.body(13, weight: FontWeight.w700, color: p.brand),
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            i == active ? '${steps[i].action} (now playing)' : steps[i].action,
+                            style: VnText.body(13,
+                                weight: i == active ? FontWeight.w700 : FontWeight.w400, color: fg, height: 1.4),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
             ],
           ),
-          const SizedBox(height: 8),
-          for (var i = 0; i < steps.length; i++)
-            InkWell(
-              onTap: _controller != null && steps[i].time.contains(':')
-                  ? () => _controller!.seekTo(seconds: _parseDuration(steps[i].time).toDouble(), allowSeekAhead: true)
-                  : null,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 3),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      width: 46,
-                      child: Text(
-                        steps[i].time,
-                        style: VnText.body(13, weight: FontWeight.w700, color: p.brand),
-                      ),
-                    ),
-                    Expanded(
-                      child: Text(
-                        i == active ? '${steps[i].action} (now playing)' : steps[i].action,
-                        style: VnText.body(13,
-                            weight: i == active ? FontWeight.w700 : FontWeight.w400, color: fg, height: 1.4),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-        ],
-      ),
+        );
+      },
     );
   }
 

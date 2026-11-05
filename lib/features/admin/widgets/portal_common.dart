@@ -193,7 +193,7 @@ class PortalAsyncList<T> extends StatelessWidget {
       color: StaffPalette.of(context).accent,
       onRefresh: onRefresh,
       child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
+        physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
         padding: padding,
         children: [
           StaffContent(

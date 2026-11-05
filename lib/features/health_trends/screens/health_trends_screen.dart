@@ -154,6 +154,7 @@ class _HealthTrendsScreenState extends ConsumerState<HealthTrendsScreen> {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 720),
             child: ListView(
+              physics: const VnAlwaysScrollablePhysics(),
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
               children: [
                 VnTopBar(
@@ -366,6 +367,7 @@ class _HealthTrendsScreenState extends ConsumerState<HealthTrendsScreen> {
               ),
               Flexible(
                 child: SingleChildScrollView(
+                  physics: const VnAlwaysScrollablePhysics(),
                   child: FutureBuilder<String>(
                     future: future,
                     builder: (context, snapshot) {

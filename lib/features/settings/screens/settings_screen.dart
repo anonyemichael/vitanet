@@ -67,6 +67,7 @@ class SettingsScreen extends ConsumerWidget {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 720),
             child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
               children: [
                 VnTopBar(
@@ -76,33 +77,34 @@ class SettingsScreen extends ConsumerWidget {
                 const SizedBox(height: 18),
                 const VnSectionLabel('Appearance'),
                 const SizedBox(height: 8),
-                VnListGroup(children: [
+                VnListGroup(radius: 12, children: [
                   VnListRow(
-                    leading: const VnIconTile(
-                        icon: Icons.dark_mode_outlined, bg: Color(0xFFE0E7FF), fg: Color(0xFF4338CA)),
+                    leading: Container(
+                      width: 28,
+                      alignment: Alignment.centerLeft,
+                      child: Icon(Icons.dark_mode_outlined, size: 20, color: p.muted),
+                    ),
                     title: 'Theme',
                     value: _themeLabel(currentTheme),
                     onTap: () => showThemeSheet(context),
                   ),
                   VnListRow(
                     leading: Container(
-                      width: 38,
-                      height: 38,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: p.surfaceAlt,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                      width: 28,
+                      alignment: Alignment.centerLeft,
                       child: Text('Aa',
-                          style: VnText.body(14, weight: FontWeight.w800, color: p.inkSoft)),
+                          style: VnText.body(14, weight: FontWeight.w800, color: p.muted)),
                     ),
                     title: 'Text size',
                     value: TextScaleNotifier.labelFor(textScale),
                     onTap: () => showTextSizeSheet(context),
                   ),
-                  const VnListRow(
-                    leading: VnIconTile(
-                        icon: Icons.language_rounded, bg: Color(0xFFD1FAE5), fg: Color(0xFF047857)),
+                  VnListRow(
+                    leading: Container(
+                      width: 28,
+                      alignment: Alignment.centerLeft,
+                      child: Icon(Icons.language_rounded, size: 20, color: p.muted),
+                    ),
                     title: 'Language',
                     value: 'English',
                     chevron: false,
@@ -111,7 +113,7 @@ class SettingsScreen extends ConsumerWidget {
                 const SizedBox(height: 18),
                 const VnSectionLabel('Notifications'),
                 const SizedBox(height: 8),
-                VnListGroup(children: [
+                VnListGroup(radius: 12, children: [
                   for (final (key, title, sub) in _toggles)
                     VnListRow(
                       title: title,
@@ -132,28 +134,35 @@ class SettingsScreen extends ConsumerWidget {
                 const SizedBox(height: 18),
                 const VnSectionLabel('Privacy & data'),
                 const SizedBox(height: 8),
-                VnListGroup(children: [
+                VnListGroup(radius: 12, children: [
                   VnListRow(
-                    leading: const VnIconTile(
-                        icon: Icons.download_rounded, bg: Color(0xFFE0F2FE), fg: Color(0xFF0369A1)),
+                    leading: Container(
+                      width: 28,
+                      alignment: Alignment.centerLeft,
+                      child: Icon(Icons.download_rounded, size: 20, color: p.muted),
+                    ),
                     title: 'Export my health data',
                     subtitle: 'Summary to share with your doctor',
                     onTap: () => _exportData(
                         ref.read(userProfileProvider), ref.read(triageHistoryProvider)),
                   ),
                   VnListRow(
-                    leading: const VnIconTile(
-                        icon: Icons.delete_outline_rounded,
-                        bg: Color(0xFFFEE2E2),
-                        fg: Color(0xFFB91C1C)),
+                    leading: Container(
+                      width: 28,
+                      alignment: Alignment.centerLeft,
+                      child: Icon(Icons.delete_outline_rounded, size: 20, color: p.danger),
+                    ),
                     title: 'Clear triage history',
                     titleColor: p.danger,
                     subtitle: 'Permanently delete past AI checks',
                     onTap: () => showClearHistoryDialog(context),
                   ),
                   VnListRow(
-                    leading: VnIconTile(
-                        icon: Icons.shield_outlined, bg: const Color(0xFFF1F5F9), fg: p.isDark ? p.inkSoft : const Color(0xFF334155)),
+                    leading: Container(
+                      width: 28,
+                      alignment: Alignment.centerLeft,
+                      child: Icon(Icons.shield_outlined, size: 20, color: p.muted),
+                    ),
                     title: 'Privacy policy',
                     subtitle: 'HIPAA and GDPR-aligned handling',
                     onTap: () => context.push('/privacy'),
@@ -162,7 +171,7 @@ class SettingsScreen extends ConsumerWidget {
                 const SizedBox(height: 18),
                 const VnSectionLabel('About'),
                 const SizedBox(height: 8),
-                VnListGroup(children: [
+                VnListGroup(radius: 12, children: [
                   VnListRow(title: 'About VitaNet', onTap: () => context.push('/about')),
                   VnListRow(title: 'Medical disclaimer', onTap: () => context.push('/disclaimer')),
                   VnListRow(title: 'Help center', onTap: () => context.push('/help-center')),

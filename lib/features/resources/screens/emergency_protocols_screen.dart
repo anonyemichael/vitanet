@@ -246,6 +246,7 @@ class _EmergencyProtocolsScreenState extends ConsumerState<EmergencyProtocolsScr
           return NotificationListener<ScrollNotification>(
             onNotification: (n) => handleScrollNotification(n, ref),
             child: CustomScrollView(
+              physics: const VnAlwaysScrollablePhysics(),
               slivers: [
                 SliverToBoxAdapter(
                   child: EmergencyHeader(

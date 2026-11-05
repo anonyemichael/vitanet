@@ -67,10 +67,11 @@ class ShortsControllerPool {
               showControls: false,
               showFullscreenButton: false,
               showVideoAnnotations: false,
-              mute: false,
+              mute: true,
               loop: true,
+              privacyEnhancedMode: true,
               strictRelatedVideos: true,
-              origin: 'https://www.youtube.com',
+              origin: 'https://www.youtube-nocookie.com',
             ),
           );
         }

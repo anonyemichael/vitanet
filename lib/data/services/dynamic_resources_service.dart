@@ -7,6 +7,7 @@ import 'package:vitanet/features/resources/models/medicine.dart';
 import 'package:vitanet/features/resources/models/health_article.dart';
 import 'package:vitanet/features/resources/models/health_video.dart';
 import 'package:vitanet/features/first_aid/screens/first_aid_screen.dart';
+import 'daily_med_service.dart';
 import 'medical_api_service.dart';
 import 'drug_synonyms.dart';
 import 'clinical_articles_data.dart';
@@ -152,6 +153,15 @@ class DynamicResourcesService {
       final List<dynamic> jsonList = json.decode(jsonString);
       if (jsonList.isNotEmpty) {
         _cachedMedicines = jsonList.map((j) => Medicine.fromJson(j)).toList();
+        for (final m in _cachedMedicines) {
+          if (m.heroImageUrl != null && m.heroImageUrl!.isNotEmpty) {
+            DailyMedService.instance.cacheImageUrl(
+              splSetId: m.splSetId,
+              drugName: m.genericName ?? m.name,
+              url: m.heroImageUrl!,
+            );
+          }
+        }
       }
     } catch (e) {
       debugPrint('Preload medicines asset error: $e');
@@ -177,6 +187,8 @@ class DynamicResourcesService {
       color: const Color(0xFF0D9488),
       icon: Icons.medication_rounded,
       isFdaApproved: true,
+      heroImageUrl: 'https://dailymed.nlm.nih.gov/dailymed/image.cfm?setid=59d01f72-4575-48e2-b914-b6a6456ca7d2&name=image-01.jpg',
+      splSetId: '59d01f72-4575-48e2-b914-b6a6456ca7d2',
       details: const [
         MedicineAccordionItem(
           title: 'Typical Dosage',
@@ -204,6 +216,8 @@ class DynamicResourcesService {
       color: const Color(0xFFF97316),
       icon: Icons.medication_rounded,
       isFdaApproved: true,
+      heroImageUrl: 'https://dailymed.nlm.nih.gov/dailymed/image.cfm?setid=307b0257-d636-416b-828a-f901782e9b10&name=647-2e-ibuprofen-1.jpg',
+      splSetId: '307b0257-d636-416b-828a-f901782e9b10',
       details: const [
         MedicineAccordionItem(
           title: 'Typical Dosage',
@@ -225,6 +239,8 @@ class DynamicResourcesService {
       color: const Color(0xFF10B981),
       icon: Icons.healing_rounded,
       isFdaApproved: true,
+      heroImageUrl: 'https://dailymed.nlm.nih.gov/dailymed/image.cfm?setid=a5c323c8-ae13-4eda-a9bf-173a0676bf9d&name=image-01.jpg',
+      splSetId: 'a5c323c8-ae13-4eda-a9bf-173a0676bf9d',
       details: const [
         MedicineAccordionItem(
           title: 'Typical Dosage',
@@ -242,6 +258,8 @@ class DynamicResourcesService {
       color: const Color(0xFF8B5CF6),
       icon: Icons.air_rounded,
       isFdaApproved: true,
+      heroImageUrl: 'https://dailymed.nlm.nih.gov/dailymed/image.cfm?setid=1dd299e7-dfdd-459b-bb2b-83e37dd2e63d&name=label-10.jpg',
+      splSetId: '1dd299e7-dfdd-459b-bb2b-83e37dd2e63d',
       details: const [
         MedicineAccordionItem(
           title: 'Typical Dosage',
@@ -259,6 +277,8 @@ class DynamicResourcesService {
       color: const Color(0xFF06B6D4),
       icon: Icons.local_pharmacy_rounded,
       isFdaApproved: true,
+      heroImageUrl: 'https://dailymed.nlm.nih.gov/dailymed/image.cfm?setid=5ceaec04-3ca3-4c7c-9184-51a42686a595&name=heb-omeprazole-carton-image-1.jpg',
+      splSetId: '5ceaec04-3ca3-4c7c-9184-51a42686a595',
       details: const [
         MedicineAccordionItem(
           title: 'Typical Dosage',
@@ -517,7 +537,9 @@ class DynamicResourcesService {
       jsonMap['cached_at'] = FieldValue.serverTimestamp();
       await docRef.set(jsonMap, SetOptions(merge: true));
     } catch (e) {
-      debugPrint('Failed to cache medicine to Firestore: $e');
+      if (e is! FirebaseException || e.code != 'permission-denied') {
+        debugPrint('Failed to cache medicine to Firestore: $e');
+      }
     }
   }
 
@@ -705,7 +727,9 @@ class DynamicResourcesService {
         'created_at': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
     } catch (e) {
-      debugPrint('Failed to cache article to Firestore: $e');
+      if (e is! FirebaseException || e.code != 'permission-denied') {
+        debugPrint('Failed to cache article to Firestore: $e');
+      }
     }
   }
 }

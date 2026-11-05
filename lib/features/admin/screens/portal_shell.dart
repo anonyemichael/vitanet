@@ -173,6 +173,7 @@ class _MoreScreen extends ConsumerWidget {
         PortalHeader(title: 'More', subtitle: me == null ? null : '${me.fullName} · ${me.role.label}'),
         Expanded(
           child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
             padding: const EdgeInsets.all(16),
             children: [
               StaffContent(

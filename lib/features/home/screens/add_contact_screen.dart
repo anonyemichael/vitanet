@@ -152,6 +152,7 @@ class _AddContactScreenState extends ConsumerState<AddContactScreen> {
             child: Form(
               key: _formKey,
               child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
                 children: [
                   SizedBox(

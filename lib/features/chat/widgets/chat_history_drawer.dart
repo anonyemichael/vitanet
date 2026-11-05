@@ -125,7 +125,7 @@ class _ChatHistoryContentState extends ConsumerState<ChatHistoryContent> {
               label: 'New chat',
               icon: Icons.add_rounded,
               height: 48,
-              radius: 14,
+              radius: 8,
               fontSize: 15,
               onPressed: _startNewChat,
             ),
@@ -245,7 +245,11 @@ class _ChatHistoryContentState extends ConsumerState<ChatHistoryContent> {
                       ),
                     ));
                   }
-                  return ListView(padding: EdgeInsets.zero, children: items);
+                  return ListView(
+                    physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
+                    padding: EdgeInsets.zero,
+                    children: items,
+                  );
                 },
               ),
             ),

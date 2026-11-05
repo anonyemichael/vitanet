@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:vitanet/features/resources/models/medicine.dart';
 import 'package:vitanet/features/resources/models/health_article.dart';
+import 'daily_med_service.dart';
 import 'drug_synonyms.dart';
 import 'openfda_sanitizer.dart';
 
@@ -47,10 +48,14 @@ class MedicalApiService {
         final data = json.decode(response.body);
         final results = data['results'] as List?;
         if (results != null && results.isNotEmpty) {
-          return results
+          final list = results
               .where((r) => !OpenFdaSanitizer.isCosmeticNoise(r as Map<String, dynamic>, query: cleanQuery))
               .map((r) => _parseFdaDrug(r as Map<String, dynamic>))
               .toList();
+          for (final med in list) {
+            DailyMedService.instance.prefetch(med);
+          }
+          return list;
         }
       } else if (response.statusCode == 404 && !isStructured) {
         // Fallback: broaden search without exact quotes
@@ -64,10 +69,14 @@ class MedicalApiService {
           final broadData = json.decode(broadResp.body);
           final broadResults = broadData['results'] as List?;
           if (broadResults != null) {
-            return broadResults
+            final broadList = broadResults
                 .where((r) => !OpenFdaSanitizer.isCosmeticNoise(r as Map<String, dynamic>, query: cleanQuery))
                 .map((r) => _parseFdaDrug(r as Map<String, dynamic>))
                 .toList();
+            for (final med in broadList) {
+              DailyMedService.instance.prefetch(med);
+            }
+            return broadList;
           }
         }
       }
@@ -168,6 +177,15 @@ class MedicalApiService {
       ));
     }
 
+    // 7. Structured Product Labeling (SPL) set_id for real manufacturer packaging photos
+    final rawSplSetId = item['set_id']?.toString() ??
+        (openfda['spl_set_id'] as List?)?.firstOrNull?.toString();
+    final genericOrPrimary = titles.isGenericPrimary ? titles.primaryTitle : titles.secondarySubtitle;
+    final cachedHeroUrl = DailyMedService.instance.getCachedImageUrl(
+      splSetId: rawSplSetId,
+      drugName: genericOrPrimary.isNotEmpty ? genericOrPrimary : titles.primaryTitle,
+    );
+
     return Medicine(
       id: 'fda_${titles.primaryTitle.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_')}',
       name: titles.primaryTitle,
@@ -182,8 +200,9 @@ class MedicalApiService {
       isHomeopathic: regStatus.isHomeopathic,
       brandName: titles.isGenericPrimary ? titles.secondarySubtitle : titles.primaryTitle,
       genericName: titles.isGenericPrimary ? titles.primaryTitle : titles.secondarySubtitle,
-      heroImageUrl: null,
+      heroImageUrl: cachedHeroUrl,
       relatedVideoId: null,
+      splSetId: rawSplSetId,
     );
   }
 

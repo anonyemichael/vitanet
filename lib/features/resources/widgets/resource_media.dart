@@ -36,6 +36,21 @@ class VnPhotos {
   static const doctorsWithChild = '$_base/doctors_with_child.jpg';
   static const xray = '$_base/xray.jpg';
 
+  // Authentic clinical photographic assets (local JPEG)
+  static const respiratoryHealth = '$_base/respiratory_health.jpg';
+  static const glucoseMonitoring = '$_base/glucose_monitoring.jpg';
+  static const cardiologyEcg = '$_base/cardiology_ecg.jpg';
+  static const circadianSleep = '$_base/circadian_sleep.jpg';
+  static const metabolicNutrition = '$_base/metabolic_nutrition.jpg';
+  static const mindfulnessWellness = '$_base/mindfulness_wellness.jpg';
+  static const fitnessVitality = '$_base/fitness_vitality.jpg';
+  static const stethoscopeDiagnostics = '$_base/stethoscope_diagnostics.jpg';
+  static const cprResuscitation = '$_base/cpr_resuscitation.jpg';
+  static const bandageTherapy = '$_base/bandage_therapy.jpg';
+  static const woundCare = '$_base/wound_care.jpg';
+  static const digitalHealth = '$_base/digital_health.jpg';
+  static const clinicalExamination = '$_base/clinical_examination.jpg';
+
   /// Picks the local photo whose subject matches the given topic text.
   ///
   /// Matching is word-boundary based (see [VnTopics]); when nothing matches
@@ -94,25 +109,54 @@ class VnTopics {
           r'(?<!oxidative )(?<!oxidant )stress(?!-strain)|burnout|suicid|loneli|mood|ptsd|mindful|meditat|'
           r'grief|bereave|schizophren|bipolar|eating disorder|self-harm|panic',
       VnPhotos.meditation,
-      [(r'depress|grief|bereave|loneli|suicid|caregiv|carers?\b|dementia', VnPhotos.holdingHands)],
+      [
+        (r'depress|grief|bereave|loneli|suicid|caregiv|carers?\b|dementia', VnPhotos.holdingHands),
+        (r'mindful|wellness|calm|reflection|tranquil', VnPhotos.mindfulnessWellness),
+      ],
     ),
-    VnTopic('Sleep', r'sleep|insomnia|circadian|melatonin|apnoea|apnea|napping', VnPhotos.sleep),
+    VnTopic(
+      'Sleep',
+      r'sleep|insomnia|circadian|melatonin|apnoea|apnea|napping',
+      VnPhotos.sleep,
+      [
+        (r'circadian|melatonin|architecture|rhythm|chronobiol', VnPhotos.circadianSleep),
+      ],
+    ),
     VnTopic(
       'Cardiology',
       r'hearts?\b|cardiac|cardio|hypertens|blood pressure|strokes?\b|atrial|arrhythm|myocard|coronary|'
           r'cholesterol|atheroscl|heart failure',
       VnPhotos.bloodPressureCheck,
-      [(r'atrial|arrhythm|heart rate|wearable|smartwatch|ecg\b|electrocardiog', VnPhotos.smartwatchWrist)],
+      [
+        (r'atrial|arrhythm|heart rate|wearable|smartwatch', VnPhotos.smartwatchWrist),
+        (r'ecg\b|electrocardiog|telemetry|infarct|cardiac arrest|rhythm', VnPhotos.cardiologyEcg),
+      ],
     ),
-    VnTopic('Respiratory', r'asthma|copd\b|lungs?\b|pulmonar|respirator|breath|pneumon|inhaler|bronch',
-        VnPhotos.doctorWithPatient),
-    VnTopic('Endocrinology', r'diabet|insulin|glucose|glycaem|glycem|thyroid|hba1c', VnPhotos.doctorWithPatient),
+    VnTopic(
+      'Respiratory',
+      r'asthma|copd\b|lungs?\b|pulmonar|respirator|breath|pneumon|inhaler|bronch',
+      VnPhotos.respiratoryHealth,
+      [
+        (r'stethoscope|auscultat', VnPhotos.stethoscopeDiagnostics),
+      ],
+    ),
+    VnTopic(
+      'Endocrinology',
+      r'diabet|insulin|glucose|glycaem|glycem|thyroid|hba1c',
+      VnPhotos.glucoseMonitoring,
+      [
+        (r'metabolic|metabolism|syndrome|fatty liver|ketone', VnPhotos.metabolicNutrition),
+      ],
+    ),
     VnTopic(
       'Nutrition',
       r'nutrition|nutrient|diets?\b|dietary|food|eating|meals?\b|fasting|vitamin|obes|mediterranean|'
           r'healthy plate|fruit|vegetable|salt intake|sugar intake',
       VnPhotos.healthyPlate,
-      [(r'fruit|vegetable|plant-based|vegan|vegetarian|mediterranean', VnPhotos.saladBowl)],
+      [
+        (r'fruit|vegetable|plant-based|vegan|vegetarian|mediterranean', VnPhotos.saladBowl),
+        (r'fasting|intermittent|metabolic|macronutrient', VnPhotos.metabolicNutrition),
+      ],
     ),
     VnTopic(
       'Medicines',
@@ -126,23 +170,40 @@ class VnTopics {
       r'vaccin|immun|antibod|infection|infectious|virus|viral|covid|sars-cov|influenza|\bflu\b|hiv\b|antimicrobial',
       VnPhotos.vaccination,
     ),
-    VnTopic('Oncology', r'cancer|tumou?r|oncolog|chemo|carcinoma|leuka?emia|lymphoma|melanoma',
-        VnPhotos.medicalTeam, [(r'surg', VnPhotos.operatingTheatre)]),
+    VnTopic(
+      'Oncology',
+      r'cancer|tumou?r|oncolog|chemo|carcinoma|leuka?emia|lymphoma|melanoma',
+      VnPhotos.medicalTeam,
+      [(r'surg', VnPhotos.operatingTheatre)],
+    ),
     VnTopic(
       "Women's Health",
       r'pregnan|maternal|menopaus|women|prenatal|antenatal|postpartum|breastfeed|contracept|endometriosis|menstru',
-      VnPhotos.doctorWithPatient,
+      VnPhotos.clinicianFemale,
     ),
-    VnTopic("Children's Health", r'child|paediatric|pediatric|infant|neonat|kids\b|adolescen',
-        VnPhotos.doctorsWithChild),
+    VnTopic(
+      "Children's Health",
+      r'child|paediatric|pediatric|infant|neonat|kids\b|adolescen',
+      VnPhotos.doctorsWithChild,
+    ),
     VnTopic(
       'Fitness',
       r'exercis|fitness|physical activity|sports?\b|athlet|olympi|strength training|resistance training|'
           r'muscle|running|walking|yoga|physiotherap|sedentary',
       VnPhotos.workout,
+      [(r'vitality|aerobic|running|cardio|stamina', VnPhotos.fitnessVitality)],
     ),
-    VnTopic('Longevity', r'ageing|aging|longevity|older adults|frailty|senescen', VnPhotos.doctorWithPatient),
-    VnTopic('Surgery', r'surg', VnPhotos.operatingTheatre),
+    VnTopic(
+      'Longevity',
+      r'ageing|aging|longevity|older adults|frailty|senescen',
+      VnPhotos.holdingHands,
+    ),
+    VnTopic(
+      'Surgery',
+      r'surg',
+      VnPhotos.operatingTheatre,
+      [(r'surgical team|surgeons', VnPhotos.surgicalTeam)],
+    ),
   ];
 
   static final Map<String, RegExp> _cache = {};
@@ -164,9 +225,12 @@ class VnTopics {
   /// Topic for a stored category label (case-insensitive), or `null`.
   static VnTopic? byCategory(String category) {
     final c = category.trim().toLowerCase();
-    if (c == 'sleep science') return all[1];
-    if (c == 'metabolic health') return all[4];
-    if (c == 'sports medicine') return all.firstWhere((t) => t.category == 'Fitness');
+    if (c == 'sleep science' || c == 'sleep') return all[1];
+    if (c == 'metabolic health' || c == 'diabetes') return all[4];
+    if (c == 'breathing' || c == 'pulmonology') return all[3];
+    if (c == 'heart') return all[2];
+    if (c == 'sports medicine' || c == 'exercise') return all.firstWhere((t) => t.category == 'Fitness');
+    if (c == 'immunity' || c == 'virology') return all.firstWhere((t) => t.category == 'Immunology');
     for (final t in all) {
       if (t.category.toLowerCase() == c) return t;
     }
@@ -184,8 +248,10 @@ class VnTopics {
   /// Photo for an article that matches its category (neutral when unknown).
   static String photoForArticle(String title, String category) {
     final topic = byCategory(category);
-    if (topic == null) return VnPhotos.laptopStethoscope;
-    return topic.photoFor(title);
+    if (topic != null) return topic.photoFor(title);
+    final classified = classify(title);
+    if (classified != null) return classified.photoFor(title);
+    return VnPhotos.laptopStethoscope;
   }
 }
 

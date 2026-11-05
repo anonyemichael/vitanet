@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vitanet/data/services/daily_med_service.dart';
 import 'package:vitanet/data/services/drug_synonyms.dart';
 import 'package:vitanet/features/resources/models/medicine.dart';
 import 'package:vitanet/features/resources/screens/medicine_search_screen.dart';
@@ -142,6 +143,14 @@ void main() {
       expect(names.any((n) => n.contains('azithromycin')), isTrue);
       expect(names.any((n) => n.contains('loratadine')), isTrue);
       expect(names.any((n) => n.contains('albuterol') || n.contains('salbutamol')), isTrue);
+
+      // Verify all 20 have official NIH DailyMed SPL packaging photo URLs (not stock Unsplash)
+      for (final med in medicines) {
+        expect(med.heroImageUrl, isNotNull);
+        expect(med.heroImageUrl, contains('dailymed.nlm.nih.gov'));
+        expect(med.splSetId, isNotNull);
+        expect(med.splSetId!.length, greaterThan(10));
+      }
     });
   });
 
@@ -168,6 +177,50 @@ void main() {
       // Verify that "0 Found / No medications match your filter" is NEVER shown on initial open
       expect(find.text('0 Found'), findsNothing);
       expect(find.text('No medications match your filter.'), findsNothing);
+    });
+  });
+
+  group('DailyMedService & Real Image Resolution Tests', () {
+    test('Caches and retrieves SPL media URLs synchronously', () {
+      final service = DailyMedService.instance;
+      const testSetId = 'test-setid-12345';
+      const testUrl = 'https://dailymed.nlm.nih.gov/dailymed/image.cfm?setid=test-setid-12345&name=box.jpg';
+
+      expect(service.getCachedImageUrl(splSetId: testSetId), isNull);
+
+      service.cacheImageUrl(
+        splSetId: testSetId,
+        drugName: 'Amoxicillin (500mg)',
+        url: testUrl,
+      );
+
+      expect(service.getCachedImageUrl(splSetId: testSetId), equals(testUrl));
+      expect(service.getCachedImageUrl(drugName: 'amoxicillin'), equals(testUrl));
+    });
+
+    test('Medicine copyWith supports splSetId and heroImageUrl', () {
+      const med = Medicine(
+        id: 'test_med',
+        name: 'Test Drug',
+        type: 'Analgesic',
+        description: 'Test description',
+        color: Color(0xFF0D9488),
+        icon: Icons.medication_rounded,
+        isFdaApproved: true,
+        details: [],
+      );
+
+      expect(med.heroImageUrl, isNull);
+      expect(med.splSetId, isNull);
+
+      final updated = med.copyWith(
+        heroImageUrl: 'https://dailymed.nlm.nih.gov/test.jpg',
+        splSetId: 'setid-999',
+      );
+
+      expect(updated.heroImageUrl, equals('https://dailymed.nlm.nih.gov/test.jpg'));
+      expect(updated.splSetId, equals('setid-999'));
+      expect(updated.name, equals('Test Drug'));
     });
   });
 }

@@ -117,6 +117,7 @@ class _PatientLoginScreenState extends ConsumerState<PatientLoginScreen> {
     return Scaffold(
       backgroundColor: p.page,
       body: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 560),

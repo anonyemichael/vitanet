@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:vitanet/core/constants/app_colors.dart';
 
@@ -1126,3 +1126,46 @@ class VnProgressBar extends StatelessWidget {
     );
   }
 }
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Enterprise Responsive Scroll Physics
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// High-responsiveness clamping scroll physics.
+///
+/// 1. Clamps strictly to viewport bounds (eliminating infinite white overscroll).
+/// 2. Reduces [dragStartDistanceMotionThreshold] to 3.5 logical pixels (down
+///    from the default 18.0px dead zone), initiating list tracking immediately
+///    when the finger touches and moves.
+/// 3. Retains native Android ballistic fling simulations.
+class VnScrollPhysics extends ClampingScrollPhysics {
+  const VnScrollPhysics({super.parent});
+
+  @override
+  VnScrollPhysics applyTo(ScrollPhysics? ancestor) {
+    return VnScrollPhysics(parent: buildParent(ancestor));
+  }
+
+  @override
+  double get dragStartDistanceMotionThreshold => 3.5;
+}
+
+/// Always-scrollable variant that maintains immediate 3.5px drag response,
+/// hard boundary clamping, and support for pull-to-refresh even when content
+/// fits within the viewport.
+class VnAlwaysScrollablePhysics extends AlwaysScrollableScrollPhysics {
+  const VnAlwaysScrollablePhysics({super.parent = const VnScrollPhysics()});
+
+  @override
+  VnAlwaysScrollablePhysics applyTo(ScrollPhysics? ancestor) {
+    return VnAlwaysScrollablePhysics(parent: buildParent(ancestor));
+  }
+
+  @override
+  double get dragStartDistanceMotionThreshold => 3.5;
+}
+
+
+/// Canonical responsive clamping physics instance.
+const vnClampingPhysics = VnAlwaysScrollablePhysics();

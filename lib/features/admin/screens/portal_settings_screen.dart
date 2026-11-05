@@ -51,7 +51,7 @@ class PortalSettingsScreen extends ConsumerWidget {
             color: p.accent,
             onRefresh: () => ref.refresh(myHospitalProvider.future),
             child: ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
+              physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
               children: [
                 StaffContent(

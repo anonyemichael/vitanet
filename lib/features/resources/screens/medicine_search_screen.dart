@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:vitanet/core/providers/shared_state.dart';
 import 'package:vitanet/data/providers/providers.dart';
+import 'package:vitanet/data/services/daily_med_service.dart';
 import 'package:vitanet/data/services/drug_synonyms.dart';
 import 'package:vitanet/shared/widgets/vn_kit.dart';
 import '../models/medicine.dart';
@@ -208,7 +209,7 @@ class _MedicineSearchScreenState extends ConsumerState<MedicineSearchScreen>
           onNotification: (n) => handleScrollNotification(n, ref),
           child: CustomScrollView(
             controller: _scrollController,
-            physics: const AlwaysScrollableScrollPhysics(),
+            physics: const VnAlwaysScrollablePhysics(),
             slivers: [
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
@@ -538,7 +539,7 @@ class _MedicineRow extends StatelessWidget {
       semanticLabel: '$name. $sub. ${medicine.isRx ? 'Prescription' : 'Over the counter'}',
       child: Row(
         children: [
-          VnIconTile(icon: Icons.medication_rounded, bg: bg, fg: fg, size: 44, radius: 14),
+          _MedicineThumbnail(medicine: medicine, bg: bg, fg: fg),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -564,6 +565,102 @@ class _MedicineRow extends StatelessWidget {
             const VnTag(label: 'Over the counter', bg: Color(0xFFD1FAE5), fg: Color(0xFF065F46)),
         ],
       ),
+    );
+  }
+}
+
+class _MedicineThumbnail extends StatefulWidget {
+  final Medicine medicine;
+  final Color bg;
+  final Color fg;
+
+  const _MedicineThumbnail({
+    required this.medicine,
+    required this.bg,
+    required this.fg,
+  });
+
+  @override
+  State<_MedicineThumbnail> createState() => _MedicineThumbnailState();
+}
+
+class _MedicineThumbnailState extends State<_MedicineThumbnail> {
+  String? _imageUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkImage();
+  }
+
+  @override
+  void didUpdateWidget(_MedicineThumbnail oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.medicine.id != widget.medicine.id ||
+        oldWidget.medicine.heroImageUrl != widget.medicine.heroImageUrl) {
+      _checkImage();
+    }
+  }
+
+  void _checkImage() {
+    final direct = widget.medicine.heroImageUrl;
+    if (direct != null && direct.isNotEmpty) {
+      _imageUrl = direct;
+      return;
+    }
+    final cached = DailyMedService.instance.getCachedImageUrl(
+      splSetId: widget.medicine.splSetId,
+      drugName: widget.medicine.genericName ?? widget.medicine.name,
+    );
+    if (cached != null) {
+      _imageUrl = cached;
+      return;
+    }
+
+    DailyMedService.instance.resolveMedicineImageUrl(
+      splSetId: widget.medicine.splSetId,
+      drugName: widget.medicine.genericName ?? widget.medicine.name,
+    ).then((url) {
+      if (mounted && url != null) {
+        setState(() => _imageUrl = url);
+      }
+    }).catchError((_) {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = VnPalette.of(context);
+    if (_imageUrl != null && _imageUrl!.isNotEmpty) {
+      return Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: p.isDark ? const Color(0xFF1E293B) : Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: p.isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+        ),
+        padding: const EdgeInsets.all(2),
+        clipBehavior: Clip.antiAlias,
+        child: Image.network(
+          _imageUrl!,
+          fit: BoxFit.contain,
+          errorBuilder: (_, _, _) => VnIconTile(
+            icon: Icons.medication_rounded,
+            bg: widget.bg,
+            fg: widget.fg,
+            size: 44,
+            radius: 10,
+          ),
+        ),
+      );
+    }
+
+    return VnIconTile(
+      icon: Icons.medication_rounded,
+      bg: widget.bg,
+      fg: widget.fg,
+      size: 44,
+      radius: 10,
     );
   }
 }
