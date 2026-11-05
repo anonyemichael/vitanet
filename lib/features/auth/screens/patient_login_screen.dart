@@ -37,6 +37,18 @@ class _PatientLoginScreenState extends ConsumerState<PatientLoginScreen> {
   bool _createMode = false;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final auth = ref.read(authProvider);
+      if (auth.status == AuthStatus.authenticated && auth.user != null) {
+        ref.read(activeWorkspaceProvider.notifier).setWorkspace(AppWorkspace.personal);
+        if (mounted) context.go('/home');
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
@@ -115,7 +127,11 @@ class _PatientLoginScreenState extends ConsumerState<PatientLoginScreen> {
         }
       } else if (next.status == AuthStatus.error) {
         if (mounted) setState(() => _isFetchingProfile = false);
-        context.showSnack(next.errorMessage ?? 'Authentication failed');
+        final err = next.errorMessage ?? 'Authentication failed';
+        final userFriendly = err.contains('unauthorized-domain') || err.contains('authorized domains')
+            ? 'Google Sign-In is optimizing for this domain. Please use Email/Password or Continue as Guest for instant access.'
+            : err;
+        context.showSnack(userFriendly);
       }
     });
 

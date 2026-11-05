@@ -29,6 +29,21 @@ class RegistrationFormScreen extends ConsumerStatefulWidget {
 class _RegistrationFormScreenState extends ConsumerState<RegistrationFormScreen> {
   bool _isSignIn = true;
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final signedIn = ref.read(authProvider).status == AuthStatus.authenticated;
+      if (signedIn) {
+        final a = ref.read(staffAccessProvider).valueOrNull;
+        if (a != null && a.kind != StaffAccessKind.none && a.kind != StaffAccessKind.rejected) {
+          ref.read(activeWorkspaceProvider.notifier).setWorkspace(AppWorkspace.hospital);
+          if (mounted) context.go('/admin');
+        }
+      }
+    });
+  }
+
   void _back() {
     if (context.canPop()) {
       context.pop();

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vitanet/core/constants/app_colors.dart';
+import 'package:vitanet/data/providers/providers.dart';
 import 'package:vitanet/features/admin/providers/portal_providers.dart';
 import 'package:vitanet/shared/widgets/vitanet_logo.dart';
 import 'package:vitanet/shared/widgets/vn_kit.dart';
@@ -44,6 +45,7 @@ class _RoleSelectionScreenState extends ConsumerState<RoleSelectionScreen> {
     final p = VnPalette.of(context);
     final width = MediaQuery.sizeOf(context).width;
     final isDesktop = width >= 960;
+    final isWideDesktop = width >= 1260;
 
     if (isDesktop) {
       return Scaffold(
@@ -59,10 +61,10 @@ class _RoleSelectionScreenState extends ConsumerState<RoleSelectionScreen> {
             Expanded(
               child: Center(
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 620),
+                  constraints: BoxConstraints(maxWidth: isWideDesktop ? 880 : 620),
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 48),
-                    child: _buildRoleSelector(p, isDesktop: true),
+                    child: _buildRoleSelector(p, isDesktop: true, isWideDesktop: isWideDesktop),
                   ),
                 ),
               ),
@@ -81,7 +83,7 @@ class _RoleSelectionScreenState extends ConsumerState<RoleSelectionScreen> {
             constraints: const BoxConstraints(maxWidth: 580),
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-              child: _buildRoleSelector(p, isDesktop: false),
+              child: _buildRoleSelector(p, isDesktop: false, isWideDesktop: false),
             ),
           ),
         ),
@@ -89,7 +91,60 @@ class _RoleSelectionScreenState extends ConsumerState<RoleSelectionScreen> {
     );
   }
 
-  Widget _buildRoleSelector(VnPalette p, {required bool isDesktop}) {
+  Widget _buildRoleSelector(VnPalette p, {required bool isDesktop, required bool isWideDesktop}) {
+    final personalCard = _WorkspaceCard(
+      image: 'assets/images/photos/doctor_with_patient.jpg',
+      imageAlt: 'Doctor consulting with smiling patient in clinical room',
+      badgeText: 'PATIENTS & CAREGIVERS',
+      title: 'Personal Health',
+      subtitle: 'Assess symptoms, track vitals, send ER pre-arrivals, and review hospital admission summaries.',
+      icon: Icons.favorite_outline_rounded,
+      actionLabel: 'Enter Personal Health',
+      bullets: const [
+        'Instant AI triage & symptom severity analysis',
+        '1-Tap ER pre-arrival check-in with GPS drive ETA',
+        'Inpatient hospital stay records & discharge notes',
+      ],
+      isPrimary: true,
+      onTap: () async {
+        await ref.read(activeWorkspaceProvider.notifier).setWorkspace(AppWorkspace.personal);
+        if (!mounted) return;
+        final isAuthed = ref.read(authProvider).status == AuthStatus.authenticated;
+        if (isAuthed) {
+          context.go('/home');
+        } else {
+          context.push('/login/patient');
+        }
+      },
+    );
+
+    final hospitalCard = _WorkspaceCard(
+      image: 'assets/images/photos/medical_team.jpg',
+      imageAlt: 'Clinical staff and surgical healthcare team in hospital corridor',
+      badgeText: 'CLINICAL STAFF & HMS',
+      title: 'Hospital Personnel',
+      subtitle: 'Manage ward bed occupancy, emergency triage cases, physician medication orders, and vital signs flow sheets.',
+      icon: Icons.local_hospital_outlined,
+      actionLabel: 'Enter Clinical Portal',
+      bullets: const [
+        'Real-time bed availability & incoming ER queue',
+        'Inpatient vitals flow sheets & nursing flow logs',
+        'Physician prescription orders & facility broadcasts',
+      ],
+      isPrimary: false,
+      onTap: () async {
+        await ref.read(activeWorkspaceProvider.notifier).setWorkspace(AppWorkspace.hospital);
+        if (!mounted) return;
+        final isAuthed = ref.read(authProvider).status == AuthStatus.authenticated;
+        final isStaff = ref.read(staffAccessProvider).valueOrNull?.isPortalUser ?? false;
+        if (isAuthed && isStaff) {
+          context.go('/admin');
+        } else {
+          context.push('/login/hospital_personnel');
+        }
+      },
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -136,48 +191,21 @@ class _RoleSelectionScreenState extends ConsumerState<RoleSelectionScreen> {
         ),
         const SizedBox(height: 24),
 
-        // Workspace Card 1: Personal User
-        _WorkspaceCard(
-          image: 'assets/images/photos/doctor_with_patient.jpg',
-          imageAlt: 'Doctor consulting with smiling patient in clinical room',
-          badgeText: 'PATIENTS & CAREGIVERS',
-          title: 'Personal Health',
-          subtitle: 'Assess symptoms, track vitals, send ER pre-arrivals, and review hospital admission summaries.',
-          icon: Icons.favorite_outline_rounded,
-          actionLabel: 'Enter Personal Health',
-          bullets: const [
-            'Instant AI triage & symptom severity analysis',
-            '1-Tap ER pre-arrival check-in with GPS drive ETA',
-            'Inpatient hospital stay records & discharge notes',
-          ],
-          isPrimary: true,
-          onTap: () {
-            ref.read(activeWorkspaceProvider.notifier).setWorkspace(AppWorkspace.personal);
-            context.push('/login/patient');
-          },
-        ),
-        const SizedBox(height: 18),
-
-        // Workspace Card 2: Hospital Personnel
-        _WorkspaceCard(
-          image: 'assets/images/photos/medical_team.jpg',
-          imageAlt: 'Clinical staff and surgical healthcare team in hospital corridor',
-          badgeText: 'CLINICAL STAFF & HMS',
-          title: 'Hospital Personnel',
-          subtitle: 'Manage ward bed occupancy, emergency triage cases, physician medication orders, and vital signs flow sheets.',
-          icon: Icons.local_hospital_outlined,
-          actionLabel: 'Enter Clinical Portal',
-          bullets: const [
-            'Real-time bed availability & incoming ER queue',
-            'Inpatient vitals flow sheets & nursing flow logs',
-            'Physician prescription orders & facility broadcasts',
-          ],
-          isPrimary: false,
-          onTap: () {
-            ref.read(activeWorkspaceProvider.notifier).setWorkspace(AppWorkspace.hospital);
-            context.push('/login/hospital_personnel');
-          },
-        ),
+        // Workspace Cards: 2-column Row on wide desktop, vertical Column otherwise
+        if (isWideDesktop)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: personalCard),
+              const SizedBox(width: 20),
+              Expanded(child: hospitalCard),
+            ],
+          )
+        else ...[
+          personalCard,
+          const SizedBox(height: 18),
+          hospitalCard,
+        ],
         const SizedBox(height: 28),
 
         // Direct sign-in shortcut
@@ -191,9 +219,15 @@ class _RoleSelectionScreenState extends ConsumerState<RoleSelectionScreen> {
                 label: 'Sign in directly',
                 fontSize: 13,
                 weight: FontWeight.w600,
-                onTap: () {
-                  ref.read(activeWorkspaceProvider.notifier).setWorkspace(AppWorkspace.personal);
-                  context.push('/login/patient');
+                onTap: () async {
+                  await ref.read(activeWorkspaceProvider.notifier).setWorkspace(AppWorkspace.personal);
+                  if (!mounted) return;
+                  final isAuthed = ref.read(authProvider).status == AuthStatus.authenticated;
+                  if (isAuthed) {
+                    context.go('/home');
+                  } else {
+                    context.push('/login/patient');
+                  }
                 },
               ),
             ],
@@ -448,6 +482,11 @@ class _WorkspaceCard extends StatelessWidget {
                       fit: BoxFit.cover,
                       alignment: const Alignment(0, -0.3),
                       semanticLabel: imageAlt,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        color: AppColors.staffNavy,
+                        alignment: Alignment.center,
+                        child: Icon(icon, size: 40, color: Colors.white24),
+                      ),
                     ),
                     DecoratedBox(
                       decoration: BoxDecoration(
