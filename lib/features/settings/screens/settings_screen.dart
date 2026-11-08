@@ -77,34 +77,31 @@ class SettingsScreen extends ConsumerWidget {
                 const SizedBox(height: 18),
                 const VnSectionLabel('Appearance'),
                 const SizedBox(height: 8),
-                VnListGroup(radius: 12, children: [
+                VnListGroup(children: [
                   VnListRow(
-                    leading: Container(
-                      width: 28,
-                      alignment: Alignment.centerLeft,
-                      child: Icon(Icons.dark_mode_outlined, size: 20, color: p.muted),
-                    ),
+                    leading: const VnIconTile(icon: Icons.dark_mode_outlined, bg: Color(0xFFE0E7FF), fg: Color(0xFF4338CA), size: 40),
                     title: 'Theme',
                     value: _themeLabel(currentTheme),
                     onTap: () => showThemeSheet(context),
                   ),
                   VnListRow(
                     leading: Container(
-                      width: 28,
-                      alignment: Alignment.centerLeft,
+                      width: 40,
+                      height: 40,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: p.surfaceAlt,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       child: Text('Aa',
-                          style: VnText.body(14, weight: FontWeight.w800, color: p.muted)),
+                          style: VnText.body(15, weight: FontWeight.w800, color: p.ink)),
                     ),
                     title: 'Text size',
                     value: TextScaleNotifier.labelFor(textScale),
                     onTap: () => showTextSizeSheet(context),
                   ),
                   VnListRow(
-                    leading: Container(
-                      width: 28,
-                      alignment: Alignment.centerLeft,
-                      child: Icon(Icons.language_rounded, size: 20, color: p.muted),
-                    ),
+                    leading: const VnIconTile(icon: Icons.language_rounded, bg: Color(0xFFDCFCE7), fg: Color(0xFF15803D), size: 40),
                     title: 'Language',
                     value: 'English',
                     chevron: false,
@@ -113,7 +110,7 @@ class SettingsScreen extends ConsumerWidget {
                 const SizedBox(height: 18),
                 const VnSectionLabel('Notifications'),
                 const SizedBox(height: 8),
-                VnListGroup(radius: 12, children: [
+                VnListGroup(children: [
                   for (final (key, title, sub) in _toggles)
                     VnListRow(
                       title: title,
@@ -134,35 +131,23 @@ class SettingsScreen extends ConsumerWidget {
                 const SizedBox(height: 18),
                 const VnSectionLabel('Privacy & data'),
                 const SizedBox(height: 8),
-                VnListGroup(radius: 12, children: [
+                VnListGroup(children: [
                   VnListRow(
-                    leading: Container(
-                      width: 28,
-                      alignment: Alignment.centerLeft,
-                      child: Icon(Icons.download_rounded, size: 20, color: p.muted),
-                    ),
+                    leading: const VnIconTile(icon: Icons.download_rounded, bg: Color(0xFFE0F2FE), fg: Color(0xFF0369A1), size: 40),
                     title: 'Export my health data',
                     subtitle: 'Summary to share with your doctor',
                     onTap: () => _exportData(
                         ref.read(userProfileProvider), ref.read(triageHistoryProvider)),
                   ),
                   VnListRow(
-                    leading: Container(
-                      width: 28,
-                      alignment: Alignment.centerLeft,
-                      child: Icon(Icons.delete_outline_rounded, size: 20, color: p.danger),
-                    ),
+                    leading: const VnIconTile(icon: Icons.delete_outline_rounded, bg: Color(0xFFFEE2E2), fg: Color(0xFFB91C1C), size: 40),
                     title: 'Clear triage history',
                     titleColor: p.danger,
                     subtitle: 'Permanently delete past AI checks',
                     onTap: () => showClearHistoryDialog(context),
                   ),
                   VnListRow(
-                    leading: Container(
-                      width: 28,
-                      alignment: Alignment.centerLeft,
-                      child: Icon(Icons.shield_outlined, size: 20, color: p.muted),
-                    ),
+                    leading: const VnIconTile(icon: Icons.shield_outlined, bg: Color(0xFFF1F5F9), fg: Color(0xFF475569), size: 40),
                     title: 'Privacy policy',
                     subtitle: 'HIPAA and GDPR-aligned handling',
                     onTap: () => context.push('/privacy'),
@@ -171,7 +156,7 @@ class SettingsScreen extends ConsumerWidget {
                 const SizedBox(height: 18),
                 const VnSectionLabel('About'),
                 const SizedBox(height: 8),
-                VnListGroup(radius: 12, children: [
+                VnListGroup(children: [
                   VnListRow(title: 'About VitaNet', onTap: () => context.push('/about')),
                   VnListRow(title: 'Medical disclaimer', onTap: () => context.push('/disclaimer')),
                   VnListRow(title: 'Help center', onTap: () => context.push('/help-center')),

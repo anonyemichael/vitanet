@@ -108,19 +108,22 @@ class ProfileScreen extends ConsumerWidget {
     final image = profileImageProvider(profile?.profileImagePath) ??
         (auth.user?.photoURL != null ? NetworkImage(auth.user!.photoURL!) : null);
 
-    final menu = <(String, String, IconData, VoidCallback)>[
+    // (title, subtitle, icon, tile bg, tile fg, onTap): tinted tiles as designed.
+    final menu = <(String, String, IconData, Color, Color, VoidCallback)>[
       ('Update medical info', 'Blood type, allergies, conditions, medications',
-          Icons.note_add_outlined, () => context.push('/edit-profile?tab=medical')),
+          Icons.note_add_outlined, const Color(0xFFCCFBF1), const Color(0xFF0F766E),
+          () => context.push('/edit-profile?tab=medical')),
       ('Check history', 'All your past triage results', Icons.history_rounded,
-          () => context.push('/history')),
+          const Color(0xFFFEF3C7), const Color(0xFFB45309), () => context.push('/history')),
       ('Devices & data', 'Watch, Health Connect, permissions', Icons.watch_outlined,
+          const Color(0xFFE0E7FF), const Color(0xFF4338CA),
           () => context.push('/device-connection/heart_rate')),
       ('App settings', 'Notifications, appearance and privacy', Icons.tune_rounded,
-          () => context.push('/settings')),
+          const Color(0xFFF1F5F9), const Color(0xFF475569), () => context.push('/settings')),
       ('Help center', 'FAQs, guides and contact support', Icons.help_outline_rounded,
-          () => context.push('/help-center')),
+          const Color(0xFFE0F2FE), const Color(0xFF0369A1), () => context.push('/help-center')),
       ('About VitaNet', 'Version, disclaimers and team', Icons.info_outline_rounded,
-          () => context.push('/about')),
+          const Color(0xFFEDE9FE), const Color(0xFF6D28D9), () => context.push('/about')),
     ];
 
     Widget statTile(String value, String label, VoidCallback onTap) => Expanded(
@@ -253,19 +256,10 @@ class ProfileScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 18),
                 VnListGroup(
-                  radius: 12,
                   children: [
-                    for (final (title, sub, icon, onTap) in menu)
+                    for (final (title, sub, icon, bg, fg, onTap) in menu)
                       VnListRow(
-                        leading: Container(
-                          width: 32,
-                          alignment: Alignment.centerLeft,
-                          child: Icon(
-                            icon,
-                            size: 20,
-                            color: p.isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
-                          ),
-                        ),
+                        leading: VnIconTile(icon: icon, bg: bg, fg: fg, size: 40),
                         title: title,
                         subtitle: sub,
                         onTap: onTap,
