@@ -20,7 +20,11 @@ typedef GeneralHealthLibraryScreen = HealthLibraryScreen;
 ({String asset, String url}) articlePhoto(HealthArticle a) {
   final fallbackAsset = VnTopics.photoForArticle(a.title, a.category);
   final directUrl = a.imageUrls.isNotEmpty ? a.imageUrls.first : '';
-  return (asset: fallbackAsset, url: directUrl);
+  // Bucketed Unsplash IDs from MedicalImageResolver are guesses (a beach for
+  // a Tai Chi study; some 404 and render blank), so the curated local topic
+  // photo wins. Real article images from other hosts are still used.
+  final useDirect = directUrl.isNotEmpty && !directUrl.contains('images.unsplash.com');
+  return (asset: fallbackAsset, url: useDirect ? directUrl : '');
 }
 
 /// Health library: Europe PMC live literature interleaved with curated
