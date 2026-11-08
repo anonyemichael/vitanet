@@ -2,12 +2,14 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vitanet/features/admin/models/portal_models.dart';
 import 'package:vitanet/features/admin/providers/portal_providers.dart';
 import 'package:vitanet/features/admin/screens/hospital_form_screen.dart';
 import 'package:vitanet/features/admin/screens/portal_gate_screen.dart';
 import 'package:vitanet/features/admin/screens/portal_shell.dart';
+import 'package:vitanet/features/admin/screens/team_screen.dart';
 import 'package:vitanet/features/admin/widgets/portal_common.dart';
 import 'package:vitanet/features/admin/widgets/staff_ui.dart';
 
@@ -127,6 +129,18 @@ class PortalSettingsScreen extends ConsumerWidget {
                                   ),
                                 ),
                                 StaffNavRow(
+                                  title: 'Team & staff requests',
+                                  subtitle: 'Approve requests, roles and access',
+                                  icon: Icons.groups_outlined,
+                                  iconTone: StaffTone.brand,
+                                  onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                                    builder: (ctx) => Scaffold(
+                                      backgroundColor: StaffPalette.of(ctx).bg,
+                                      body: TeamScreen(onBack: () => Navigator.of(ctx).pop()),
+                                    ),
+                                  )),
+                                ),
+                                StaffNavRow(
                                   title: 'Audit log',
                                   subtitle: 'Who did what, and when',
                                   icon: Icons.history_rounded,
@@ -154,6 +168,16 @@ class PortalSettingsScreen extends ConsumerWidget {
                           icon: Icons.lock_outline_rounded,
                           iconTone: StaffTone.amber,
                           onTap: () => showStaffSheet<void>(context, builder: (_) => const ChangePasswordSheet()),
+                        ),
+                        StaffNavRow(
+                          title: 'Switch to Personal Health App',
+                          subtitle: 'Your own checks, vitals and care circle',
+                          icon: Icons.person_outline_rounded,
+                          iconTone: StaffTone.indigo,
+                          onTap: () {
+                            ref.read(activeWorkspaceProvider.notifier).setWorkspace(AppWorkspace.personal);
+                            context.go('/home');
+                          },
                         ),
                       ]),
                       const SizedBox(height: 20),

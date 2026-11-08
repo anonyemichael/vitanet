@@ -19,9 +19,9 @@ import 'package:vitanet/shared/widgets/vitanet_logo.dart';
 final portalMeProvider = Provider<StaffMe?>((ref) => ref.watch(staffAccessProvider).valueOrNull?.me);
 
 enum PortalTab {
-  today('Today', Icons.space_dashboard_outlined, Icons.space_dashboard_rounded),
+  today('Home', Icons.home_outlined, Icons.home_rounded),
   referrals('Referrals', Icons.move_to_inbox_outlined, Icons.move_to_inbox_rounded),
-  cases('Cases', Icons.assignment_ind_outlined, Icons.assignment_ind_rounded),
+  cases('Patients', Icons.people_outline_rounded, Icons.people_rounded),
   alerts('Alerts', Icons.notifications_none_rounded, Icons.notifications_rounded),
   hospital('Hospital', Icons.local_hospital_outlined, Icons.local_hospital_rounded),
   team('Team', Icons.groups_outlined, Icons.groups_rounded),
@@ -33,8 +33,9 @@ enum PortalTab {
   const PortalTab(this.label, this.icon, this.activeIcon);
 }
 
-/// Portal navigation: bottom bar (Today, Referrals, Cases, Alerts, More) on
-/// phones, a side nav with every section on wide screens.
+/// Portal navigation: bottom bar (Home, Alerts, Patients, Hospital, Settings)
+/// on phones as designed, a side nav with every section on wide screens.
+/// On phones Referrals opens from Home and Team from Settings.
 class PortalShell extends ConsumerStatefulWidget {
   final StaffMe me;
   const PortalShell({super.key, required this.me});
@@ -46,12 +47,32 @@ class PortalShell extends ConsumerStatefulWidget {
 class PortalShellState extends ConsumerState<PortalShell> {
   PortalTab _tab = PortalTab.today;
 
-  static const _phoneTabs = [PortalTab.today, PortalTab.referrals, PortalTab.cases, PortalTab.alerts];
+  static const _phoneTabs = [
+    PortalTab.today,
+    PortalTab.alerts,
+    PortalTab.cases,
+    PortalTab.hospital,
+    PortalTab.settings,
+  ];
 
   List<PortalTab> get _tabs =>
       [for (final t in PortalTab.values) if (t != PortalTab.team || widget.me.isAdmin) t];
 
-  void select(PortalTab t) => setState(() => _tab = t);
+  void select(PortalTab t) {
+    final wide = MediaQuery.sizeOf(context).width >= 900;
+    if (!wide && !_phoneTabs.contains(t)) {
+      // Sections without a phone tab (Referrals, Team) open as a page.
+      final p = StaffPalette.of(context);
+      Navigator.of(context).push(MaterialPageRoute(
+        builder: (ctx) => Scaffold(
+          backgroundColor: p.bg,
+          body: _screen(t, true, onBack: () => Navigator.of(ctx).pop()),
+        ),
+      ));
+      return;
+    }
+    setState(() => _tab = t);
+  }
 
   Widget _screen(PortalTab t, bool active, {VoidCallback? onBack}) => switch (t) {
         PortalTab.today => TodayScreen(active: active, onOpenTab: select),
@@ -75,15 +96,13 @@ class PortalShellState extends ConsumerState<PortalShell> {
           _ => null,
         };
 
-    // On phones, Hospital / Team / Settings live under "More".
-    final phoneTab = _phoneTabs.contains(_tab) ? _tab : null;
-    final shownTabs = wide ? _tabs : [..._phoneTabs, PortalTab.settings];
+    final phoneIndex = _phoneTabs.indexOf(_tab).clamp(0, _phoneTabs.length - 1);
+    final shownTabs = wide ? _tabs : _phoneTabs;
     final stack = IndexedStack(
-      index: wide ? _tabs.indexOf(_tab).clamp(0, _tabs.length - 1) : (phoneTab == null ? 4 : _phoneTabs.indexOf(phoneTab)),
+      index: wide ? _tabs.indexOf(_tab).clamp(0, _tabs.length - 1) : phoneIndex,
       children: [
         for (final t in (wide ? _tabs : _phoneTabs))
           TickerMode(enabled: t == _tab, child: _screen(t, t == _tab)),
-        if (!wide) _MoreScreen(tabs: _tabs.where((t) => !_phoneTabs.contains(t)).toList(), screen: _screen),
       ],
     );
 
@@ -114,7 +133,6 @@ class PortalShellState extends ConsumerState<PortalShell> {
       );
     }
 
-    final navIndex = phoneTab == null ? 4 : _phoneTabs.indexOf(phoneTab);
     return Scaffold(
       backgroundColor: p.bg,
       body: body,
@@ -130,10 +148,10 @@ class PortalShellState extends ConsumerState<PortalShell> {
         ),
         child: NavigationBar(
           height: 64,
-          selectedIndex: navIndex,
-          onDestinationSelected: (i) => select(i < 4 ? _phoneTabs[i] : PortalTab.settings),
+          selectedIndex: phoneIndex,
+          onDestinationSelected: (i) => select(_phoneTabs[i]),
           destinations: [
-            for (final t in _phoneTabs)
+            for (final t in shownTabs)
               NavigationDestination(
                 icon: Badge(isLabelVisible: badgeFor(t) != null, label: Text(badgeFor(t) ?? ''), child: Icon(t.icon)),
                 selectedIcon:
@@ -141,77 +159,9 @@ class PortalShellState extends ConsumerState<PortalShell> {
                 label: t.label,
                 tooltip: t.label,
               ),
-            const NavigationDestination(
-              icon: Icon(Icons.menu_rounded),
-              selectedIcon: Icon(Icons.menu_open_rounded),
-              label: 'More',
-              tooltip: 'More',
-            ),
           ],
         ),
       ),
-    );
-  }
-}
-
-class _MoreScreen extends ConsumerWidget {
-  final List<PortalTab> tabs;
-  final Widget Function(PortalTab, bool, {VoidCallback? onBack}) screen;
-  const _MoreScreen({required this.tabs, required this.screen});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final p = StaffPalette.of(context);
-    final me = ref.watch(portalMeProvider);
-    String sub(PortalTab t) => switch (t) {
-          PortalTab.hospital => 'Wards, beds, equipment and who is on duty',
-          PortalTab.team => 'Approve staff requests, roles and access',
-          PortalTab.settings => 'Profile, facility, notifications, sign out',
-          _ => '',
-        };
-    return Column(
-      children: [
-        PortalHeader(title: 'More', subtitle: me == null ? null : '${me.fullName} · ${me.role.label}'),
-        Expanded(
-          child: ListView(
-            physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
-            padding: const EdgeInsets.all(16),
-            children: [
-              StaffContent(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    StaffGroup(children: [
-                      for (final t in tabs)
-                        StaffNavRow(
-                          title: t.label,
-                          subtitle: sub(t),
-                          icon: t.icon,
-                          onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                            builder: (ctx) => Scaffold(
-                              backgroundColor: p.bg,
-                              body: screen(t, true, onBack: () => Navigator.of(ctx).pop()),
-                            ),
-                          )),
-                        ),
-                    ]),
-                    const SizedBox(height: 16),
-                    StaffButton(
-                      'Switch to Personal Health App',
-                      kind: StaffButtonKind.secondary,
-                      icon: Icons.person_rounded,
-                      onPressed: () {
-                        ref.read(activeWorkspaceProvider.notifier).setWorkspace(AppWorkspace.personal);
-                        context.go('/home');
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }
