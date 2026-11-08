@@ -26,7 +26,6 @@ class MedicineDetailScreen extends ConsumerStatefulWidget {
 class _MedicineDetailScreenState extends ConsumerState<MedicineDetailScreen> {
   int _tab = 0;
   String? _heroImageUrl;
-  bool _isLoadingImage = false;
 
   Medicine get m => widget.medicine;
 
@@ -49,7 +48,6 @@ class _MedicineDetailScreenState extends ConsumerState<MedicineDetailScreen> {
     final direct = widget.medicine.heroImageUrl;
     if (direct != null && direct.isNotEmpty) {
       _heroImageUrl = DailyMedService.safeImageUrl(direct);
-      _isLoadingImage = false;
       return;
     }
 
@@ -59,26 +57,17 @@ class _MedicineDetailScreenState extends ConsumerState<MedicineDetailScreen> {
     );
     if (cached != null) {
       _heroImageUrl = DailyMedService.safeImageUrl(cached);
-      _isLoadingImage = false;
       return;
     }
 
-    _isLoadingImage = true;
     DailyMedService.instance.resolveMedicineImageUrl(
       splSetId: widget.medicine.splSetId,
       drugName: widget.medicine.genericName ?? widget.medicine.name,
     ).then((url) {
       if (mounted) {
-        setState(() {
-          _heroImageUrl = url != null ? DailyMedService.safeImageUrl(url) : null;
-          _isLoadingImage = false;
-        });
+        setState(() => _heroImageUrl = url != null ? DailyMedService.safeImageUrl(url) : null);
       }
-    }).catchError((_) {
-      if (mounted) {
-        setState(() => _isLoadingImage = false);
-      }
-    });
+    }).catchError((_) {});
   }
 
   // ── Label parsing (real monograph text) ──────────────────────────────────
@@ -287,6 +276,21 @@ class _MedicineDetailScreenState extends ConsumerState<MedicineDetailScreen> {
               child: Stack(
                 children: [
                   _buildHeroSection(context, p),
+                  // The sheet's rounded top lip. Drawn here because the
+                  // viewport paints earlier slivers above later ones, which
+                  // hid a translated sheet behind the photo.
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    height: 24,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: p.page,
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                      ),
+                    ),
+                  ),
                   Positioned(
                     top: MediaQuery.paddingOf(context).top + 16,
                     left: 16,
@@ -314,14 +318,9 @@ class _MedicineDetailScreenState extends ConsumerState<MedicineDetailScreen> {
               ),
             ),
             SliverToBoxAdapter(
-              child: Transform.translate(
-                offset: const Offset(0, -24),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: p.page,
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                  ),
-                  padding: EdgeInsets.fromLTRB(20, 22, 20, MediaQuery.paddingOf(context).bottom + 8),
+              child: Container(
+                  color: p.page,
+                  padding: EdgeInsets.fromLTRB(20, 0, 20, MediaQuery.paddingOf(context).bottom + 8),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -436,7 +435,6 @@ class _MedicineDetailScreenState extends ConsumerState<MedicineDetailScreen> {
                     ],
                   ),
                 ),
-              ),
             ),
           ],
         ),
@@ -444,137 +442,118 @@ class _MedicineDetailScreenState extends ConsumerState<MedicineDetailScreen> {
     ), maxWidth: 900, background: p.page);
   }
 
+  /// Full-bleed photo hero as designed. The official DailyMed packaging scan
+  /// is a flattened carton with die-lines, so it sits in a framed inset
+  /// (tap to enlarge) rather than filling the hero.
   Widget _buildHeroSection(BuildContext context, VnPalette p) {
     final topPadding = MediaQuery.paddingOf(context).top;
-    final heroHeight = 220 + topPadding;
-
-    if (_heroImageUrl != null && _heroImageUrl!.isNotEmpty) {
-      return Container(
-        height: heroHeight,
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: p.isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-        ),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: p.isDark
-                        ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
-                        : [const Color(0xFFE2E8F0), const Color(0xFFF8FAFC)],
-                  ),
-                ),
-              ),
+    final packaging = _heroImageUrl;
+    return SizedBox(
+      height: 240 + topPadding,
+      width: double.infinity,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.asset(
+            'assets/images/photos/blister_packs.jpg',
+            fit: BoxFit.cover,
+            semanticLabel: 'Blister packs of tablets',
+            errorBuilder: (_, _, _) => ColoredBox(color: p.surfaceAlt),
+          ),
+          if (packaging != null && packaging.isNotEmpty)
+            Positioned(
+              right: 16,
+              bottom: 40,
+              child: _PackagingInset(url: packaging),
             ),
-            Padding(
-              padding: EdgeInsets.only(
-                top: topPadding + 14,
-                bottom: 34,
-                left: 36,
-                right: 36,
-              ),
-              child: Image.network(
-                _heroImageUrl!,
-                fit: BoxFit.contain,
-                alignment: Alignment.center,
-                loadingBuilder: (context, child, progress) {
-                  if (progress == null) return child;
-                  return Center(
-                    child: SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: p.ink),
-                    ),
-                  );
-                },
-                errorBuilder: (_, _, _) => _buildFallbackHero(context, p),
+        ],
+      ),
+    );
+  }
+}
+
+class _PackagingInset extends StatelessWidget {
+  final String url;
+  const _PackagingInset({required this.url});
+
+  void _enlarge(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => Dialog(
+        insetPadding: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          children: [
+            InteractiveViewer(
+              maxScale: 5,
+              child: Container(
+                color: Colors.white,
+                padding: const EdgeInsets.all(12),
+                child: Image.network(url, fit: BoxFit.contain),
               ),
             ),
             Positioned(
-              bottom: 32,
-              right: 18,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: (p.isDark ? const Color(0xFF1E293B) : Colors.white).withValues(alpha: 0.92),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: p.isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.verified_rounded, size: 12, color: Color(0xFF0D9488)),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Official SPL Packaging',
-                      style: VnText.body(11, weight: FontWeight.w600, color: p.isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
-                    ),
-                  ],
-                ),
+              top: 8,
+              right: 8,
+              child: VnIconButton(
+                icon: Icons.close_rounded,
+                tooltip: 'Close',
+                size: 40,
+                onPressed: () => Navigator.of(ctx).pop(),
               ),
             ),
           ],
         ),
-      );
-    }
-
-    if (_isLoadingImage) {
-      return Container(
-        height: heroHeight,
-        width: double.infinity,
-        color: p.isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-        child: Center(
-          child: SizedBox(
-            width: 24,
-            height: 24,
-            child: CircularProgressIndicator(strokeWidth: 2, color: p.ink),
-          ),
-        ),
-      );
-    }
-
-    return _buildFallbackHero(context, p);
+      ),
+    );
   }
 
-  Widget _buildFallbackHero(BuildContext context, VnPalette p) {
-    final topPadding = MediaQuery.paddingOf(context).top;
-    final heroHeight = 220 + topPadding;
-    return Container(
-      height: heroHeight,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: p.isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: p.isDark
-              ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
-              : [const Color(0xFFE2E8F0), const Color(0xFFF8FAFC)],
+  @override
+  Widget build(BuildContext context) {
+    final p = VnPalette.of(context);
+    return Semantics(
+      button: true,
+      label: 'Official FDA packaging photo. Tap to enlarge',
+      excludeSemantics: true,
+      child: Material(
+        color: p.surface,
+        elevation: 4,
+        shadowColor: Colors.black26,
+        borderRadius: BorderRadius.circular(14),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => _enlarge(context),
+          child: Padding(
+            padding: const EdgeInsets.all(6),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 88,
+                  height: 64,
+                  color: Colors.white,
+                  child: Image.network(
+                    url,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, _, _) =>
+                        Icon(Icons.inventory_2_outlined, color: p.muted),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.verified_rounded, size: 12, color: p.brand),
+                    const SizedBox(width: 3),
+                    Text('FDA packaging',
+                        style: VnText.body(10, weight: FontWeight.w700, color: p.inkSoft)),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ),
-      ),
-      padding: EdgeInsets.only(top: topPadding + 16, bottom: 34, left: 24, right: 24),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(m.icon, size: 48, color: const Color(0xFF0D9488)),
-          const SizedBox(height: 8),
-          Text(
-            m.name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: VnText.body(16, weight: FontWeight.w700, color: p.ink),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            '${m.route} Monograph · FDA Verified',
-            style: VnText.body(12, weight: FontWeight.w500, color: p.muted),
-          ),
-        ],
       ),
     );
   }

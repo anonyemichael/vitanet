@@ -412,7 +412,7 @@ class _PhotoCategoryCard extends StatelessWidget {
                           style: VnText.body(16, weight: FontWeight.w800, color: Colors.white)),
                       const SizedBox(height: 2),
                       Text(category.subtitle,
-                          maxLines: 1,
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: VnText.body(12, color: const Color(0xFFE2E8F0))),
                     ],
