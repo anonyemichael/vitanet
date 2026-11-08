@@ -287,7 +287,8 @@ class _UrgentAlertDialog extends ConsumerWidget {
                         soft('Nearest ER', Icons.location_on_outlined, () {
                           final router = GoRouter.of(context);
                           Navigator.of(context).pop();
-                          router.push('/pharmacy');
+                          // Hospitals with A&E, not the pharmacy finder.
+                          router.push('/hospitals');
                         }),
                       ],
                     ),
