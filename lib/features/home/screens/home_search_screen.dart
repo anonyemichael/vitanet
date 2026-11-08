@@ -43,7 +43,7 @@ const _catalog = <_SearchItem>[
     title: 'Tension headache vs migraine',
     subtitle: 'Article · 6 min read',
     type: SearchContentType.articles,
-    image: 'assets/images/photos/meditation.jpg',
+    image: 'assets/images/photos/laptop_stethoscope.jpg',
     route: '/resources/health-library',
     keywords: ['headache', 'migraine', 'pain', 'head'],
     area: 'Head',

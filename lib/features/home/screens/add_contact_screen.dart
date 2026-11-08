@@ -290,10 +290,14 @@ class _AddContactScreenState extends ConsumerState<AddContactScreen> {
                         subtitle: 'SMS with your location',
                         chevron: false,
                         onTap: () => setState(() => _alertOnUrgent = !_alertOnUrgent),
-                        trailing: VnSwitch(
+                        trailing: Checkbox(
                           value: _alertOnUrgent,
                           semanticLabel: 'Alert on urgent results',
-                          onChanged: (v) => setState(() => _alertOnUrgent = v),
+                          activeColor: p.brand,
+                          checkColor: p.onBrand,
+                          side: BorderSide(color: p.faint, width: 1.5),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+                          onChanged: (v) => setState(() => _alertOnUrgent = v ?? false),
                         ),
                         padding: const EdgeInsets.fromLTRB(16, 6, 12, 6),
                       ),
@@ -302,10 +306,14 @@ class _AddContactScreenState extends ConsumerState<AddContactScreen> {
                         subtitle: 'Every Sunday, by email',
                         chevron: false,
                         onTap: () => setState(() => _weeklySummary = !_weeklySummary),
-                        trailing: VnSwitch(
+                        trailing: Checkbox(
                           value: _weeklySummary,
                           semanticLabel: 'Share weekly vitals summary',
-                          onChanged: (v) => setState(() => _weeklySummary = v),
+                          activeColor: p.brand,
+                          checkColor: p.onBrand,
+                          side: BorderSide(color: p.faint, width: 1.5),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+                          onChanged: (v) => setState(() => _weeklySummary = v ?? false),
                         ),
                         padding: const EdgeInsets.fromLTRB(16, 6, 12, 6),
                       ),
@@ -314,7 +322,7 @@ class _AddContactScreenState extends ConsumerState<AddContactScreen> {
                   const SizedBox(height: 24),
                   VnButton(
                     label: 'Send invitation',
-                    icon: Icons.send_rounded,
+                    icon: Icons.send_outlined,
                     onPressed: _saveContact,
                   ),
                 ],
@@ -366,14 +374,20 @@ class _OutlinedChoice extends StatelessWidget {
         child: InkWell(
           customBorder: const StadiumBorder(),
           onTap: onTap,
-          child: Container(
+          child: SizedBox(
             height: 44,
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            alignment: Alignment.center,
-            child: Text(label,
-                style: VnText.body(14,
-                    weight: selected ? FontWeight.w700 : FontWeight.w600,
-                    color: selected ? p.brandDeep : p.ink)),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              // widthFactor 1 shrink-wraps the label; a plain aligned
+              // Container stretched each chip to the full Wrap width.
+              child: Align(
+                widthFactor: 1,
+                child: Text(label,
+                    style: VnText.body(15,
+                        weight: selected ? FontWeight.w700 : FontWeight.w600,
+                        color: selected ? p.brandDeep : p.ink)),
+              ),
+            ),
           ),
         ),
       ),

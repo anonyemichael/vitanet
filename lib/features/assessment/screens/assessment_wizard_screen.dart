@@ -471,14 +471,18 @@ class _AssessmentWizardScreenState extends ConsumerState<AssessmentWizardScreen>
                       customBorder: const StadiumBorder(),
                       onTap: () => setState(() =>
                           _symptoms.contains(x) ? _symptoms.remove(x) : _symptoms.add(x)),
-                      child: Container(
-                        height: 44,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        alignment: Alignment.center,
-                        child: Text(x,
-                            style: VnText.body(14,
-                                weight: FontWeight.w600,
-                                color: _symptoms.contains(x) ? p.brandDeep : p.ink)),
+                      // IntrinsicWidth: an aligned Container in a Wrap
+                      // otherwise stretches to the full row.
+                      child: IntrinsicWidth(
+                        child: Container(
+                          height: 44,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          alignment: Alignment.center,
+                          child: Text(x,
+                              style: VnText.body(14,
+                                  weight: FontWeight.w600,
+                                  color: _symptoms.contains(x) ? p.brandDeep : p.ink)),
+                        ),
                       ),
                     ),
                   ),

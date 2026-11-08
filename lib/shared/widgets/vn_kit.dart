@@ -796,7 +796,7 @@ class VnChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = VnPalette.of(context);
-    final fg = selected ? p.onBrand : p.inkSoft;
+    final fg = selected ? p.onBrand : p.ink;
     return Semantics(
       selected: selected,
       button: true,
@@ -808,13 +808,15 @@ class VnChip extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
+          // No `alignment` here: an aligned Container expands to the parent's
+          // max width, which stretched every chip in a Wrap to a full row.
           child: Container(
             height: height,
             constraints: const BoxConstraints(minWidth: 44),
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            alignment: Alignment.center,
             child: Row(
               mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 if (icon != null) ...[
                   Icon(icon, size: 16, color: fg),
