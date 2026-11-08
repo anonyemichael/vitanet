@@ -690,10 +690,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           ],
         );
       },
-    ).whenComplete(() {
-      med1Controller.dispose();
-      med2Controller.dispose();
-    });
+    );
+    // Controllers are not disposed when the sheet's future completes: its
+    // TextFields are still mounted during the exit animation, and disposing
+    // then trips `_dependents.isEmpty`.
   }
 
   void _showHealthProfileSummaryModal(BuildContext context) {

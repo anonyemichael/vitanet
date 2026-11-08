@@ -168,46 +168,66 @@ class _PatientLoginScreenState extends ConsumerState<PatientLoginScreen> {
       );
     }
 
-    // Mobile / Tablet layout
+    // Mobile / Tablet layout: photo hero with the form on a rounded sheet.
+    final topInset = MediaQuery.paddingOf(context).top;
     return Scaffold(
       backgroundColor: p.page,
-      appBar: AppBar(
-        backgroundColor: p.page,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_rounded, color: p.ink),
-          tooltip: 'Workspaces',
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go('/login');
-            }
-          },
-        ),
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const VitaNetLogo(size: 26),
-            const SizedBox(width: 8),
-            Text(
-              'VitaNet',
-              style: VnText.heading(18, weight: FontWeight.w800, color: p.ink),
+            SizedBox(
+              height: 230 + topInset,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.asset(
+                    'assets/images/photos/doctor_with_patient.jpg',
+                    fit: BoxFit.cover,
+                    alignment: const Alignment(0, -0.4),
+                    semanticLabel: 'Doctor talking with a smiling patient',
+                    errorBuilder: (c, e, s) => ColoredBox(color: p.brandWash),
+                  ),
+                  Positioned(
+                    top: topInset + 16,
+                    left: 16,
+                    child: VnIconButton(
+                      icon: Icons.chevron_left_rounded,
+                      tooltip: 'Back',
+                      size: 48,
+                      iconSize: 26,
+                      background: p.surface,
+                      foreground: p.ink,
+                      onPressed: () {
+                        if (context.canPop()) {
+                          context.pop();
+                        } else {
+                          context.go('/login');
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Transform.translate(
+              offset: const Offset(0, -26),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: p.page,
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(28)),
+                ),
+                padding: const EdgeInsets.fromLTRB(20, 32, 20, 8),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 520),
+                    child: _buildAuthCard(p, isLoading, isDesktop: false),
+                  ),
+                ),
+              ),
             ),
           ],
-        ),
-        centerTitle: true,
-      ),
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 520),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-              child: _buildAuthCard(p, isLoading, isDesktop: false),
-            ),
-          ),
         ),
       ),
     );
@@ -251,70 +271,19 @@ class _PatientLoginScreenState extends ConsumerState<PatientLoginScreen> {
             const SizedBox(height: 16),
           ],
 
-          // Role Badge & Header
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: AppColors.brandWash,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: p.brandBorder),
-                ),
-                child: Text(
-                  'PERSONAL HEALTH',
-                  style: VnText.heading(10, weight: FontWeight.w700, color: AppColors.brandDark),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
           Semantics(
             header: true,
             child: Text(
-              _createMode ? 'Create your personal account' : 'Welcome back',
-              style: VnText.heading(26, weight: FontWeight.w800, color: p.ink),
+              _createMode ? 'Create your account' : 'Welcome back',
+              style: VnText.heading(30, weight: FontWeight.w800, color: p.ink),
             ),
           ),
           const SizedBox(height: 6),
           Text(
             _createMode
-                ? 'Sign up to track vitals, send ER pre-arrivals, and review hospital stays.'
-                : 'Sign in to access your health checks, vitals history, and hospital records.',
-            style: VnText.body(14, color: p.muted, height: 1.45),
-          ),
-          const SizedBox(height: 20),
-
-          // Executive Segmented Mode Switcher (Sign In vs Create Account)
-          Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: p.surfaceAlt,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: p.line),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _ModeSwitchButton(
-                    label: 'Sign In',
-                    active: !_createMode,
-                    onTap: () {
-                      if (_createMode) setState(() => _createMode = false);
-                    },
-                  ),
-                ),
-                Expanded(
-                  child: _ModeSwitchButton(
-                    label: 'Create Account',
-                    active: _createMode,
-                    onTap: () {
-                      if (!_createMode) setState(() => _createMode = true);
-                    },
-                  ),
-                ),
-              ],
-            ),
+                ? 'Save your checks, vitals and care circle securely.'
+                : 'Sign in to see your checks, vitals and care circle.',
+            style: VnText.body(15, color: p.muted, height: 1.45),
           ),
           const SizedBox(height: 24),
 
@@ -337,7 +306,7 @@ class _PatientLoginScreenState extends ConsumerState<PatientLoginScreen> {
           else ...[
             // Email Input
             VnTextField(
-              label: 'Email address',
+              label: 'Email',
               controller: _emailCtrl,
               hint: 'you@example.com',
               prefixIcon: Icons.mail_outline_rounded,
@@ -385,8 +354,8 @@ class _PatientLoginScreenState extends ConsumerState<PatientLoginScreen> {
                 alignment: Alignment.centerRight,
                 child: VnLink(
                   label: 'Forgot password?',
-                  fontSize: 13,
-                  weight: FontWeight.w500,
+                  fontSize: 14,
+                  weight: FontWeight.w600,
                   onTap: isLoading ? null : _forgotPassword,
                 ),
               ),
@@ -397,7 +366,7 @@ class _PatientLoginScreenState extends ConsumerState<PatientLoginScreen> {
 
             // Submit Button
             VnButton(
-              label: _createMode ? 'Create Personal Account' : 'Sign In',
+              label: _createMode ? 'Create account' : 'Sign in',
               loading: isLoading,
               onPressed: isLoading ? null : _submitEmail,
             ),
@@ -409,8 +378,7 @@ class _PatientLoginScreenState extends ConsumerState<PatientLoginScreen> {
                 Expanded(child: Divider(color: p.line, height: 1)),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 14),
-                  child: Text('or continue with',
-                      style: VnText.body(12, color: p.faint, weight: FontWeight.w500)),
+                  child: Text('or', style: VnText.body(13, color: p.faint)),
                 ),
                 Expanded(child: Divider(color: p.line, height: 1)),
               ],
@@ -443,9 +411,9 @@ class _PatientLoginScreenState extends ConsumerState<PatientLoginScreen> {
 
             // Anonymous / Guest Triage
             VnOutlineButton(
-              label: 'Continue as Guest',
+              label: 'Try anonymously',
               icon: Icons.person_outline_rounded,
-              background: p.surfaceAlt.withValues(alpha: 0.6),
+              background: p.surfaceAlt,
               borderColor: Colors.transparent,
               onPressed: isLoading
                   ? null
@@ -454,35 +422,31 @@ class _PatientLoginScreenState extends ConsumerState<PatientLoginScreen> {
                       ref.read(authProvider.notifier).signInAnonymously();
                     },
             ),
-            const SizedBox(height: 6),
-            Text(
-              'Guest mode: perform instant triage without cloud sync.',
-              textAlign: TextAlign.center,
-              style: VnText.body(11, color: p.faint),
-            ),
           ],
 
-          const SizedBox(height: 24),
-          Divider(color: p.line, height: 1),
-          const SizedBox(height: 16),
+          const SizedBox(height: 32),
 
-          // Switch to Hospital Staff
+          // Toggle between sign-in and account creation.
           Center(
             child: Wrap(
               alignment: WrapAlignment.center,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                Text('Healthcare professional? ',
-                    style: VnText.body(13, color: p.muted)),
+                Text(
+                    _createMode
+                        ? 'Already have an account? '
+                        : 'New to VitaNet? ',
+                    style: VnText.body(14, color: p.muted)),
                 VnLink(
-                  label: 'Access Hospital Staff Portal →',
-                  fontSize: 13,
-                  weight: FontWeight.w600,
-                  onTap: () => context.push('/login/hospital_personnel'),
+                  label: _createMode ? 'Sign in' : 'Create an account',
+                  fontSize: 14,
+                  weight: FontWeight.w700,
+                  onTap: () => setState(() => _createMode = !_createMode),
                 ),
               ],
             ),
           ),
+          const SizedBox(height: 16),
         ],
       ),
     );
@@ -645,45 +609,6 @@ class _PatientHeroBullet extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _ModeSwitchButton extends StatelessWidget {
-  final String label;
-  final bool active;
-  final VoidCallback onTap;
-
-  const _ModeSwitchButton({
-    required this.label,
-    required this.active,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final p = VnPalette.of(context);
-    return Material(
-      color: active ? p.surface : Colors.transparent,
-      borderRadius: BorderRadius.circular(6),
-      elevation: active ? 1 : 0,
-      shadowColor: Colors.black.withValues(alpha: 0.05),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(6),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 9),
-          alignment: Alignment.center,
-          child: Text(
-            label,
-            style: VnText.heading(
-              13,
-              weight: active ? FontWeight.w700 : FontWeight.w500,
-              color: active ? p.ink : p.muted,
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

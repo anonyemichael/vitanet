@@ -287,8 +287,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         ]);
       }),
     );
-    nameCtrl.dispose();
-    infoCtrl.dispose();
+    // Not disposed here: the dialog's TextFields are still mounted during the
+    // exit animation, and disposing now trips `_dependents.isEmpty`.
     if (result != null) {
       setState(() {
         if (index == null) {

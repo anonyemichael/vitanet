@@ -172,7 +172,8 @@ class _PatientCompletionScreenState
         ]);
       },
     );
-    ctrl.dispose();
+    // Not disposed here: the dialog's TextField is still mounted during the
+    // exit animation, and disposing now trips `_dependents.isEmpty`.
     final v = value?.trim() ?? '';
     if (v.isNotEmpty && !_allergies.contains(v)) {
       setState(() => _allergies.add(v));
@@ -490,8 +491,13 @@ class _PatientCompletionScreenState
           decoration: InputDecoration(
             filled: true,
             fillColor: p.surface,
-            suffixText: unit,
-            suffixStyle: VnText.body(15, color: p.muted, weight: FontWeight.w500),
+            // suffixIcon (unlike suffixText) stays visible while empty.
+            suffixIcon: Padding(
+              padding: const EdgeInsets.only(right: 14),
+              child: Text(unit,
+                  style: VnText.body(15, color: p.muted, weight: FontWeight.w500)),
+            ),
+            suffixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),

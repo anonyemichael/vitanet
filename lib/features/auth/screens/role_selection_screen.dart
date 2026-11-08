@@ -92,20 +92,15 @@ class _RoleSelectionScreenState extends ConsumerState<RoleSelectionScreen> {
   }
 
   Widget _buildRoleSelector(VnPalette p, {required bool isDesktop, required bool isWideDesktop}) {
+    final hospitalSelected =
+        ref.watch(activeWorkspaceProvider) == AppWorkspace.hospital;
     final personalCard = _WorkspaceCard(
       image: 'assets/images/photos/doctor_with_patient.jpg',
       imageAlt: 'Doctor consulting with smiling patient in clinical room',
-      badgeText: 'PATIENTS & CAREGIVERS',
-      title: 'Personal Health',
-      subtitle: 'Assess symptoms, track vitals, send ER pre-arrivals, and review hospital admission summaries.',
+      title: 'Personal user',
+      subtitle: 'Check symptoms and manage your health securely',
       icon: Icons.favorite_outline_rounded,
-      actionLabel: 'Enter Personal Health',
-      bullets: const [
-        'Instant AI triage & symptom severity analysis',
-        '1-Tap ER pre-arrival check-in with GPS drive ETA',
-        'Inpatient hospital stay records & discharge notes',
-      ],
-      isPrimary: true,
+      selected: !hospitalSelected,
       onTap: () async {
         await ref.read(activeWorkspaceProvider.notifier).setWorkspace(AppWorkspace.personal);
         if (!mounted) return;
@@ -121,17 +116,10 @@ class _RoleSelectionScreenState extends ConsumerState<RoleSelectionScreen> {
     final hospitalCard = _WorkspaceCard(
       image: 'assets/images/photos/medical_team.jpg',
       imageAlt: 'Clinical staff and surgical healthcare team in hospital corridor',
-      badgeText: 'CLINICAL STAFF & HMS',
-      title: 'Hospital Personnel',
-      subtitle: 'Manage ward bed occupancy, emergency triage cases, physician medication orders, and vital signs flow sheets.',
+      title: 'Hospital personnel',
+      subtitle: 'Access the clinical dashboard and review cases',
       icon: Icons.local_hospital_outlined,
-      actionLabel: 'Enter Clinical Portal',
-      bullets: const [
-        'Real-time bed availability & incoming ER queue',
-        'Inpatient vitals flow sheets & nursing flow logs',
-        'Physician prescription orders & facility broadcasts',
-      ],
-      isPrimary: false,
+      selected: hospitalSelected,
       onTap: () async {
         await ref.read(activeWorkspaceProvider.notifier).setWorkspace(AppWorkspace.hospital);
         if (!mounted) return;
@@ -152,44 +140,32 @@ class _RoleSelectionScreenState extends ConsumerState<RoleSelectionScreen> {
           // Mobile header
           Row(
             children: [
-              const VitaNetLogo(size: 32),
+              const VitaNetLogo(size: 36),
               const SizedBox(width: 10),
               Text(
                 'VitaNet',
                 style: VnText.heading(20, weight: FontWeight.w800, color: p.ink),
               ),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.brandWash,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: p.brandBorder),
-                ),
-                child: Text(
-                  'HEALTHCARE',
-                  style: VnText.heading(10, weight: FontWeight.w700, color: AppColors.brandDark),
-                ),
-              ),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 32),
         ],
 
         // Screen title & subtitle
         Semantics(
           header: true,
           child: Text(
-            'Select your workspace',
-            style: VnText.heading(isDesktop ? 28 : 24, weight: FontWeight.w800, color: p.ink),
+            'How will you use VitaNet?',
+            style: VnText.heading(isDesktop ? 32 : 30,
+                weight: FontWeight.w800, color: p.ink, height: 1.15),
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         Text(
-          'Choose how you want to use VitaNet. You can fluidly switch workspaces anytime from your profile.',
-          style: VnText.body(14, color: p.muted, height: 1.5),
+          'Pick one. You can switch later from Settings.',
+          style: VnText.body(15, color: p.muted, height: 1.5),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 28),
 
         // Workspace Cards: 2-column Row on wide desktop, vertical Column otherwise
         if (isWideDesktop)
@@ -206,51 +182,24 @@ class _RoleSelectionScreenState extends ConsumerState<RoleSelectionScreen> {
           const SizedBox(height: 18),
           hospitalCard,
         ],
-        const SizedBox(height: 28),
-
-        // Direct sign-in shortcut
-        Center(
-          child: Wrap(
-            alignment: WrapAlignment.center,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              Text('Already have an account? ', style: VnText.body(13, color: p.muted)),
-              VnLink(
-                label: 'Sign in directly',
-                fontSize: 13,
-                weight: FontWeight.w600,
-                onTap: () async {
-                  await ref.read(activeWorkspaceProvider.notifier).setWorkspace(AppWorkspace.personal);
-                  if (!mounted) return;
-                  final isAuthed = ref.read(authProvider).status == AuthStatus.authenticated;
-                  if (isAuthed) {
-                    context.go('/home');
-                  } else {
-                    context.push('/login/patient');
-                  }
-                },
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 40),
 
         // Legal footnote
         Text.rich(
           TextSpan(
-            style: VnText.body(12, color: p.faint, height: 1.5),
+            style: VnText.body(13, color: p.muted, height: 1.5),
             children: [
               const TextSpan(text: 'By continuing you agree to the '),
               TextSpan(
                 text: 'Privacy Policy',
                 recognizer: _privacyTap,
-                style: VnText.body(12, weight: FontWeight.w600, color: p.brand),
+                style: VnText.body(13, weight: FontWeight.w600, color: p.brand),
               ),
               const TextSpan(text: ' and '),
               TextSpan(
                 text: 'Medical Disclaimer',
                 recognizer: _disclaimerTap,
-                style: VnText.body(12, weight: FontWeight.w600, color: p.brand),
+                style: VnText.body(13, weight: FontWeight.w600, color: p.brand),
               ),
               const TextSpan(text: '.'),
             ],
@@ -422,29 +371,25 @@ class _HeroFeature extends StatelessWidget {
   }
 }
 
-/// High-density clinical workspace card.
+/// Photo-led workspace choice card from the redesign: full-bleed photo,
+/// title + one-line subtitle, chevron. The selected card gets a brand
+/// border and a check badge over the photo.
 class _WorkspaceCard extends StatelessWidget {
   final String image;
   final String imageAlt;
-  final String badgeText;
   final String title;
   final String subtitle;
   final IconData icon;
-  final String actionLabel;
-  final List<String> bullets;
-  final bool isPrimary;
+  final bool selected;
   final VoidCallback onTap;
 
   const _WorkspaceCard({
     required this.image,
     required this.imageAlt,
-    required this.badgeText,
     required this.title,
     required this.subtitle,
     required this.icon,
-    required this.actionLabel,
-    required this.bullets,
-    required this.isPrimary,
+    required this.selected,
     required this.onTap,
   });
 
@@ -453,176 +398,80 @@ class _WorkspaceCard extends StatelessWidget {
     final p = VnPalette.of(context);
     return Semantics(
       button: true,
+      selected: selected,
       label: '$title. $subtitle',
       child: Material(
         color: p.surface,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(18),
           side: BorderSide(
-            color: isPrimary ? AppColors.brand : p.line,
-            width: isPrimary ? 1.5 : 1.0,
+            color: selected ? p.brand : p.line,
+            width: selected ? 1.5 : 1.0,
           ),
         ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
-          hoverColor: p.brandWash.withValues(alpha: 0.4),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Full-bleed Image Header with dark cinematic gradient & floating badges
-              SizedBox(
-                height: 145,
-                width: double.infinity,
+              AspectRatio(
+                aspectRatio: 2.3,
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
                     Image.asset(
                       image,
                       fit: BoxFit.cover,
-                      alignment: const Alignment(0, -0.3),
+                      alignment: const Alignment(0, -0.2),
                       semanticLabel: imageAlt,
                       errorBuilder: (context, error, stackTrace) => Container(
-                        color: AppColors.staffNavy,
+                        color: p.brandWash,
                         alignment: Alignment.center,
-                        child: Icon(icon, size: 40, color: Colors.white24),
+                        child: Icon(icon, size: 40, color: p.brand),
                       ),
                     ),
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.black.withValues(alpha: 0.1),
-                            Colors.black.withValues(alpha: 0.72),
-                          ],
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      top: 12,
-                      left: 12,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.7),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.25),
+                    if (selected)
+                      Positioned(
+                        top: 12,
+                        right: 12,
+                        child: Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: p.brand,
+                            shape: BoxShape.circle,
                           ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              icon,
-                              size: 13,
-                              color: isPrimary ? AppColors.mintLight : Colors.white,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              badgeText,
-                              style: VnText.heading(10,
-                                  weight: FontWeight.w700,
-                                  color: isPrimary ? AppColors.mintLight : Colors.white),
-                            ),
-                          ],
+                          child: const Icon(Icons.check_rounded,
+                              size: 18, color: Colors.white),
                         ),
                       ),
-                    ),
-                    Positioned(
-                      top: 12,
-                      right: 12,
-                      child: Container(
-                        width: 28,
-                        height: 28,
-                        decoration: BoxDecoration(
-                          color: isPrimary ? AppColors.brand : Colors.black.withValues(alpha: 0.65),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.arrow_forward_rounded,
-                          size: 14,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
                   ],
                 ),
               ),
-
               Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                padding: const EdgeInsets.fromLTRB(20, 18, 16, 20),
+                child: Row(
                   children: [
-                    // Title
-                    Text(
-                      title,
-                      style: VnText.heading(18, weight: FontWeight.w700, color: p.ink),
-                    ),
-                    const SizedBox(height: 6),
-
-                    // Subtitle
-                    Text(
-                      subtitle,
-                      style: VnText.body(13, color: p.muted, height: 1.45),
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Feature checkmarks
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: p.surfaceAlt.withValues(alpha: 0.5),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
+                    Expanded(
                       child: Column(
-                        children: bullets.map((bullet) {
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 2.5),
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Icons.check_circle_outline_rounded,
-                                  size: 15,
-                                  color: AppColors.brand,
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    bullet,
-                                    style: VnText.body(12,
-                                        weight: FontWeight.w500, color: p.ink),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }).toList(),
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            style: VnText.heading(18,
+                                weight: FontWeight.w700, color: p.ink),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            subtitle,
+                            style: VnText.body(14, color: p.muted, height: 1.4),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 16),
-
-                    // Bottom CTA button
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        Text(
-                          actionLabel,
-                          style: VnText.heading(13,
-                              weight: FontWeight.w700,
-                              color: isPrimary ? AppColors.brand : p.ink),
-                        ),
-                        const SizedBox(width: 4),
-                        Icon(
-                          Icons.arrow_forward_rounded,
-                          size: 14,
-                          color: isPrimary ? AppColors.brand : p.ink,
-                        ),
-                      ],
-                    ),
+                    const SizedBox(width: 12),
+                    Icon(Icons.chevron_right_rounded, size: 24, color: p.muted),
                   ],
                 ),
               ),
