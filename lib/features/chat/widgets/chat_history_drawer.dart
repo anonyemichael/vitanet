@@ -285,6 +285,49 @@ class _ChatHistoryContentState extends ConsumerState<ChatHistoryContent> {
       );
 }
 
+/// Slides [ChatHistoryDrawer] in from the left on the root navigator, so it
+/// covers the bottom navigation bar, with a round close button on the scrim.
+Future<void> showChatHistory(BuildContext context) {
+  return showGeneralDialog<void>(
+    context: context,
+    useRootNavigator: true,
+    barrierDismissible: true,
+    barrierLabel: 'Close chat history',
+    barrierColor: const Color(0x8C0F172A),
+    transitionDuration: const Duration(milliseconds: 240),
+    pageBuilder: (dialogContext, _, _) {
+      return Stack(
+        children: [
+          const Align(
+            alignment: Alignment.centerLeft,
+            child: ChatHistoryDrawer(),
+          ),
+          Positioned(
+            top: MediaQuery.paddingOf(dialogContext).top + 16,
+            left: 316 + 16,
+            child: VnIconButton(
+              icon: Icons.close_rounded,
+              tooltip: 'Close chat history',
+              size: 44,
+              radius: 22,
+              background: Colors.white.withValues(alpha: 0.16),
+              foreground: Colors.white,
+              onPressed: () => Navigator.of(dialogContext).pop(),
+            ),
+          ),
+        ],
+      );
+    },
+    transitionBuilder: (_, animation, _, child) {
+      final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
+      return SlideTransition(
+        position: Tween(begin: const Offset(-1, 0), end: Offset.zero).animate(curved),
+        child: child,
+      );
+    },
+  );
+}
+
 /// Drawer wrapper (316px, rounded right edge) around [ChatHistoryContent].
 class ChatHistoryDrawer extends StatelessWidget {
   const ChatHistoryDrawer({super.key});

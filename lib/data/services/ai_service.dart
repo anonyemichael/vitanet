@@ -289,7 +289,7 @@ User message: "$userMessage"
       if (response.statusCode != 200) {
         final err = await response.stream.bytesToString();
         debugPrint('OpenRouter stream error ${response.statusCode}: $err');
-        yield 'AI service error (${response.statusCode}). Please try again.';
+        yield 'VitaNet AI is unavailable right now. Please try again in a moment. If you feel very unwell, call 112.';
         return;
       }
 
@@ -417,7 +417,7 @@ User message: "$userMessage"
         return [_errorMessage('Empty response from AI.')];
       } else {
         debugPrint('OpenRouter error ${response.statusCode}: ${response.body}');
-        return [_errorMessage('AI service error (${response.statusCode}). Please try again.')];
+        return [_errorMessage('VitaNet AI is unavailable right now. Please try again in a moment. If you feel very unwell, call 112.')];
       }
     } catch (e) {
       debugPrint('AiService error: $e');
@@ -530,7 +530,7 @@ Lowest (recent): $low $unit
         final data = jsonDecode(response.body);
         return data['choices'][0]['message']['content'] ?? 'Unable to generate report.';
       }
-      return 'AI service error (${response.statusCode}).';
+      return 'VitaNet AI is unavailable right now. Please try again in a moment. If you feel very unwell, call 112.';
     } catch (e) {
       return 'Connection error. Check your internet and try again.';
     }

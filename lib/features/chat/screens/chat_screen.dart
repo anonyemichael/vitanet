@@ -214,31 +214,27 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 'For accurate triage and safe dosing advice, add your date of birth, height, weight and blood type.',
                 style: VnText.body(14, color: p.inkSoft, height: 1.55),
               ),
-              Row(
+              // Stacked: side by side, "Continue anyway" was truncated on phones.
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(
-                    child: VnOutlineButton(
-                      label: 'Continue anyway',
-                      fontSize: 14,
-                      background: p.surfaceAlt,
-                      borderColor: Colors.transparent,
-                      onPressed: () {
-                        Navigator.pop(dialogContext);
-                        _sendMessage(text, imagePath: resolvedImagePath, isVoice: isVoice);
-                      },
-                    ),
+                  VnButton(
+                    label: 'Update profile',
+                    height: 52,
+                    onPressed: () {
+                      Navigator.pop(dialogContext);
+                      context.push('/edit-profile');
+                    },
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: VnButton(
-                      label: 'Update profile',
-                      height: 52,
-                      fontSize: 14,
-                      onPressed: () {
-                        Navigator.pop(dialogContext);
-                        context.push('/edit-profile');
-                      },
-                    ),
+                  const SizedBox(height: 10),
+                  VnOutlineButton(
+                    label: 'Continue anyway',
+                    background: p.surfaceAlt,
+                    borderColor: Colors.transparent,
+                    onPressed: () {
+                      Navigator.pop(dialogContext);
+                      _sendMessage(text, imagePath: resolvedImagePath, isVoice: isVoice);
+                    },
                   ),
                 ],
               ),
@@ -797,7 +793,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 if (canPop) {
                   Navigator.of(context).pop();
                 } else {
-                  Scaffold.of(scaffoldContext).openDrawer();
+                  showChatHistory(scaffoldContext);
                 }
               },
             ),
@@ -982,13 +978,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final p = VnPalette.of(context);
     final chips = <(IconData, String, VoidCallback)>[
       (
-        Icons.health_and_safety_outlined,
+        Icons.monitor_heart_outlined,
         'Check symptoms',
         () => _checkProfileCompletionAndProceed(
               'I want to check my symptoms. Please ask structured triage questions to evaluate what I am experiencing.',
             ),
       ),
-      (Icons.science_outlined, 'Lab results', _openLabValues),
+      (Icons.description_outlined, 'Lab results', _openLabValues),
       (Icons.medication_outlined, 'Medication help', () => _showMedicationInteractionModal(context)),
       (Icons.emergency_outlined, 'First aid', () => _showEmergencyFirstAidModal(context)),
     ];
@@ -1009,7 +1005,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               excludeSemantics: true,
               child: Material(
                 color: p.surfaceAlt,
-                borderRadius: BorderRadius.circular(8),
+                shape: const StadiumBorder(),
                 clipBehavior: Clip.antiAlias,
                 child: InkWell(
                   onTap: onTap,
@@ -1232,7 +1228,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     return Scaffold(
       backgroundColor: p.page,
-      drawer: const ChatHistoryDrawer(),
       body: SafeArea(
         child: Column(
           children: [
