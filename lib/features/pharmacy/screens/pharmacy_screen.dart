@@ -60,6 +60,11 @@ class _PharmacyScreenState extends State<PharmacyScreen> {
   /// the permission request while the prompt is left unanswered, so without
   /// this the screen would spin forever.
   static const _locateTimeout = Duration(seconds: 8);
+  static const _overpassEndpoints = [
+    'https://overpass-api.de/api/interpreter',
+    'https://overpass.kumi.systems/api/interpreter',
+    'https://overpass.private.coffee/api/interpreter',
+  ];
 
   Future<void> _locateAndLoad() async {
     final run = ++_locateRun;
@@ -121,14 +126,23 @@ class _PharmacyScreenState extends State<PharmacyScreen> {
         'way["amenity"~"^(pharmacy|hospital|clinic)\$"](around:5000,${pos.latitude},${pos.longitude});'
         ');out center tags 60;';
     try {
-      final res = await http
-          .post(
-            Uri.parse('https://overpass-api.de/api/interpreter'),
-            headers: {'User-Agent': 'VitaNet/1.0'},
-            body: {'data': query},
-          )
-          .timeout(const Duration(seconds: 18));
-      if (res.statusCode != 200) throw Exception('HTTP ${res.statusCode}');
+      // The main public Overpass server is often overloaded and never
+      // answers, so fall back to the public mirrors in turn.
+      http.Response? res;
+      for (final endpoint in _overpassEndpoints) {
+        try {
+          final r = await http
+              .post(Uri.parse(endpoint), body: {'data': query})
+              .timeout(const Duration(seconds: 12));
+          if (r.statusCode == 200) {
+            res = r;
+            break;
+          }
+        } catch (_) {
+          // Try the next mirror.
+        }
+      }
+      if (res == null) throw Exception('All Overpass endpoints failed');
       final data = jsonDecode(res.body) as Map<String, dynamic>;
       final elements = (data['elements'] as List?) ?? const [];
       final now = DateTime.now();
@@ -240,33 +254,43 @@ class _PharmacyScreenState extends State<PharmacyScreen> {
                       ),
                     ),
                   ),
+                  // The sheet's rounded lip and grab handle. Drawn here because
+                  // the viewport paints earlier slivers above later ones, which
+                  // hid a translated sheet top behind the map.
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    height: 24,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: p.page,
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                      ),
+                      child: Align(
+                        alignment: const Alignment(0, 0.2),
+                        child: Container(
+                          width: 40,
+                          height: 5,
+                          decoration: BoxDecoration(
+                            color: p.isDark ? const Color(0xFF404040) : const Color(0xFFCBD5E1),
+                            borderRadius: BorderRadius.circular(5),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
           ),
           SliverToBoxAdapter(
-            child: Transform.translate(
-              offset: const Offset(0, -24),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: p.page,
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                ),
-                padding: EdgeInsets.fromLTRB(0, 10, 0, MediaQuery.paddingOf(context).bottom + 8),
+            child: Container(
+                color: p.page,
+                padding: EdgeInsets.fromLTRB(0, 4, 0, MediaQuery.paddingOf(context).bottom + 8),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 5,
-                        decoration: BoxDecoration(
-                          color: p.isDark ? const Color(0xFF404040) : const Color(0xFFCBD5E1),
-                          borderRadius: BorderRadius.circular(5),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
                     SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -291,7 +315,6 @@ class _PharmacyScreenState extends State<PharmacyScreen> {
                   ],
                 ),
               ),
-            ),
           ),
         ],
       ),
