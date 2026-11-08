@@ -83,8 +83,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 gap,
                 const ActiveReferralSection(),
                 const UrgentCareAlertBanner(),
-                const HospitalCareSection(),
-                gap,
                 const SymptomCheckHero(),
                 if (completion < 1) ...[
                   gap,
@@ -100,6 +98,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 const CareCircleSection(),
                 gap,
                 const HomeQuickLinks(),
+                gap,
+                const HospitalCareSection(),
               ],
             ),
           ),

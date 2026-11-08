@@ -23,18 +23,23 @@ final referralServiceProvider = Provider<ReferralService>(
 /// slower than 8 seconds. Never throws.
 final currentLocationProvider = FutureProvider.autoDispose<DeviceLocation?>((ref) async {
   try {
-    if (!await Geolocator.isLocationServiceEnabled()) return null;
-    var permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-    }
-    if (permission != LocationPermission.whileInUse && permission != LocationPermission.always) {
-      return null;
-    }
-    final pos = await Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(accuracy: LocationAccuracy.medium),
-    ).timeout(const Duration(seconds: 8));
-    return DeviceLocation(pos.latitude, pos.longitude);
+    // One overall deadline: on web an unanswered permission prompt never
+    // resolves, which left every location-dependent card loading forever.
+    return await () async {
+      if (!await Geolocator.isLocationServiceEnabled()) return null;
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission != LocationPermission.whileInUse && permission != LocationPermission.always) {
+        return null;
+      }
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.medium),
+      );
+      return DeviceLocation(pos.latitude, pos.longitude);
+    }()
+        .timeout(const Duration(seconds: 10));
   } catch (e) {
     debugPrint('Referral location unavailable: $e');
     return null;

@@ -53,8 +53,8 @@ class _WellnessInsightCardState extends State<WellnessInsightCard> {
     final tip = left <= 0
         ? 'Daily goal reached. Nice work.'
         : (left == 1
-            ? 'One more glass to reach your goal.'
-            : '$left more glasses to reach your daily goal.');
+              ? 'One more glass to reach your goal.'
+              : '$left more glasses to reach your daily goal.');
     final accent = p.isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7);
 
     return VnCard(
@@ -66,10 +66,16 @@ class _WellnessInsightCardState extends State<WellnessInsightCard> {
             width: 38,
             height: 38,
             decoration: BoxDecoration(
-              color: p.surfaceAlt,
-              borderRadius: BorderRadius.circular(10),
+              color: p.isDark
+                  ? const Color(0xFF0C2A3A)
+                  : const Color(0xFFE0F2FE),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.water_drop_outlined, color: Color(0xFF0284C7), size: 20),
+            child: Icon(
+              Icons.water_drop_outlined,
+              color: p.tintFg(const Color(0xFF0369A1)),
+              size: 20,
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -84,7 +90,9 @@ class _WellnessInsightCardState extends State<WellnessInsightCard> {
                 VnProgressBar(
                   value: pct,
                   color: accent,
-                  track: p.isDark ? const Color(0xFF0C2A3A) : const Color(0xFFE0F2FE),
+                  track: p.isDark
+                      ? const Color(0xFF0C2A3A)
+                      : const Color(0xFFE0F2FE),
                 ),
                 const SizedBox(height: 8),
                 Text(tip, style: VnText.body(13, color: p.muted)),
@@ -99,11 +107,16 @@ class _WellnessInsightCardState extends State<WellnessInsightCard> {
               label: 'Log a glass of water',
               excludeSemantics: true,
               child: Material(
-                color: p.isDark ? const Color(0xFF0C2A3A) : const Color(0xFFF0F9FF),
+                color: p.isDark
+                    ? const Color(0xFF0C2A3A)
+                    : const Color(0xFFF0F9FF),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                   side: BorderSide(
-                      color: p.isDark ? const Color(0xFF155E75) : const Color(0xFFBAE6FD)),
+                    color: p.isDark
+                        ? const Color(0xFF155E75)
+                        : const Color(0xFFBAE6FD),
+                  ),
                 ),
                 child: InkWell(
                   borderRadius: BorderRadius.circular(12),
@@ -111,7 +124,10 @@ class _WellnessInsightCardState extends State<WellnessInsightCard> {
                   child: SizedBox(
                     width: 44,
                     height: 44,
-                    child: Icon(Icons.add_rounded, color: p.tintFg(const Color(0xFF0369A1))),
+                    child: Icon(
+                      Icons.add_rounded,
+                      color: p.tintFg(const Color(0xFF0369A1)),
+                    ),
                   ),
                 ),
               ),
@@ -144,40 +160,54 @@ class HomeQuickLinks extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, size: 22, color: fg),
-            const SizedBox(height: 12),
-            Text(title, style: VnText.body(15, weight: FontWeight.w700, color: p.ink)),
-            const SizedBox(height: 10),
-            Text(sub, style: VnText.body(13, color: p.muted)),
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: p.isDark ? fg.withValues(alpha: 0.18) : bg,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, size: 22, color: p.tintFg(fg)),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              title,
+              style: VnText.body(15, weight: FontWeight.w700, color: p.ink),
+            ),
+            const SizedBox(height: 4),
+            Text(sub, style: VnText.body(13, color: p.muted, height: 1.4)),
           ],
         ),
       );
     }
 
-    return Row(
-      children: [
-        Expanded(
-          child: tile(
-            icon: Icons.local_pharmacy_outlined,
-            bg: const Color(0xFFFEE2E2),
-            fg: const Color(0xFFB91C1C),
-            title: 'Care nearby',
-            sub: 'Pharmacies and clinics',
-            onTap: () => context.push('/pharmacy'),
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: tile(
+              icon: Icons.local_hospital_outlined,
+              bg: const Color(0xFFFEE2E2),
+              fg: const Color(0xFFB91C1C),
+              title: 'Care nearby',
+              sub: 'Pharmacies and clinics',
+              onTap: () => context.push('/pharmacy'),
+            ),
           ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: tile(
-            icon: Icons.warning_amber_rounded,
-            bg: const Color(0xFFFFEDD5),
-            fg: const Color(0xFFC2410C),
-            title: 'First aid',
-            sub: 'Step-by-step guides',
-            onTap: () => context.push('/first-aid'),
+          const SizedBox(width: 12),
+          Expanded(
+            child: tile(
+              icon: Icons.warning_amber_rounded,
+              bg: const Color(0xFFFFEDD5),
+              fg: const Color(0xFFC2410C),
+              title: 'First aid',
+              sub: 'Step-by-step guides',
+              onTap: () => context.push('/first-aid'),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

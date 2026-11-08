@@ -12,6 +12,7 @@ import 'package:vitanet/features/admin/services/hospital_api_service.dart';
 import 'package:vitanet/features/admin/widgets/portal_common.dart';
 import 'package:vitanet/features/admin/widgets/staff_ui.dart';
 import 'package:vitanet/features/auth/widgets/email_verification_banner.dart';
+import 'package:vitanet/shared/widgets/vn_kit.dart';
 
 /// Hospital staff sign-in / sign-up (StaffRegister.dc.html).
 ///
@@ -341,12 +342,16 @@ class _CredentialsStepState extends ConsumerState<_CredentialsStep> {
         StaffButton(widget.isSignIn ? 'Sign in' : 'Create account',
             height: 56, radius: 16, fontSize: 16, loading: _isLoading, onPressed: _submit),
         const SizedBox(height: 12),
-        StaffButton('Continue with Google',
-            kind: StaffButtonKind.secondary,
-            icon: Icons.account_circle_outlined,
-            height: 52,
-            radius: 16,
-            onPressed: _isLoading ? null : _google),
+        VnOutlineButton(
+          label: 'Continue with Google',
+          leading: Image.asset(
+            'assets/images/google_logo.png',
+            width: 18,
+            height: 18,
+            errorBuilder: (c, e, s) => const Icon(Icons.g_mobiledata_rounded, size: 24),
+          ),
+          onPressed: _isLoading ? null : _google,
+        ),
         const SizedBox(height: 12),
         widget.isSignIn
             ? _footerLink(context, 'New to VitaNet?', 'Request access', widget.onSwitch)
@@ -480,7 +485,7 @@ class _StaffDetailsStepState extends ConsumerState<_StaffDetailsStep> {
         ),
         const SizedBox(height: 16),
         StaffField(
-          label: 'Hospital',
+          label: 'Facility',
           helper: _newHospital
               ? Text(
                   'Only the VitaNet bootstrap administrator can set up a new hospital. '

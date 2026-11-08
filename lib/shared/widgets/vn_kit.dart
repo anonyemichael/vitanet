@@ -1106,8 +1106,11 @@ class VnProgressBar extends StatelessWidget {
     final p = VnPalette.of(context);
     return ClipRRect(
       borderRadius: BorderRadius.circular(height),
+      // Full width: otherwise the Stack sizes to the fill, so a 0% bar
+      // collapsed to nothing, track included.
       child: SizedBox(
         height: height,
+        width: double.infinity,
         child: Stack(
           children: [
             Positioned.fill(child: ColoredBox(color: track ?? p.surfaceAlt)),
