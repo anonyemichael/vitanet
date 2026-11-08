@@ -67,13 +67,13 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
             builder: (d) => [
               _CountsGrid(counts: d.counts, isAdmin: me?.isAdmin ?? false, onOpenTab: widget.onOpenTab),
               PortalSectionTitle(
-                'Incoming referrals',
+                'Incoming from VitaNet',
                 trailing: widget.onOpenTab == null
                     ? null
                     : TextButton(
                         onPressed: () => widget.onOpenTab!(PortalTab.referrals),
                         style: TextButton.styleFrom(minimumSize: const Size(44, 44)),
-                        child: const Text('See all'),
+                        child: const Text('View all'),
                       ),
               ),
               if (d.incoming.isEmpty)
