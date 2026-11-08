@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:vitanet/shared/widgets/vitanet_logo.dart';
 import 'package:vitanet/shared/widgets/vn_kit.dart';
 
@@ -46,8 +47,18 @@ class AboutScreen extends StatelessWidget {
                       const SizedBox(height: 10),
                       Text('VitaNet', style: VnText.heading(26, color: p.ink)),
                       const SizedBox(height: 10),
-                      Text('Version 1.0.0 · Up to date',
-                          style: VnText.body(14, color: p.muted)),
+                      // Real version and build from the installed package; the old
+                      // hardcoded text also claimed 'Up to date' without any check.
+                      FutureBuilder<PackageInfo>(
+                        future: PackageInfo.fromPlatform(),
+                        builder: (context, snap) {
+                          final info = snap.data;
+                          return Text(
+                            info == null ? ' ' : 'Version ${info.version} (build ${info.buildNumber})',
+                            style: VnText.body(14, color: p.muted),
+                          );
+                        },
+                      ),
                     ],
                   ),
                 ),
