@@ -38,7 +38,7 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
     ),
   ];
 
-  int _open = -1;
+  int _open = 0; // First question starts expanded, as designed.
   String _query = '';
 
   @override

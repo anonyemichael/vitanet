@@ -51,17 +51,23 @@ class _ThemeSheet extends ConsumerWidget {
                   const SizedBox(height: 10),
                   Row(
                     children: [
+                      // Classic radio: ring with a filled centre dot when on.
                       AnimatedContainer(
                         duration: const Duration(milliseconds: 150),
-                        width: 16,
-                        height: 16,
+                        width: 18,
+                        height: 18,
+                        alignment: Alignment.center,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          border: Border.all(
-                            color: on ? p.brand : p.switchOff,
-                            width: on ? 5 : 2,
-                          ),
+                          border: Border.all(color: on ? p.brand : p.switchOff, width: 2),
                         ),
+                        child: on
+                            ? Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(color: p.brand, shape: BoxShape.circle),
+                              )
+                            : null,
                       ),
                       const SizedBox(width: 6),
                       Flexible(
