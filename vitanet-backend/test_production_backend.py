@@ -1,8 +1,59 @@
 """Comprehensive backend test suite verifying real production endpoints."""
-from fastapi.testclient import TestClient
-from app.main import app
+import os
+
+# Endpoints require a signed-in user; the dev bypass (never active when
+# ENVIRONMENT=production) stands in for one. Must be set before app import.
+os.environ.setdefault("ENVIRONMENT", "development")
+os.environ.setdefault("DEV_BYPASS_AUTH", "true")
+# Own throwaway database (like test_security.py) so the dev vitanet.db is
+# never modified; recreated each run so seed data is fresh.
+os.environ.setdefault("DATABASE_URL", "sqlite:///./production_test.db")
+if os.environ["DATABASE_URL"] == "sqlite:///./production_test.db" and os.path.exists("production_test.db"):
+    os.remove("production_test.db")
+
+from fastapi.testclient import TestClient  # noqa: E402
+from app.main import app  # noqa: E402
 
 client = TestClient(app)
+# Run the lifespan so tables are created and seed data loaded; without it
+# every query failed with "no such table".
+client.__enter__()
+
+
+def _ensure_dev_staff():
+    """Admin routes require an approved staff account; give the dev user one."""
+    from app.database.connection import SessionLocal
+    from app.dependencies.security import DEV_TEST_UID
+    from app.models.hospital import Hospital
+    from app.models.staff_account import StaffAccount, StaffRole, StaffStatus
+
+    db = SessionLocal()
+    try:
+        if db.get(StaffAccount, DEV_TEST_UID) is None:
+            hospital = db.query(Hospital).first()
+            db.add(StaffAccount(
+                firebase_uid=DEV_TEST_UID,
+                email="dev@vitanet.test",
+                full_name="Dev Tester",
+                role=StaffRole.ADMIN,
+                status=StaffStatus.APPROVED,
+                hospital_id=hospital.id if hospital else None,
+            ))
+            db.commit()
+
+        # Patient endpoints only serve the caller's own records, so the seeded
+        # demo patient must belong to the dev identity for the patient tests.
+        from uuid import UUID as _UUID
+        from app.models.user import User
+        demo = db.get(User, _UUID("00000000-0000-0000-0000-000000000001"))
+        if demo is not None and demo.firebase_uid != DEV_TEST_UID:
+            demo.firebase_uid = DEV_TEST_UID
+            db.commit()
+    finally:
+        db.close()
+
+
+_ensure_dev_staff()
 
 
 def test_root():
