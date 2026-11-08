@@ -409,13 +409,13 @@ Future<bool> confirmDeleteCheck(BuildContext context, TriageResult session) asyn
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  width: 48,
-                  height: 48,
+                  width: 56,
+                  height: 56,
                   decoration: BoxDecoration(
                     color: p.dangerTint,
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  child: Icon(Icons.delete_outline_rounded, color: p.danger, size: 24),
+                  child: Icon(Icons.delete_outline_rounded, color: p.danger, size: 28),
                 ),
                 const SizedBox(height: 14),
                 Text('Delete this check?', textAlign: TextAlign.center, style: VnText.heading(20, color: p.ink)),
