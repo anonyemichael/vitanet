@@ -221,14 +221,14 @@ class _CaseRecordScreenState extends ConsumerState<CaseRecordScreen> {
             ),
             _ActionChip(
               icon: Icons.medication_outlined,
-              label: 'Order Medication',
+              label: 'Order medication',
               onTap: _busy
                   ? null
                   : () => _sheet(OrderPrescriptionSheet(portalCase: c)),
             ),
             _ActionChip(
               icon: Icons.monitor_heart_outlined,
-              label: 'Record Vitals',
+              label: 'Record vitals',
               onTap: _busy
                   ? null
                   : () => _sheet(RecordInpatientVitalsSheet(portalCase: c)),
@@ -799,7 +799,7 @@ class _OrderPrescriptionSheetState
   @override
   Widget build(BuildContext context) {
     return PortalSheet(
-      title: 'Order Medication',
+      title: 'Order medication',
       subtitle:
           'Prescribe medicine for ${widget.portalCase.patientName}. Appears on chart and discharge.',
       actions: [
@@ -808,13 +808,13 @@ class _OrderPrescriptionSheetState
           kind: StaffButtonKind.secondary,
           onPressed: () => Navigator.of(context).pop(),
         ),
-        StaffButton('Sign & Order', loading: _saving, onPressed: _submit),
+        StaffButton('Sign & order', loading: _saving, onPressed: _submit),
       ],
       children: [
         PortalTextField(
           controller: _medication,
-          label: 'Medication Name',
-          hint: 'e.g. Amoxicillin, Ceftriaxone, Paracetamol, Ibuprofen',
+          label: 'Medication',
+          hint: 'e.g. Amoxicillin',
         ),
         const SizedBox(height: 12),
         Row(
@@ -823,7 +823,7 @@ class _OrderPrescriptionSheetState
               child: PortalTextField(
                 controller: _dosage,
                 label: 'Dosage',
-                hint: '500 mg, 1 g, 10 ml',
+                hint: 'e.g. 500 mg',
               ),
             ),
             const SizedBox(width: 12),
@@ -831,7 +831,7 @@ class _OrderPrescriptionSheetState
               child: PortalTextField(
                 controller: _duration,
                 label: 'Duration',
-                hint: '5 days, 7 days',
+                hint: 'e.g. 5 days',
               ),
             ),
           ],
@@ -840,13 +840,13 @@ class _OrderPrescriptionSheetState
         PortalTextField(
           controller: _frequency,
           label: 'Frequency',
-          hint: 'TID, BID, QDS, Once daily, PRN',
+          hint: 'e.g. Twice daily',
         ),
         const SizedBox(height: 12),
         PortalTextField(
           controller: _instructions,
-          label: 'Special Instructions',
-          hint: 'Take with food after meals, monitor liver enzymes, etc.',
+          label: 'Instructions (optional)',
+          hint: 'e.g. Take with food',
           maxLines: 2,
         ),
       ],
@@ -912,7 +912,7 @@ class _RecordInpatientVitalsSheetState
             temperature: temp,
             respiratoryRate: rr,
           ),
-      success: 'Inpatient vitals recorded.',
+      success: 'Vitals recorded.',
     );
     if (!mounted) return;
     setState(() => _saving = false);
@@ -922,7 +922,7 @@ class _RecordInpatientVitalsSheetState
   @override
   Widget build(BuildContext context) {
     return PortalSheet(
-      title: 'Record Inpatient Vitals',
+      title: 'Record vitals',
       subtitle:
           'Observation round vitals for ${widget.portalCase.patientName}.',
       actions: [
@@ -931,7 +931,7 @@ class _RecordInpatientVitalsSheetState
           kind: StaffButtonKind.secondary,
           onPressed: () => Navigator.of(context).pop(),
         ),
-        StaffButton('Save Vitals', loading: _saving, onPressed: _submit),
+        StaffButton('Save vitals', loading: _saving, onPressed: _submit),
       ],
       children: [
         Row(
@@ -939,7 +939,7 @@ class _RecordInpatientVitalsSheetState
             Expanded(
               child: PortalTextField(
                 controller: _hr,
-                label: 'Heart Rate (bpm)',
+                label: 'Heart rate (bpm)',
                 hint: '72',
                 keyboardType: TextInputType.number,
               ),
@@ -963,7 +963,7 @@ class _RecordInpatientVitalsSheetState
             Expanded(
               child: PortalTextField(
                 controller: _bp,
-                label: 'Blood Pressure',
+                label: 'Blood pressure',
                 hint: '120/80',
               ),
             ),
@@ -983,7 +983,7 @@ class _RecordInpatientVitalsSheetState
         const SizedBox(height: 12),
         PortalTextField(
           controller: _rr,
-          label: 'Respiratory Rate (/min)',
+          label: 'Respiratory rate (/min)',
           hint: '16',
           keyboardType: TextInputType.number,
         ),
