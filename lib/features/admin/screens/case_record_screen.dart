@@ -3,11 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vitanet/features/admin/models/portal_models.dart';
 import 'package:vitanet/features/admin/providers/portal_providers.dart';
 import 'package:vitanet/features/admin/screens/referrals_screen.dart';
+import 'package:vitanet/features/admin/screens/cases_screen.dart';
 import 'package:vitanet/features/admin/widgets/portal_common.dart';
 import 'package:vitanet/features/admin/widgets/staff_ui.dart';
 
 void openCase(BuildContext context, String id) {
-  Navigator.of(context).push(MaterialPageRoute(builder: (_) => CaseRecordScreen(caseId: id)));
+  Navigator.of(
+    context,
+  ).push(MaterialPageRoute(builder: (_) => CaseRecordScreen(caseId: id)));
 }
 
 /// Case record: details, timeline, notes, status, ward/bed, assignee,
@@ -30,7 +33,10 @@ class _CaseRecordScreenState extends ConsumerState<CaseRecordScreen> {
     super.dispose();
   }
 
-  Future<bool> _apply(Future<PortalCase> Function() call, {String? success}) async {
+  Future<bool> _apply(
+    Future<PortalCase> Function() call, {
+    String? success,
+  }) async {
     setState(() => _busy = true);
     final r = await runPortalAction(context, call, success: success);
     if (!mounted) return false;
@@ -42,12 +48,19 @@ class _CaseRecordScreenState extends ConsumerState<CaseRecordScreen> {
   Future<void> _addNote() async {
     final text = _note.text.trim();
     if (text.isEmpty) return;
-    final ok = await _apply(() => ref.read(hospitalApiProvider).addNote(widget.caseId, text), success: 'Note added.');
+    final ok = await _apply(
+      () => ref.read(hospitalApiProvider).addNote(widget.caseId, text),
+      success: 'Note added.',
+    );
     if (ok) _note.clear();
   }
 
   Future<void> _sheet(Widget sheet) async {
-    final changed = await showStaffSheet<bool>(context, tall: true, builder: (_) => sheet);
+    final changed = await showStaffSheet<bool>(
+      context,
+      tall: true,
+      builder: (_) => sheet,
+    );
     if (changed == true && mounted) invalidatePortalData(ref);
   }
 
@@ -62,10 +75,17 @@ class _CaseRecordScreenState extends ConsumerState<CaseRecordScreen> {
         children: [
           PortalHeader(
             title: c?.patientName ?? 'Case',
-            subtitle: c == null ? null : '${caseStatusLabel(c.status)} · opened ${relativeTime(c.createdAt)}',
+            subtitle: c == null
+                ? null
+                : '${caseStatusLabel(c.status)} · opened ${relativeTime(c.createdAt)}',
             onBack: () => Navigator.of(context).pop(),
           ),
-          if (_busy) LinearProgressIndicator(minHeight: 2, color: p.accent, backgroundColor: Colors.transparent),
+          if (_busy)
+            LinearProgressIndicator(
+              minHeight: 2,
+              color: p.accent,
+              backgroundColor: Colors.transparent,
+            ),
           Expanded(
             child: PortalAsyncList<PortalCase>(
               value: value,
@@ -82,42 +102,100 @@ class _CaseRecordScreenState extends ConsumerState<CaseRecordScreen> {
     final p = StaffPalette.of(context);
     final api = ref.read(hospitalApiProvider);
     return [
+      // Patient header (design): avatar, name, age/sex and place, then tags.
       StaffCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Wrap(spacing: 8, runSpacing: 8, children: [
-              StaffTag(levelLabel(c.level), tone: levelTone(c.level)),
-              StaffTag(caseStatusLabel(c.status),
+            Row(
+              children: [
+                StaffInitialsAvatar(
+                  initialsOf(c.patientName),
+                  tone: levelTone(c.level) == StaffTone.neutral
+                      ? StaffTone.indigo
+                      : levelTone(c.level),
+                  size: 56,
+                  fontSize: 18,
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        c.patientName,
+                        style: staffHeading(20, color: p.ink),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        [
+                          ageSex(c.age, c.sex),
+                          CaseCard.caseRef(c.id),
+                          [
+                            c.wardName,
+                            if ((c.bed ?? '').isNotEmpty) 'Bed ${c.bed}',
+                          ].whereType<String>().join(' · '),
+                        ].where((s) => s.isNotEmpty).join(' · '),
+                        style: staffBody(13, color: p.muted),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                StaffTag(
+                  levelLabel(c.level).toUpperCase(),
+                  tone: levelTone(c.level),
+                ),
+                StaffTag(
+                  caseStatusLabel(c.status),
                   tone: switch (c.status) {
                     'waiting' => StaffTone.amber,
                     'treatment' => StaffTone.indigo,
                     _ => StaffTone.green,
-                  }),
-              if (c.referralId != null) const StaffTag('VitaNet referral', tone: StaffTone.brand),
-            ]),
-            const SizedBox(height: 12),
-            Text(c.complaint, style: staffHeading(18, weight: FontWeight.w700, color: p.ink)),
-            const SizedBox(height: 8),
-            InfoRow('Age / sex', ageSex(c.age, c.sex)),
-            InfoRow('Ward', c.wardName ?? 'Not in a ward'),
-            InfoRow('Bed', c.bed ?? ''),
+                  },
+                ),
+                StaffTag(c.complaint, tone: StaffTone.neutral),
+                StaffTag(
+                  (c.allergies ?? '').isEmpty
+                      ? 'Allergy: none recorded'
+                      : 'Allergy: ${c.allergies}',
+                  tone: (c.allergies ?? '').isEmpty
+                      ? StaffTone.amber
+                      : StaffTone.danger,
+                ),
+                if (c.referralId != null)
+                  const StaffTag('VitaNet referral', tone: StaffTone.brand),
+              ],
+            ),
+            const SizedBox(height: 10),
             InfoRow('Assigned to', c.assigneeName ?? 'Unassigned'),
-            InfoRow('Allergies', c.allergies ?? 'None recorded', tone: c.allergies == null ? null : StaffTone.danger),
             InfoRow('Updated', relativeTime(c.updatedAt)),
           ],
         ),
       ),
       if (c.referral != null) ...[
         const SizedBox(height: 10),
-        StaffButton('View referral summary',
-            kind: StaffButtonKind.secondary,
-            icon: Icons.description_outlined,
-            onPressed: () => openReferral(context, c.referral!.id)),
+        StaffButton(
+          'View referral summary',
+          kind: StaffButtonKind.secondary,
+          icon: Icons.description_outlined,
+          onPressed: () => openReferral(context, c.referral!.id),
+        ),
       ],
       if (c.isDischarged) ...[
         const PortalSectionTitle('Discharge summary'),
-        StaffCard(child: Text(c.dischargeSummary ?? '', style: staffBody(14, color: p.body, height: 1.55))),
+        StaffCard(
+          child: Text(
+            c.dischargeSummary ?? '',
+            style: staffBody(14, color: p.body, height: 1.55),
+          ),
+        ),
       ] else ...[
         const PortalSectionTitle('Actions'),
         Wrap(
@@ -125,37 +203,56 @@ class _CaseRecordScreenState extends ConsumerState<CaseRecordScreen> {
           runSpacing: 10,
           children: [
             _ActionChip(
-              icon: c.status == 'waiting' ? Icons.play_arrow_rounded : Icons.undo_rounded,
-              label: c.status == 'waiting' ? 'Start treatment' : 'Back to waiting',
+              icon: c.status == 'waiting'
+                  ? Icons.play_arrow_rounded
+                  : Icons.undo_rounded,
+              label: c.status == 'waiting'
+                  ? 'Start treatment'
+                  : 'Back to waiting',
               onTap: _busy
                   ? null
                   : () => _apply(
-                      () => api.updateCase(c.id, status: c.status == 'waiting' ? 'treatment' : 'waiting'),
-                      success: 'Status updated.'),
+                      () => api.updateCase(
+                        c.id,
+                        status: c.status == 'waiting' ? 'treatment' : 'waiting',
+                      ),
+                      success: 'Status updated.',
+                    ),
             ),
             _ActionChip(
               icon: Icons.medication_outlined,
               label: 'Order Medication',
-              onTap: _busy ? null : () => _sheet(OrderPrescriptionSheet(portalCase: c)),
+              onTap: _busy
+                  ? null
+                  : () => _sheet(OrderPrescriptionSheet(portalCase: c)),
             ),
             _ActionChip(
               icon: Icons.monitor_heart_outlined,
               label: 'Record Vitals',
-              onTap: _busy ? null : () => _sheet(RecordInpatientVitalsSheet(portalCase: c)),
+              onTap: _busy
+                  ? null
+                  : () => _sheet(RecordInpatientVitalsSheet(portalCase: c)),
             ),
             _ActionChip(
-                icon: Icons.bed_outlined,
-                label: 'Move ward / bed',
-                onTap: _busy ? null : () => _sheet(MoveCaseSheet(portalCase: c))),
+              icon: Icons.bed_outlined,
+              label: 'Move ward / bed',
+              onTap: _busy ? null : () => _sheet(MoveCaseSheet(portalCase: c)),
+            ),
             _ActionChip(
-                icon: Icons.person_outline_rounded,
-                label: 'Reassign',
-                onTap: _busy ? null : () => _sheet(ReassignCaseSheet(portalCase: c))),
+              icon: Icons.person_outline_rounded,
+              label: 'Reassign',
+              onTap: _busy
+                  ? null
+                  : () => _sheet(ReassignCaseSheet(portalCase: c)),
+            ),
             _ActionChip(
-                icon: Icons.logout_rounded,
-                label: 'Discharge',
-                danger: true,
-                onTap: _busy ? null : () => _sheet(DischargeCaseSheet(portalCase: c))),
+              icon: Icons.logout_rounded,
+              label: 'Discharge',
+              danger: true,
+              onTap: _busy
+                  ? null
+                  : () => _sheet(DischargeCaseSheet(portalCase: c)),
+            ),
           ],
         ),
       ],
@@ -170,26 +267,43 @@ class _CaseRecordScreenState extends ConsumerState<CaseRecordScreen> {
               maxLines: 6,
               textCapitalization: TextCapitalization.sentences,
               style: staffBody(15, color: p.ink),
-              decoration: staffInputDecoration(context, hint: 'Observation, vitals, plan…', fill: p.fill),
+              decoration: staffInputDecoration(
+                context,
+                hint: 'Observation, vitals, plan…',
+                fill: p.fill,
+              ),
             ),
             const SizedBox(height: 10),
             Align(
               alignment: Alignment.centerRight,
-              child: StaffButton('Add note',
-                  expand: false, height: 44, icon: Icons.note_add_outlined, onPressed: _busy ? null : _addNote),
+              child: StaffButton(
+                'Add note',
+                expand: false,
+                height: 44,
+                icon: Icons.note_add_outlined,
+                onPressed: _busy ? null : _addNote,
+              ),
             ),
           ],
         ),
       ),
       const PortalSectionTitle('Timeline'),
       if (c.timeline.isEmpty)
-        const StaffCard(child: PortalEmpty(icon: Icons.timeline_rounded, title: 'Nothing on the timeline yet'))
+        const StaffCard(
+          child: PortalEmpty(
+            icon: Icons.timeline_rounded,
+            title: 'Nothing on the timeline yet',
+          ),
+        )
       else
         StaffCard(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Column(children: [
-            for (final e in c.timeline.reversed) _TimelineRow(event: e),
-          ]),
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+          child: Column(
+            children: [
+              for (final (i, e) in c.timeline.reversed.indexed)
+                _TimelineRow(event: e, isLast: i == c.timeline.length - 1),
+            ],
+          ),
         ),
     ];
   }
@@ -200,7 +314,12 @@ class _ActionChip extends StatelessWidget {
   final String label;
   final VoidCallback? onTap;
   final bool danger;
-  const _ActionChip({required this.icon, required this.label, this.onTap, this.danger = false});
+  const _ActionChip({
+    required this.icon,
+    required this.label,
+    this.onTap,
+    this.danger = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -208,7 +327,10 @@ class _ActionChip extends StatelessWidget {
     final fg = danger ? p.tone(StaffTone.danger).fg : p.ink;
     return Material(
       color: p.card,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: BorderSide(color: p.line)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: p.line),
+      ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
@@ -216,11 +338,17 @@ class _ActionChip extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14),
           child: SizedBox(
             height: 46,
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Icon(icon, size: 19, color: fg),
-              const SizedBox(width: 8),
-              Text(label, style: staffBody(14, weight: FontWeight.w600, color: fg)),
-            ]),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 19, color: fg),
+                const SizedBox(width: 8),
+                Text(
+                  label,
+                  style: staffBody(14, weight: FontWeight.w600, color: fg),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -228,47 +356,90 @@ class _ActionChip extends StatelessWidget {
   }
 }
 
+/// Connected timeline row (design): coloured dot on a rail, bold clock time.
 class _TimelineRow extends StatelessWidget {
   final TimelineEvent event;
-  const _TimelineRow({required this.event});
+  final bool isLast;
+  const _TimelineRow({required this.event, this.isLast = false});
+
+  static String _clock(String iso) {
+    final t = DateTime.tryParse(iso)?.toLocal();
+    if (t == null) return '';
+    final now = DateTime.now();
+    final hm =
+        '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+    final sameDay =
+        t.year == now.year && t.month == now.month && t.day == now.day;
+    return sameDay ? hm : '${t.day}/${t.month} $hm';
+  }
 
   @override
   Widget build(BuildContext context) {
     final p = StaffPalette.of(context);
-    final (icon, tone) = switch (event.kind) {
-      'note' => (Icons.sticky_note_2_outlined, StaffTone.sky),
-      'status' => (Icons.swap_horiz_rounded, StaffTone.indigo),
-      'move' => (Icons.bed_outlined, StaffTone.violet),
-      'assign' => (Icons.person_outline_rounded, StaffTone.brand),
-      'discharge' => (Icons.logout_rounded, StaffTone.green),
-      'referral' => (Icons.move_to_inbox_outlined, StaffTone.brand),
-      'prescription' => (Icons.medication_rounded, StaffTone.brand),
-      'vitals' => (Icons.monitor_heart_rounded, StaffTone.danger),
-      'emergency_checkin' => (Icons.emergency_rounded, StaffTone.danger),
-      _ => (Icons.circle_outlined, StaffTone.neutral),
+    final tone = switch (event.kind) {
+      'vitals' || 'emergency_checkin' => StaffTone.danger,
+      'note' || 'prescription' || 'assign' || 'referral' => StaffTone.brand,
+      'discharge' => StaffTone.green,
+      'status' || 'move' => StaffTone.indigo,
+      _ => StaffTone.neutral,
     };
     final t = p.tone(tone);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
+    return IntrinsicHeight(
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(color: t.bg, borderRadius: BorderRadius.circular(10)),
-            child: Icon(icon, size: 17, color: p.dark ? t.fg : t.strong),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
+          SizedBox(
+            width: 20,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(event.text, style: staffBody(14, color: p.ink, height: 1.45)),
-                const SizedBox(height: 2),
-                Text([event.by, relativeTime(event.at)].where((s) => s.isNotEmpty).join(' · '),
-                    style: staffBody(12, color: p.muted)),
+                const SizedBox(height: 6),
+                Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: tone == StaffTone.neutral
+                        ? p.faint
+                        : (p.dark ? t.fg : t.strong),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                if (!isLast)
+                  Expanded(child: Container(width: 2, color: p.line)),
               ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: '${_clock(event.at)} ',
+                          style: staffBody(
+                            14,
+                            weight: FontWeight.w800,
+                            color: p.ink,
+                            height: 1.45,
+                          ),
+                        ),
+                        TextSpan(
+                          text: event.text,
+                          style: staffBody(14, color: p.ink, height: 1.45),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (event.by.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(event.by, style: staffBody(12, color: p.muted)),
+                  ],
+                ],
+              ),
             ),
           ),
         ],
@@ -303,7 +474,9 @@ class _MoveCaseSheetState extends ConsumerState<MoveCaseSheet> {
     setState(() => _saving = true);
     final r = await runPortalAction(
       context,
-      () => ref.read(hospitalApiProvider).updateCase(
+      () => ref
+          .read(hospitalApiProvider)
+          .updateCase(
             c.id,
             wardId: _ward >= 0 && _ward != c.wardId ? _ward : null,
             clearWard: clear,
@@ -323,14 +496,29 @@ class _MoveCaseSheetState extends ConsumerState<MoveCaseSheet> {
     return PortalSheet(
       title: 'Move ward / bed',
       actions: [
-        StaffButton('Cancel', kind: StaffButtonKind.secondary, onPressed: () => Navigator.of(context).pop()),
-        StaffButton('Save', loading: _saving, onPressed: cap.hasValue ? _submit : null),
+        StaffButton(
+          'Cancel',
+          kind: StaffButtonKind.secondary,
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        StaffButton(
+          'Save',
+          loading: _saving,
+          onPressed: cap.hasValue ? _submit : null,
+        ),
       ],
       children: cap.when(
         loading: () => const [PortalLoading()],
-        error: (e, _) => [PortalError(error: e, onRetry: () => ref.invalidate(capacityProvider))],
+        error: (e, _) => [
+          PortalError(
+            error: e,
+            onRetry: () => ref.invalidate(capacityProvider),
+          ),
+        ],
         data: (cap) {
-          final options = cap.wards.where((w) => w.id == current || w.bedsFree > 0).toList();
+          final options = cap.wards
+              .where((w) => w.id == current || w.bedsFree > 0)
+              .toList();
           return [
             StaffField(
               label: 'Ward',
@@ -340,14 +528,20 @@ class _MoveCaseSheetState extends ConsumerState<MoveCaseSheet> {
                 labelOf: (id) {
                   if (id < 0) return 'Not in a ward';
                   final w = options.firstWhere((w) => w.id == id);
-                  return w.id == current ? '${w.name} (current)' : '${w.name} · ${w.bedsFree} free';
+                  return w.id == current
+                      ? '${w.name} (current)'
+                      : '${w.name} · ${w.bedsFree} free';
                 },
                 icon: Icons.bed_outlined,
                 onChanged: (v) => setState(() => _ward = v),
               ),
             ),
             const SizedBox(height: 14),
-            PortalTextField(controller: _bed, label: 'Bed', hint: 'Leave empty to clear'),
+            PortalTextField(
+              controller: _bed,
+              label: 'Bed',
+              hint: 'Leave empty to clear',
+            ),
           ];
         },
       ),
@@ -371,7 +565,9 @@ class _ReassignCaseSheetState extends ConsumerState<ReassignCaseSheet> {
     setState(() => _saving = true);
     final r = await runPortalAction(
       context,
-      () => ref.read(hospitalApiProvider).updateCase(widget.portalCase.id, assigneeUid: _uid),
+      () => ref
+          .read(hospitalApiProvider)
+          .updateCase(widget.portalCase.id, assigneeUid: _uid),
       success: _uid.isEmpty ? 'Case unassigned.' : 'Case reassigned.',
     );
     if (!mounted) return;
@@ -385,27 +581,55 @@ class _ReassignCaseSheetState extends ConsumerState<ReassignCaseSheet> {
     return PortalSheet(
       title: 'Reassign case',
       actions: [
-        StaffButton('Cancel', kind: StaffButtonKind.secondary, onPressed: () => Navigator.of(context).pop()),
-        StaffButton('Save', loading: _saving, onPressed: cap.hasValue ? _submit : null),
+        StaffButton(
+          'Cancel',
+          kind: StaffButtonKind.secondary,
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        StaffButton(
+          'Save',
+          loading: _saving,
+          onPressed: cap.hasValue ? _submit : null,
+        ),
       ],
       children: cap.when(
         loading: () => const [PortalLoading()],
-        error: (e, _) => [PortalError(error: e, onRetry: () => ref.invalidate(capacityProvider))],
+        error: (e, _) => [
+          PortalError(
+            error: e,
+            onRetry: () => ref.invalidate(capacityProvider),
+          ),
+        ],
         data: (cap) => [
-          StaffGroup(children: [
-            for (final uid in ['', ...cap.team.map((m) => m.firebaseUid)])
-              _RadioRow(
-                selected: _uid == uid,
-                onTap: () => setState(() => _uid = uid),
-                child: uid.isEmpty
-                    ? Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-                        child: Text('Unassigned',
-                            style: staffBody(15, weight: FontWeight.w600, color: StaffPalette.of(context).ink)),
-                      )
-                    : TeamMemberTile(member: cap.team.firstWhere((m) => m.firebaseUid == uid)),
-              ),
-          ]),
+          StaffGroup(
+            children: [
+              for (final uid in ['', ...cap.team.map((m) => m.firebaseUid)])
+                _RadioRow(
+                  selected: _uid == uid,
+                  onTap: () => setState(() => _uid = uid),
+                  child: uid.isEmpty
+                      ? Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 18,
+                          ),
+                          child: Text(
+                            'Unassigned',
+                            style: staffBody(
+                              15,
+                              weight: FontWeight.w600,
+                              color: StaffPalette.of(context).ink,
+                            ),
+                          ),
+                        )
+                      : TeamMemberTile(
+                          member: cap.team.firstWhere(
+                            (m) => m.firebaseUid == uid,
+                          ),
+                        ),
+                ),
+            ],
+          ),
         ],
       ),
     );
@@ -416,7 +640,11 @@ class _RadioRow extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
   final Widget child;
-  const _RadioRow({required this.selected, required this.onTap, required this.child});
+  const _RadioRow({
+    required this.selected,
+    required this.onTap,
+    required this.child,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -426,14 +654,20 @@ class _RadioRow extends StatelessWidget {
       button: true,
       child: InkWell(
         onTap: onTap,
-        child: Row(children: [
-          Expanded(child: IgnorePointer(child: child)),
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: Icon(selected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
-                color: selected ? p.accent : p.faint),
-          ),
-        ]),
+        child: Row(
+          children: [
+            Expanded(child: IgnorePointer(child: child)),
+            Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: Icon(
+                selected
+                    ? Icons.radio_button_checked_rounded
+                    : Icons.radio_button_off_rounded,
+                color: selected ? p.accent : p.faint,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -466,7 +700,8 @@ class _DischargeCaseSheetState extends ConsumerState<DischargeCaseSheet> {
     setState(() => _saving = true);
     final r = await runPortalAction(
       context,
-      () => ref.read(hospitalApiProvider).dischargeCase(widget.portalCase.id, s),
+      () =>
+          ref.read(hospitalApiProvider).dischargeCase(widget.portalCase.id, s),
       success: '${widget.portalCase.patientName} discharged.',
     );
     if (!mounted) return;
@@ -480,8 +715,17 @@ class _DischargeCaseSheetState extends ConsumerState<DischargeCaseSheet> {
       title: 'Discharge patient',
       subtitle: 'Frees their bed and closes the case. This can’t be undone.',
       actions: [
-        StaffButton('Cancel', kind: StaffButtonKind.secondary, onPressed: () => Navigator.of(context).pop()),
-        StaffButton('Discharge', kind: StaffButtonKind.dangerOutline, loading: _saving, onPressed: _submit),
+        StaffButton(
+          'Cancel',
+          kind: StaffButtonKind.secondary,
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        StaffButton(
+          'Discharge',
+          kind: StaffButtonKind.dangerOutline,
+          loading: _saving,
+          onPressed: _submit,
+        ),
       ],
       children: [
         PortalTextField(
@@ -501,10 +745,12 @@ class OrderPrescriptionSheet extends ConsumerStatefulWidget {
   const OrderPrescriptionSheet({super.key, required this.portalCase});
 
   @override
-  ConsumerState<OrderPrescriptionSheet> createState() => _OrderPrescriptionSheetState();
+  ConsumerState<OrderPrescriptionSheet> createState() =>
+      _OrderPrescriptionSheetState();
 }
 
-class _OrderPrescriptionSheetState extends ConsumerState<OrderPrescriptionSheet> {
+class _OrderPrescriptionSheetState
+    extends ConsumerState<OrderPrescriptionSheet> {
   final _medication = TextEditingController();
   final _dosage = TextEditingController(text: '500 mg');
   final _frequency = TextEditingController(text: 'TID (Three times daily)');
@@ -531,13 +777,17 @@ class _OrderPrescriptionSheetState extends ConsumerState<OrderPrescriptionSheet>
     setState(() => _saving = true);
     final r = await runPortalAction(
       context,
-      () => ref.read(hospitalApiProvider).orderPrescription(
+      () => ref
+          .read(hospitalApiProvider)
+          .orderPrescription(
             widget.portalCase.id,
             medication: med,
             dosage: _dosage.text.trim(),
             frequency: _frequency.text.trim(),
             duration: _duration.text.trim(),
-            instructions: _instructions.text.trim().isEmpty ? null : _instructions.text.trim(),
+            instructions: _instructions.text.trim().isEmpty
+                ? null
+                : _instructions.text.trim(),
           ),
       success: 'Prescription ordered for $med.',
     );
@@ -550,9 +800,14 @@ class _OrderPrescriptionSheetState extends ConsumerState<OrderPrescriptionSheet>
   Widget build(BuildContext context) {
     return PortalSheet(
       title: 'Order Medication',
-      subtitle: 'Prescribe medicine for ${widget.portalCase.patientName}. Appears on chart and discharge.',
+      subtitle:
+          'Prescribe medicine for ${widget.portalCase.patientName}. Appears on chart and discharge.',
       actions: [
-        StaffButton('Cancel', kind: StaffButtonKind.secondary, onPressed: () => Navigator.of(context).pop()),
+        StaffButton(
+          'Cancel',
+          kind: StaffButtonKind.secondary,
+          onPressed: () => Navigator.of(context).pop(),
+        ),
         StaffButton('Sign & Order', loading: _saving, onPressed: _submit),
       ],
       children: [
@@ -605,10 +860,12 @@ class RecordInpatientVitalsSheet extends ConsumerStatefulWidget {
   const RecordInpatientVitalsSheet({super.key, required this.portalCase});
 
   @override
-  ConsumerState<RecordInpatientVitalsSheet> createState() => _RecordInpatientVitalsSheetState();
+  ConsumerState<RecordInpatientVitalsSheet> createState() =>
+      _RecordInpatientVitalsSheetState();
 }
 
-class _RecordInpatientVitalsSheetState extends ConsumerState<RecordInpatientVitalsSheet> {
+class _RecordInpatientVitalsSheetState
+    extends ConsumerState<RecordInpatientVitalsSheet> {
   final _hr = TextEditingController();
   final _spo2 = TextEditingController();
   final _bp = TextEditingController();
@@ -633,7 +890,11 @@ class _RecordInpatientVitalsSheetState extends ConsumerState<RecordInpatientVita
     final temp = double.tryParse(_temp.text.trim());
     final rr = int.tryParse(_rr.text.trim());
 
-    if (hr == null && spo2 == null && bp == null && temp == null && rr == null) {
+    if (hr == null &&
+        spo2 == null &&
+        bp == null &&
+        temp == null &&
+        rr == null) {
       showStaffSnack(context, 'Enter at least one vital sign value.');
       return;
     }
@@ -641,7 +902,9 @@ class _RecordInpatientVitalsSheetState extends ConsumerState<RecordInpatientVita
     setState(() => _saving = true);
     final r = await runPortalAction(
       context,
-      () => ref.read(hospitalApiProvider).recordInpatientVitals(
+      () => ref
+          .read(hospitalApiProvider)
+          .recordInpatientVitals(
             widget.portalCase.id,
             heartRate: hr,
             bloodOxygen: spo2,
@@ -660,9 +923,14 @@ class _RecordInpatientVitalsSheetState extends ConsumerState<RecordInpatientVita
   Widget build(BuildContext context) {
     return PortalSheet(
       title: 'Record Inpatient Vitals',
-      subtitle: 'Observation round vitals for ${widget.portalCase.patientName}.',
+      subtitle:
+          'Observation round vitals for ${widget.portalCase.patientName}.',
       actions: [
-        StaffButton('Cancel', kind: StaffButtonKind.secondary, onPressed: () => Navigator.of(context).pop()),
+        StaffButton(
+          'Cancel',
+          kind: StaffButtonKind.secondary,
+          onPressed: () => Navigator.of(context).pop(),
+        ),
         StaffButton('Save Vitals', loading: _saving, onPressed: _submit),
       ],
       children: [
@@ -682,7 +950,9 @@ class _RecordInpatientVitalsSheetState extends ConsumerState<RecordInpatientVita
                 controller: _spo2,
                 label: 'SpO2 (%)',
                 hint: '98',
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
               ),
             ),
           ],
@@ -703,7 +973,9 @@ class _RecordInpatientVitalsSheetState extends ConsumerState<RecordInpatientVita
                 controller: _temp,
                 label: 'Temp (°C)',
                 hint: '36.8',
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
               ),
             ),
           ],
