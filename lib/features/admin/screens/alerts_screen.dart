@@ -250,7 +250,7 @@ class _BroadcastAlertSheetState extends ConsumerState<BroadcastAlertSheet> {
     final title = _titleCtrl.text.trim();
     final body = _bodyCtrl.text.trim();
     if (title.isEmpty || body.isEmpty) {
-      showStaffSnack(context, 'Provide both an alert title and details.');
+      showStaffSnack(context, 'Add a headline and details.');
       return;
     }
 
@@ -265,7 +265,7 @@ class _BroadcastAlertSheetState extends ConsumerState<BroadcastAlertSheet> {
             severity: _severity,
             department: _deptCtrl.text.trim(),
           ),
-      success: 'Broadcast alert published.',
+      success: 'Alert sent to your team.',
     );
     if (!mounted) return;
     setState(() => _saving = false);
@@ -275,9 +275,8 @@ class _BroadcastAlertSheetState extends ConsumerState<BroadcastAlertSheet> {
   @override
   Widget build(BuildContext context) {
     return PortalSheet(
-      title: 'Broadcast Facility Alert',
-      subtitle:
-          'Post an operational notice or priority clinical alert across the department.',
+      title: 'Broadcast an alert',
+      subtitle: 'Everyone on staff at your hospital sees it in Alerts.',
       actions: [
         StaffButton(
           'Cancel',
@@ -289,7 +288,7 @@ class _BroadcastAlertSheetState extends ConsumerState<BroadcastAlertSheet> {
       children: [
         PortalTextField(
           controller: _titleCtrl,
-          label: 'Alert Headline',
+          label: 'Headline',
           hint: 'e.g. Trauma Bay 2 reserved for inbound MVA',
         ),
         const SizedBox(height: 12),
@@ -301,29 +300,18 @@ class _BroadcastAlertSheetState extends ConsumerState<BroadcastAlertSheet> {
         const SizedBox(height: 12),
         PortalTextField(
           controller: _bodyCtrl,
-          label: 'Alert Body / Instructions',
-          hint: 'Details, required staff prep, or operational notice…',
+          label: 'Details',
+          hint: 'What staff need to know or prepare',
           maxLines: 3,
         ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: ChoiceChip(
-                label: const Text('Priority Warning'),
-                selected: _severity == 'warning',
-                onSelected: (_) => setState(() => _severity = 'warning'),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: ChoiceChip(
-                label: const Text('Critical Emergency'),
-                selected: _severity == 'critical',
-                onSelected: (_) => setState(() => _severity = 'critical'),
-              ),
-            ),
-          ],
+        const SizedBox(height: 16),
+        Text('Severity',
+            style: staffBody(13, weight: FontWeight.w600, color: StaffPalette.of(context).inkSoft)),
+        const SizedBox(height: 8),
+        StaffSegmented(
+          labels: const ['Warning', 'Critical'],
+          selected: _severity == 'critical' ? 1 : 0,
+          onChanged: (i) => setState(() => _severity = i == 1 ? 'critical' : 'warning'),
         ),
       ],
     );
