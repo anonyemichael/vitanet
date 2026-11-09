@@ -284,8 +284,11 @@ class PortalHeader extends StatelessWidget {
   final Widget? trailing;
   final VoidCallback? onBack;
   final Widget? bottom;
+  /// Shown before the title, e.g. the staff member's avatar on Home.
+  final Widget? leading;
 
-  const PortalHeader({super.key, required this.title, this.subtitle, this.trailing, this.onBack, this.bottom});
+  const PortalHeader(
+      {super.key, required this.title, this.subtitle, this.trailing, this.onBack, this.bottom, this.leading});
 
   @override
   Widget build(BuildContext context) {
@@ -311,6 +314,7 @@ class PortalHeader extends StatelessWidget {
                   ),
                   const SizedBox(width: 10),
                 ],
+                if (leading != null) ...[leading!, const SizedBox(width: 12)],
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

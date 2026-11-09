@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:vitanet/features/admin/models/portal_models.dart';
 import 'package:vitanet/features/admin/providers/portal_providers.dart';
-import 'package:vitanet/features/admin/screens/case_record_screen.dart';
-import 'package:vitanet/features/admin/screens/cases_screen.dart';
 import 'package:vitanet/features/admin/screens/portal_shell.dart';
 import 'package:vitanet/features/admin/screens/referrals_screen.dart';
 import 'package:vitanet/features/admin/widgets/portal_common.dart';
 import 'package:vitanet/features/admin/widgets/staff_ui.dart';
 
-/// Today: live counts, incoming referrals, my cases, on-duty toggle.
+/// Home: who is signed in, duty status, live counts and incoming referrals.
 class TodayScreen extends ConsumerStatefulWidget {
   final bool active;
   final ValueChanged<PortalTab>? onOpenTab;
@@ -34,28 +33,29 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
     }
   }
 
-  String _greeting() {
-    final h = DateTime.now().hour;
-    return h < 12 ? 'Good morning' : (h < 17 ? 'Good afternoon' : 'Good evening');
-  }
-
   @override
   Widget build(BuildContext context) {
     final dash = ref.watch(dashboardProvider);
     final me = ref.watch(portalMeProvider);
+    final alerts = ref.watch(alertsProvider).valueOrNull?.length ?? 0;
     final d = dash.valueOrNull;
     final name = d?.myName.isNotEmpty == true ? d!.myName : (me?.fullName ?? '');
-    final firstName = name.split(' ').where((s) => s.isNotEmpty && !s.endsWith('.')).firstOrNull ?? name;
+    final subtitle = [
+      if ((me?.department ?? '').isNotEmpty) me!.department!,
+      if (me != null) me.role.label,
+    ].join(' · ');
     return Column(
       children: [
         PortalHeader(
-          title: '${_greeting()}${firstName.isEmpty ? '' : ', $firstName'}',
-          subtitle: me == null ? null : '${me.role.label}${(me.department ?? '').isEmpty ? '' : ' · ${me.department}'}',
+          leading: _Avatar(name: name),
+          title: name.isEmpty ? 'Home' : name,
+          subtitle: subtitle.isEmpty ? null : subtitle,
           trailing: widget.onOpenTab == null
               ? null
               : HeaderIconButton(
                   icon: Icons.notifications_none_rounded,
                   tooltip: 'Alerts',
+                  badge: alerts > 0 ? '$alerts' : null,
                   onPressed: () => widget.onOpenTab!(PortalTab.alerts),
                 ),
           bottom: d == null ? null : _DutyBanner(onDuty: d.onDuty, saving: _savingDuty, onChanged: _setDuty),
@@ -65,7 +65,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
             value: dash,
             onRefresh: () => ref.refresh(dashboardProvider.future),
             builder: (d) => [
-              _CountsGrid(counts: d.counts, isAdmin: me?.isAdmin ?? false, onOpenTab: widget.onOpenTab),
+              _CountsGrid(counts: d.counts, onOpenTab: widget.onOpenTab),
               PortalSectionTitle(
                 'Incoming from VitaNet',
                 trailing: widget.onOpenTab == null
@@ -89,20 +89,6 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                   ReferralCard(referral: r, onTap: () => openReferral(context, r.id)),
                   const SizedBox(height: 10),
                 ],
-              const PortalSectionTitle('My cases'),
-              if (d.myCases.isEmpty)
-                const StaffCard(
-                  child: PortalEmpty(
-                    icon: Icons.assignment_ind_outlined,
-                    title: 'No open cases assigned to you',
-                    message: 'Cases you are assigned to show here until they are discharged.',
-                  ),
-                )
-              else
-                for (final c in d.myCases) ...[
-                  CaseCard(portalCase: c, onTap: () => openCase(context, c.id)),
-                  const SizedBox(height: 10),
-                ],
             ],
           ),
         ),
@@ -111,6 +97,28 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
   }
 }
 
+/// Initials tile; staff accounts have no photo field.
+class _Avatar extends StatelessWidget {
+  final String name;
+  const _Avatar({required this.name});
+
+  @override
+  Widget build(BuildContext context) {
+    final parts = name.split(' ').where((s) => s.isNotEmpty && !s.endsWith('.')).toList();
+    final initials = parts.isEmpty
+        ? '?'
+        : (parts.first[0] + (parts.length > 1 ? parts.last[0] : '')).toUpperCase();
+    return Container(
+      width: 52,
+      height: 52,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(color: const Color(0xFF0F766E), borderRadius: BorderRadius.circular(16)),
+      child: Text(initials, style: staffHeading(18, color: Colors.white)),
+    );
+  }
+}
+
+/// Duty status with the current date and time, as designed, plus the toggle.
 class _DutyBanner extends StatelessWidget {
   final bool onDuty;
   final bool saving;
@@ -119,10 +127,15 @@ class _DutyBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final now = DateFormat('EEE d MMM · HH:mm').format(DateTime.now());
     return MergeSemantics(
       child: Container(
-        padding: const EdgeInsets.fromLTRB(14, 6, 8, 6),
-        decoration: BoxDecoration(color: const Color(0x14FFFFFF), borderRadius: BorderRadius.circular(14)),
+        padding: const EdgeInsets.fromLTRB(14, 4, 6, 4),
+        decoration: BoxDecoration(
+          color: onDuty ? const Color(0x1A2DD4BF) : const Color(0x14FFFFFF),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: onDuty ? const Color(0x552DD4BF) : const Color(0x22FFFFFF)),
+        ),
         child: Row(
           children: [
             Container(
@@ -135,12 +148,15 @@ class _DutyBanner extends StatelessWidget {
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: Text(onDuty ? 'On duty' : 'Off duty',
-                  style: staffBody(14, weight: FontWeight.w600, color: const Color(0xFFF1F5F9))),
+              child: Text(onDuty ? 'On shift' : 'Off shift',
+                  style: staffBody(14,
+                      weight: FontWeight.w700,
+                      color: onDuty ? const Color(0xFF5EEAD4) : const Color(0xFFF1F5F9))),
             ),
+            Text(now, style: staffBody(13, color: const Color(0xFF94A3B8))),
             if (saving)
               const Padding(
-                padding: EdgeInsets.all(12),
+                padding: EdgeInsets.all(14),
                 child: SizedBox(
                     width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
               )
@@ -158,67 +174,50 @@ class _DutyBanner extends StatelessWidget {
   }
 }
 
+/// The design's four cards: active cases, urgent incoming, beds, staff.
 class _CountsGrid extends StatelessWidget {
   final DashboardCounts counts;
-  final bool isAdmin;
   final ValueChanged<PortalTab>? onOpenTab;
-  const _CountsGrid({required this.counts, required this.isAdmin, this.onOpenTab});
+  const _CountsGrid({required this.counts, this.onOpenTab});
 
   @override
   Widget build(BuildContext context) {
+    final bedsUsed = counts.bedsTotal == 0 ? 0.0 : 1 - counts.bedsFree / counts.bedsTotal;
     final tiles = <Widget>[
       _StatTile(
-        label: 'Incoming',
-        value: '${counts.incoming}',
-        hint: counts.incomingUrgent > 0 ? '${counts.incomingUrgent} urgent' : null,
-        tone: counts.incomingUrgent > 0 ? StaffTone.danger : StaffTone.brand,
-        icon: Icons.move_to_inbox_outlined,
+        label: 'Active cases',
+        value: '${counts.waiting + counts.inTreatment}',
+        hint: '${counts.waiting} waiting',
+        hintTone: StaffTone.green,
+        onTap: onOpenTab == null ? null : () => onOpenTab!(PortalTab.cases),
+      ),
+      _StatTile(
+        label: 'Urgent incoming',
+        value: '${counts.incomingUrgent}',
+        hint: '${counts.incoming} incoming',
+        hintTone: StaffTone.danger,
+        critical: counts.incomingUrgent > 0,
         onTap: onOpenTab == null ? null : () => onOpenTab!(PortalTab.referrals),
-      ),
-      _StatTile(
-        label: 'Waiting',
-        value: '${counts.waiting}',
-        tone: StaffTone.amber,
-        icon: Icons.hourglass_top_rounded,
-        onTap: onOpenTab == null ? null : () => onOpenTab!(PortalTab.cases),
-      ),
-      _StatTile(
-        label: 'In treatment',
-        value: '${counts.inTreatment}',
-        tone: StaffTone.indigo,
-        icon: Icons.healing_outlined,
-        onTap: onOpenTab == null ? null : () => onOpenTab!(PortalTab.cases),
       ),
       _StatTile(
         label: 'Beds free',
         value: '${counts.bedsFree}',
-        hint: 'of ${counts.bedsTotal}',
-        tone: StaffTone.green,
-        icon: Icons.bed_outlined,
+        suffix: '/ ${counts.bedsTotal}',
+        progress: counts.bedsTotal == 0 ? null : bedsUsed,
         onTap: onOpenTab == null ? null : () => onOpenTab!(PortalTab.hospital),
       ),
       _StatTile(
         label: 'Staff on duty',
         value: '${counts.staffOnDuty}',
-        tone: StaffTone.sky,
-        icon: Icons.badge_outlined,
         onTap: onOpenTab == null ? null : () => onOpenTab!(PortalTab.hospital),
       ),
-      if (isAdmin)
-        _StatTile(
-          label: 'Staff requests',
-          value: '${counts.pendingStaff}',
-          tone: counts.pendingStaff > 0 ? StaffTone.violet : StaffTone.neutral,
-          icon: Icons.person_add_alt_outlined,
-          onTap: onOpenTab == null ? null : () => onOpenTab!(PortalTab.team),
-        ),
     ];
     return LayoutBuilder(builder: (context, c) {
-      final cols = c.maxWidth >= 640 ? 3 : 2;
-      final w = (c.maxWidth - (cols - 1) * 10) / cols;
+      final cols = c.maxWidth >= 640 ? 4 : 2;
+      final w = (c.maxWidth - (cols - 1) * 12) / cols;
       return Wrap(
-        spacing: 10,
-        runSpacing: 10,
+        spacing: 12,
+        runSpacing: 12,
         children: [for (final t in tiles) SizedBox(width: w, child: t)],
       );
     });
@@ -228,48 +227,73 @@ class _CountsGrid extends StatelessWidget {
 class _StatTile extends StatelessWidget {
   final String label;
   final String value;
+  final String? suffix;
   final String? hint;
-  final StaffTone tone;
-  final IconData icon;
+  final StaffTone hintTone;
+  final double? progress;
+  final bool critical;
   final VoidCallback? onTap;
 
-  const _StatTile({required this.label, required this.value, this.hint, required this.tone, required this.icon, this.onTap});
+  const _StatTile({
+    required this.label,
+    required this.value,
+    this.suffix,
+    this.hint,
+    this.hintTone = StaffTone.green,
+    this.progress,
+    this.critical = false,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     final p = StaffPalette.of(context);
-    final t = p.tone(tone);
+    final danger = p.tone(StaffTone.danger);
+    final hintColor = p.tone(hintTone).fg;
     return StaffTap(
       onTap: onTap,
       color: p.card,
-      radius: 16,
-      semanticLabel: '$label: $value${hint == null ? '' : ', $hint'}',
-      child: Padding(
-        padding: const EdgeInsets.all(14),
+      radius: 20,
+      semanticLabel: '$label: $value${suffix == null ? '' : ' $suffix'}${hint == null ? '' : ', $hint'}',
+      child: Container(
+        decoration: critical
+            ? BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: danger.bg, width: 1.5),
+              )
+            : null,
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Text(label,
+                style: staffBody(13,
+                    weight: FontWeight.w600, color: critical ? danger.fg : p.muted)),
+            const SizedBox(height: 6),
             Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
               children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(color: t.bg, borderRadius: BorderRadius.circular(10)),
-                  child: Icon(icon, size: 18, color: p.dark ? t.fg : t.strong),
-                ),
-                const Spacer(),
-                if (hint != null)
-                  Flexible(
-                    child: Text(hint!,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: staffBody(11, weight: FontWeight.w700, color: t.fg)),
-                  ),
+                Text(value, style: staffHeading(30, color: critical ? danger.fg : p.ink)),
+                if (suffix != null) ...[
+                  const SizedBox(width: 4),
+                  Text(suffix!, style: staffBody(15, color: p.muted)),
+                ],
               ],
             ),
-            const SizedBox(height: 10),
-            Text(value, style: staffHeading(26, color: p.ink)),
-            Text(label, style: staffBody(12, weight: FontWeight.w600, color: p.muted)),
+            const SizedBox(height: 6),
+            if (progress != null)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 6,
+                  backgroundColor: p.line,
+                  color: progress! > 0.85 ? const Color(0xFFDC2626) : const Color(0xFFF59E0B),
+                ),
+              )
+            else if (hint != null)
+              Text(hint!, style: staffBody(13, weight: FontWeight.w600, color: hintColor)),
           ],
         ),
       ),
