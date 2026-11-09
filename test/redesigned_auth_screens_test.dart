@@ -33,16 +33,14 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Verified enterprise content
-      expect(find.text('Select your workspace'), findsOneWidget);
-      expect(find.text('Personal Health'), findsOneWidget);
-      expect(find.text('Hospital Personnel'), findsOneWidget);
+      // Redesign copy, plus the desktop hero panel
+      expect(find.text('How will you use VitaNet?'), findsOneWidget);
+      expect(find.text('Personal user'), findsOneWidget);
+      expect(find.text('Hospital personnel'), findsOneWidget);
       expect(find.text('One Unified Platform for Patients & Clinical Teams.'), findsOneWidget);
-      expect(find.text('Enter Personal Health'), findsOneWidget);
-      expect(find.text('Enter Clinical Portal'), findsOneWidget);
 
-      // Tap Personal User card navigates to patient login
-      await tester.tap(find.text('Enter Personal Health'));
+      // Tapping the personal card opens patient login
+      await tester.tap(find.text('Personal user'));
       await tester.pumpAndSettle();
       expect(find.text('PATIENT_LOGIN'), findsOneWidget);
     });
@@ -72,13 +70,15 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Select your workspace'), findsOneWidget);
-      expect(find.text('HEALTHCARE'), findsOneWidget);
-      expect(find.text('Personal Health'), findsOneWidget);
-      expect(find.text('Hospital Personnel'), findsOneWidget);
+      expect(find.text('How will you use VitaNet?'), findsOneWidget);
+      expect(find.text('Pick one. You can switch later from Settings.'), findsOneWidget);
+      expect(find.text('Personal user'), findsOneWidget);
+      expect(find.text('Hospital personnel'), findsOneWidget);
+      // The old badge is gone
+      expect(find.text('HEALTHCARE'), findsNothing);
     });
 
-    testWidgets('PatientLoginScreen renders segmented mode switcher and form inputs',
+    testWidgets('PatientLoginScreen renders the redesign form and toggles create-account mode',
         (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1280, 800);
       tester.view.devicePixelRatio = 1.0;
@@ -103,23 +103,22 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Check segmented buttons
-      expect(find.text('Sign In'), findsWidgets);
-      expect(find.text('Create Account'), findsOneWidget);
-      expect(find.text('Email address'), findsOneWidget);
+      expect(find.text('Welcome back'), findsOneWidget);
+      expect(find.text('Email'), findsOneWidget);
       expect(find.text('Password'), findsOneWidget);
+      expect(find.text('Sign in'), findsOneWidget);
       expect(find.text('Continue with Google'), findsOneWidget);
-      expect(find.text('Continue as Guest'), findsOneWidget);
+      expect(find.text('Try anonymously'), findsOneWidget);
 
-      // Switch to Create Account mode
-      await tester.tap(find.text('Create Account'));
+      // Footer link switches to create-account mode
+      await tester.tap(find.text('Create an account'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Create your personal account'), findsOneWidget);
-      expect(find.text('Create Personal Account'), findsOneWidget);
+      expect(find.text('Create your account'), findsOneWidget);
+      expect(find.text('Create account'), findsOneWidget);
 
-      // Switch back to Sign In
-      await tester.tap(find.text('Sign In').first);
+      // And back to sign in
+      await tester.tap(find.text('Sign in'));
       await tester.pumpAndSettle();
       expect(find.text('Welcome back'), findsOneWidget);
     });

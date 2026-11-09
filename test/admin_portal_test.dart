@@ -164,9 +164,12 @@ void main() {
         staffAccessProvider.overrideWith((ref) async => StaffAccess.fromMe(_me())),
       ]));
       await tester.pumpAndSettle();
-      expect(find.text('Incoming referrals'), findsOneWidget);
+      expect(find.text('Incoming from VitaNet'), findsOneWidget);
       expect(find.text('No incoming referrals yet'), findsOneWidget);
-      expect(find.text('No open cases assigned to you'), findsOneWidget);
+      // Phone tab bar from the redesign.
+      for (final tab in ['Home', 'Alerts', 'Patients', 'Hospital', 'Settings']) {
+        expect(find.text(tab), findsWidgets);
+      }
       await tester.pumpWidget(const SizedBox());
     });
 
