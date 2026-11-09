@@ -6,7 +6,7 @@ import 'package:vitanet/features/admin/screens/portal_shell.dart';
 import 'package:vitanet/features/admin/widgets/portal_common.dart';
 import 'package:vitanet/features/admin/widgets/staff_ui.dart';
 
-/// Hospital capacity: wards, equipment, team on duty.
+/// Hospital (design): bed occupancy, equipment grid, who is on duty now.
 class HospitalScreen extends ConsumerWidget {
   final VoidCallback? onBack;
   const HospitalScreen({super.key, this.onBack});
@@ -24,97 +24,92 @@ class HospitalScreen extends ConsumerWidget {
     final p = StaffPalette.of(context);
     final isAdmin = ref.watch(portalMeProvider)?.isAdmin ?? false;
     final value = ref.watch(capacityProvider);
+    final hospitalName = ref.watch(myHospitalProvider).valueOrNull?.name;
+    final now = TimeOfDay.now();
+    final live = 'live at ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+
+    Widget addButton(String label, VoidCallback onPressed) => TextButton.icon(
+          onPressed: onPressed,
+          style: TextButton.styleFrom(minimumSize: const Size(44, 44)),
+          icon: const Icon(Icons.add_rounded, size: 18),
+          label: Text(label),
+        );
+
     return Column(
       children: [
-        PortalHeader(title: 'Hospital', subtitle: 'Beds, equipment and who is on duty', onBack: onBack),
+        PortalHeader(
+          title: 'Hospital',
+          subtitle: hospitalName == null ? live : '$hospitalName · $live',
+          onBack: onBack,
+        ),
         Expanded(
           child: PortalAsyncList<Capacity>(
             value: value,
             onRefresh: () => ref.refresh(capacityProvider.future),
             builder: (cap) {
               final onDuty = cap.team.where((m) => m.onDuty).toList();
-              final beds = cap.wards.fold<int>(0, (s, w) => s + w.bedsTotal);
-              final used = cap.wards.fold<int>(0, (s, w) => s + w.bedsOccupied);
               return [
-                PortalSectionTitle(
-                  'Wards',
-                  trailing: isAdmin
-                      ? TextButton.icon(
-                          onPressed: () => _open(context, ref, const WardSheet(isAdmin: true)),
-                          style: TextButton.styleFrom(minimumSize: const Size(44, 44)),
-                          icon: const Icon(Icons.add_rounded, size: 18),
-                          label: const Text('Add ward'),
+                _Panel(
+                  title: 'Bed occupancy',
+                  action: isAdmin ? addButton('Add ward', () => _open(context, ref, const WardSheet(isAdmin: true))) : null,
+                  child: cap.wards.isEmpty
+                      ? PortalEmpty(
+                          icon: Icons.bed_outlined,
+                          title: 'No wards set up yet',
+                          message: isAdmin
+                              ? 'Add your wards and bed counts so staff can place patients.'
+                              : 'Your administrator hasn’t added wards yet.',
                         )
-                      : null,
+                      : Column(
+                          children: [
+                            for (final w in cap.wards)
+                              _WardRow(ward: w, onTap: () => _open(context, ref, WardSheet(isAdmin: isAdmin, ward: w))),
+                          ],
+                        ),
                 ),
-                if (cap.wards.isEmpty)
-                  StaffCard(
-                    child: PortalEmpty(
-                      icon: Icons.bed_outlined,
-                      title: 'No wards set up yet',
-                      message: isAdmin
-                          ? 'Add your wards and bed counts so staff can place patients.'
-                          : 'Your administrator hasn’t added wards yet.',
-                    ),
-                  )
-                else ...[
+                const SizedBox(height: 14),
+                _Panel(
+                  title: 'Equipment',
+                  action: isAdmin
+                      ? addButton('Add', () => _open(context, ref, const EquipmentSheet(isAdmin: true)))
+                      : null,
+                  child: cap.equipment.isEmpty
+                      ? const PortalEmpty(icon: Icons.medical_services_outlined, title: 'No equipment listed')
+                      : LayoutBuilder(builder: (context, c) {
+                          final w = (c.maxWidth - 10) / 2;
+                          return Wrap(
+                            spacing: 10,
+                            runSpacing: 10,
+                            children: [
+                              for (final e in cap.equipment)
+                                SizedBox(
+                                  width: w,
+                                  child: _EquipmentTile(
+                                    equipment: e,
+                                    onTap: () => _open(context, ref, EquipmentSheet(isAdmin: isAdmin, equipment: e)),
+                                  ),
+                                ),
+                            ],
+                          );
+                        }),
+                ),
+                const SizedBox(height: 14),
+                _Panel(
+                  title: 'On duty now · ${onDuty.length}',
+                  child: onDuty.isEmpty
+                      ? PortalEmpty(
+                          icon: Icons.badge_outlined,
+                          title: 'Nobody is marked on duty',
+                          message: 'Staff switch themselves on shift from Home.',
+                        )
+                      : Column(children: [for (final m in onDuty) TeamMemberTile(member: m)]),
+                ),
+                if (cap.team.length > onDuty.length)
                   Padding(
-                    padding: const EdgeInsets.only(left: 4, bottom: 8),
-                    child: Text('${beds - used} of $beds beds free', style: staffBody(13, color: p.muted)),
+                    padding: const EdgeInsets.only(top: 10, left: 4),
+                    child: Text('${cap.team.length - onDuty.length} more off shift',
+                        style: staffBody(13, color: p.muted)),
                   ),
-                  for (final w in cap.wards) ...[
-                    _CapacityCard(
-                      title: w.name,
-                      used: w.bedsOccupied,
-                      total: w.bedsTotal,
-                      caption: '${w.bedsOccupied}/${w.bedsTotal} beds occupied · ${w.bedsFree} free',
-                      critical: w.critical,
-                      onTap: () => _open(context, ref, WardSheet(isAdmin: isAdmin, ward: w)),
-                    ),
-                    const SizedBox(height: 10),
-                  ],
-                ],
-                PortalSectionTitle(
-                  'Equipment',
-                  trailing: isAdmin
-                      ? TextButton.icon(
-                          onPressed: () => _open(context, ref, const EquipmentSheet(isAdmin: true)),
-                          style: TextButton.styleFrom(minimumSize: const Size(44, 44)),
-                          icon: const Icon(Icons.add_rounded, size: 18),
-                          label: const Text('Add'),
-                        )
-                      : null,
-                ),
-                if (cap.equipment.isEmpty)
-                  const StaffCard(
-                    child: PortalEmpty(icon: Icons.medical_services_outlined, title: 'No equipment listed'),
-                  )
-                else
-                  for (final e in cap.equipment) ...[
-                    _CapacityCard(
-                      title: e.name,
-                      used: e.total - e.available,
-                      total: e.total,
-                      caption: '${e.available}/${e.total} available${(e.note ?? '').isEmpty ? '' : ' · ${e.note}'}',
-                      onTap: () => _open(context, ref, EquipmentSheet(isAdmin: isAdmin, equipment: e)),
-                    ),
-                    const SizedBox(height: 10),
-                  ],
-                PortalSectionTitle('On duty now (${onDuty.length})'),
-                if (onDuty.isEmpty)
-                  const StaffCard(
-                    child: PortalEmpty(
-                      icon: Icons.badge_outlined,
-                      title: 'Nobody is marked on duty',
-                      message: 'Staff switch themselves on duty from the Today screen.',
-                    ),
-                  )
-                else
-                  StaffGroup(children: [for (final m in onDuty) TeamMemberTile(member: m)]),
-                if (cap.team.length > onDuty.length) ...[
-                  PortalSectionTitle('Off duty (${cap.team.length - onDuty.length})'),
-                  StaffGroup(children: [for (final m in cap.team.where((m) => !m.onDuty)) TeamMemberTile(member: m)]),
-                ],
               ];
             },
           ),
@@ -124,47 +119,144 @@ class HospitalScreen extends ConsumerWidget {
   }
 }
 
-class _CapacityCard extends StatelessWidget {
+/// White rounded section card with a heading and optional action.
+class _Panel extends StatelessWidget {
   final String title;
-  final int used;
-  final int total;
-  final String caption;
-  final bool critical;
-  final VoidCallback onTap;
-
-  const _CapacityCard({
-    required this.title,
-    required this.used,
-    required this.total,
-    required this.caption,
-    required this.onTap,
-    this.critical = false,
-  });
+  final Widget? action;
+  final Widget child;
+  const _Panel({required this.title, required this.child, this.action});
 
   @override
   Widget build(BuildContext context) {
     final p = StaffPalette.of(context);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(24)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Semantics(
+                  header: true,
+                  child: Text(title, style: staffHeading(18, weight: FontWeight.w700, color: p.ink)),
+                ),
+              ),
+              ?action,
+            ],
+          ),
+          const SizedBox(height: 8),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _WardRow extends StatelessWidget {
+  final Ward ward;
+  final VoidCallback onTap;
+  const _WardRow({required this.ward, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = StaffPalette.of(context);
+    final ratio = ward.bedsTotal == 0 ? 0.0 : ward.bedsOccupied / ward.bedsTotal;
+    final color = ratio >= 0.9
+        ? const Color(0xFFDC2626)
+        : ratio >= 0.7
+            ? const Color(0xFFF59E0B)
+            : const Color(0xFF10B981);
+    return Semantics(
+      button: true,
+      label: '${ward.name}: ${ward.bedsOccupied} of ${ward.bedsTotal} beds occupied, ${ward.bedsFree} free. Edit',
+      excludeSemantics: true,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(ward.name, style: staffBody(15, weight: FontWeight.w600, color: p.ink)),
+                  ),
+                  Text.rich(TextSpan(children: [
+                    TextSpan(
+                        text: '${ward.bedsOccupied}',
+                        style: staffBody(14, weight: FontWeight.w800, color: p.ink)),
+                    TextSpan(
+                        text: ' / ${ward.bedsTotal} · ${ward.bedsFree} free',
+                        style: staffBody(14, color: p.muted)),
+                  ])),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: ratio.clamp(0.0, 1.0),
+                  minHeight: 8,
+                  backgroundColor: p.line,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _EquipmentTile extends StatelessWidget {
+  final Equipment equipment;
+  final VoidCallback onTap;
+  const _EquipmentTile({required this.equipment, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = StaffPalette.of(context);
+    final e = equipment;
+    final tone = e.available == 0
+        ? StaffTone.danger
+        : (e.total > 0 && e.available / e.total < 0.5)
+            ? StaffTone.amber
+            : StaffTone.neutral;
+    final t = p.tone(tone);
+    final accent = tone == StaffTone.neutral ? p.tone(StaffTone.green).fg : t.fg;
     return StaffTap(
       onTap: onTap,
-      color: p.card,
-      radius: 16,
-      semanticLabel: '$title, $caption. Edit',
+      color: tone == StaffTone.neutral ? p.bg : t.bg,
+      radius: 18,
+      semanticLabel: '${e.name}: ${e.available} of ${e.total} free${(e.note ?? '').isEmpty ? '' : ', ${e.note}'}. Edit',
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Expanded(child: Text(title, style: staffBody(15, weight: FontWeight.w700, color: p.ink))),
-                if (critical) ...[const StaffTag('Critical care', tone: StaffTone.danger), const SizedBox(width: 6)],
-                Icon(Icons.edit_outlined, size: 18, color: p.faint),
-              ],
-            ),
-            const SizedBox(height: 10),
-            OccupancyBar(used: used, total: total),
+            Text(e.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: staffBody(13, weight: FontWeight.w600, color: tone == StaffTone.neutral ? p.muted : t.fg)),
             const SizedBox(height: 6),
-            Text(caption, style: staffBody(12, color: p.muted)),
+            Text.rich(TextSpan(children: [
+              TextSpan(text: '${e.available}', style: staffHeading(24, color: p.ink)),
+              TextSpan(
+                  text: ' of ${e.total} free',
+                  style: staffBody(13, weight: FontWeight.w700, color: accent)),
+            ])),
+            if ((e.note ?? '').isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(e.note!,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: staffBody(12, color: p.muted)),
+            ],
           ],
         ),
       ),
