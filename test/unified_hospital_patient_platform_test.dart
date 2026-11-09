@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vitanet/features/admin/models/portal_models.dart' as portal;
+import 'package:vitanet/features/portal/data/portal_models.dart' as portal;
 import 'package:vitanet/data/providers/referral_providers.dart';
 import 'package:vitanet/data/services/referral_service.dart';
-import 'package:vitanet/features/admin/providers/portal_providers.dart';
+import 'package:vitanet/features/portal/data/portal_providers.dart';
 import 'package:vitanet/features/home/widgets/hospital_care_section.dart';
 
 void main() {
@@ -59,28 +59,31 @@ void main() {
       expect(parsed.dosage, order.dosage);
     });
 
-    test('InpatientVitals serializes vital signs flow sheet', () {
-      final vitals = portal.InpatientVitals(
-        heartRate: 74,
-        bloodOxygen: 98.5,
-        bloodPressure: '118/76',
-        temperature: 36.7,
-        respiratoryRate: 15,
-        recordedBy: 'Nurse Serwaa',
-        recordedAt: '2026-11-05T18:15:00Z',
-      );
+    test('CaseVitals sends only what was measured and reads the server shape', () {
+      const vitals = portal.CaseVitals(heartRate: 108, bpSystolic: 158, bpDiastolic: 96, spo2: 96, alert: true);
+      expect(vitals.toJson(), {
+        'heart_rate': 108,
+        'bp_systolic': 158,
+        'bp_diastolic': 96,
+        'blood_oxygen': 96,
+        'alert': true,
+      });
 
-      final json = vitals.toJson();
-      expect(json['heart_rate'], 74);
-      expect(json['blood_oxygen'], 98.5);
-      expect(json['blood_pressure'], '118/76');
-      expect(json['temperature'], 36.7);
-      expect(json['respiratory_rate'], 15);
-
-      final parsed = portal.InpatientVitals.fromJson(json);
-      expect(parsed.heartRate, 74);
-      expect(parsed.bloodOxygen, 98.5);
-      expect(parsed.bloodPressure, '118/76');
+      final parsed = portal.CaseVitals.fromJson({
+        'heart_rate': 124,
+        'bp_systolic': 98,
+        'bp_diastolic': 60,
+        'spo2': 91,
+        'respiratory_rate': 26,
+        'early_warning': 8,
+        'recorded_by': 'Nurse Badu',
+        'at': '2026-11-09T10:12:00Z',
+      });
+      expect(parsed.heartRate, 124);
+      expect(parsed.spo2, 91);
+      expect(parsed.earlyWarning, 8);
+      expect(parsed.temperature, isNull);
+      expect(parsed.isEmpty, isFalse);
     });
 
     test('PatientHospitalCase parses status, ward bed stay, and discharge summary', () {
@@ -89,9 +92,9 @@ void main() {
         'hospital_id': 'h_ridge',
         'hospital_name': 'Greater Accra Regional Hospital',
         'hospital_phone': '+233 30 222 8315',
-        'ward': 'Cardiology Care Unit',
+        'ward_name': 'Cardiology Care Unit',
         'bed': 'CCU-04',
-        'attending_doctor': 'Dr. Mensah',
+        'assignee_name': 'Dr. Mensah',
         'status': 'treatment',
         'level': 'urgent',
         'complaint': 'Acute substernal chest pressure with dyspnea',
@@ -118,27 +121,43 @@ void main() {
       expect(kase.hospitalName, 'Greater Accra Regional Hospital');
       expect(kase.ward, 'Cardiology Care Unit');
       expect(kase.bed, 'CCU-04');
+      expect(kase.attendingDoctor, 'Dr. Mensah');
       expect(kase.isInTreatment, isTrue);
       expect(kase.isDischarged, isFalse);
       expect(kase.timeline.length, 2);
       expect(kase.timeline.first.kind, 'emergency_checkin');
     });
 
-    test('EmergencyCheckinResult parses confirmation and triage dispatch', () {
+    test('EmergencyCheckinResult reads the referral the server creates', () {
       final res = portal.EmergencyCheckinResult.fromJson({
-        'referral_id': 'ref_er_123',
-        'case_id': 'case_er_456',
+        'id': 'ref_er_123',
         'hospital_id': 'h_ridge',
-        'status': 'arriving',
-        'eta_minutes': 15,
-        'message': 'Pre-arrival emergency check-in received at Ridge Hospital. ER triage notified.',
+        'status': 'new',
+        'source': 'checkin',
+        'eta_minutes': 9,
       });
 
       expect(res.referralId, 'ref_er_123');
-      expect(res.caseId, 'case_er_456');
-      expect(res.status, 'arriving');
-      expect(res.etaMinutes, 15);
-      expect(res.message, contains('Ridge Hospital'));
+      expect(res.status, 'new');
+      expect(res.etaMinutes, 9);
+    });
+
+    test('Referral counts down to the absolute ETA', () {
+      final r = portal.Referral.fromJson({
+        'id': 'r1',
+        'hospital_id': 'h1',
+        'status': 'new',
+        'triage_level': 'urgent',
+        'summary': {'complaint': 'Chest pain'},
+        'eta_minutes': 10,
+        'eta_at': '2026-11-09T10:10:00Z',
+        'created_at': '2026-11-09T10:00:00Z',
+        'updated_at': '2026-11-09T10:00:00Z',
+        'suggestion': {'ward_id': 3, 'ward_name': 'Resus', 'assignee_uid': 'd1', 'assignee_name': 'Dr. Addo'},
+      });
+      expect(r.minutesToArrival(now: DateTime.utc(2026, 11, 9, 10, 4)), 6);
+      expect(r.minutesToArrival(now: DateTime.utc(2026, 11, 9, 10, 15)), -5);
+      expect(r.suggestion!.wardName, 'Resus');
     });
   });
 

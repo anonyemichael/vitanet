@@ -215,7 +215,12 @@ void main() {
 
     testWidgets('arrived', (tester) async {
       await tester.pumpWidget(_card(const Referral(id: 'r', hospitalId: 'h1', status: 'arrived')));
-      expect(find.text('Visit completed'), findsOneWidget);
+      expect(find.textContaining('the team has you'), findsOneWidget);
+    });
+
+    testWidgets('closed after discharge', (tester) async {
+      await tester.pumpWidget(_card(const Referral(id: 'r', hospitalId: 'h1', status: 'closed')));
+      expect(find.text('Visit finished — your summary is in Visits'), findsOneWidget);
       expect(find.text('Directions'), findsNothing);
     });
 

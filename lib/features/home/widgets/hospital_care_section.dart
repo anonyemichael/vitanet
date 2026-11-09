@@ -3,10 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:vitanet/core/constants/app_colors.dart';
 import 'package:vitanet/data/providers/referral_providers.dart';
-import 'package:vitanet/features/admin/models/portal_models.dart' as portal;
-import 'package:vitanet/features/admin/providers/portal_providers.dart';
-import 'package:vitanet/features/admin/services/hospital_api_service.dart';
+import 'package:vitanet/features/portal/data/portal_models.dart' as portal;
+import 'package:vitanet/features/portal/data/portal_providers.dart';
 import 'package:vitanet/features/home/screens/hospital_directory_screen.dart';
+import 'package:vitanet/features/home/widgets/emergency_checkin_sheet.dart';
 import 'package:vitanet/features/history/screens/patient_visits_screen.dart';
 import 'package:vitanet/shared/widgets/vn_kit.dart';
 
@@ -47,14 +47,8 @@ class HospitalCareSection extends ConsumerWidget {
     }
   }
 
-  void _showEmergencyCheckinSheet(BuildContext context, WidgetRef ref, dynamic hospital) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => _EmergencyCheckinModal(hospital: hospital),
-    );
-  }
+  void _showEmergencyCheckinSheet(BuildContext context, WidgetRef ref, dynamic hospital) =>
+      showEmergencyCheckin(context, hospitalId: hospital.id.toString(), hospitalName: hospital.name as String);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -417,229 +411,6 @@ class _ActiveInpatientCard extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// Pre-Arrival Emergency Check-In Modal Sheet.
-class _EmergencyCheckinModal extends ConsumerStatefulWidget {
-  final dynamic hospital;
-  const _EmergencyCheckinModal({required this.hospital});
-
-  @override
-  ConsumerState<_EmergencyCheckinModal> createState() => _EmergencyCheckinModalState();
-}
-
-class _EmergencyCheckinModalState extends ConsumerState<_EmergencyCheckinModal> {
-  final _complaintCtrl = TextEditingController();
-  int _etaMinutes = 15;
-  bool _submitting = false;
-
-  @override
-  void dispose() {
-    _complaintCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    final complaint = _complaintCtrl.text.trim();
-    if (complaint.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please describe your emergency or symptom.')),
-      );
-      return;
-    }
-
-    setState(() => _submitting = true);
-    try {
-      final hospitalId = widget.hospital.id.toString();
-      final liveVitals = ref.read(referralVitalsProvider);
-      final res = await ref.read(hospitalApiProvider).emergencyCheckin(
-        hospitalId,
-        complaint: complaint,
-        etaMinutes: _etaMinutes,
-        vitals: liveVitals,
-      );
-
-      ref.invalidate(patientCasesProvider);
-      ref.invalidate(myReferralsProvider);
-
-      if (mounted) {
-        Navigator.of(context).pop();
-        showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: Row(
-              children: const [
-                Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 24),
-                SizedBox(width: 8),
-                Text('ER Pre-Arrival Confirmed'),
-              ],
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(res.message, style: const TextStyle(fontSize: 14)),
-                const SizedBox(height: 12),
-                Text(
-                  'Hospital: ${widget.hospital.name}\nEstimated Arrival: in $_etaMinutes minutes\nCase ID: ${res.caseId}',
-                  style: const TextStyle(fontSize: 12, color: Colors.grey, height: 1.5),
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  'Please proceed immediately to the Emergency Department reception. Your clinical pre-intake has been delivered to triage.',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('Understood'),
-              ),
-            ],
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(apiErrorMessage(e))),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _submitting = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final p = VnPalette.of(context);
-    final bottomPad = MediaQuery.of(context).viewInsets.bottom;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: p.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      padding: EdgeInsets.fromLTRB(20, 20, 20, 24 + bottomPad),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: const Color(0x1FEF4444),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.emergency_rounded, color: Color(0xFFDC2626), size: 20),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Emergency Pre-Arrival Check-In',
-                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
-                    ),
-                    Text(
-                      widget.hospital.name,
-                      style: TextStyle(fontSize: 12, color: p.muted),
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                onPressed: () => Navigator.of(context).pop(),
-                icon: const Icon(Icons.close_rounded),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Chief Emergency Complaint / Symptoms',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: p.ink),
-          ),
-          const SizedBox(height: 6),
-          TextField(
-            controller: _complaintCtrl,
-            maxLines: 2,
-            textCapitalization: TextCapitalization.sentences,
-            decoration: InputDecoration(
-              hintText: 'e.g. Severe acute chest tightness radiating to left arm',
-              filled: true,
-              fillColor: p.surfaceAlt,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
-            ),
-          ),
-          const SizedBox(height: 14),
-          Text(
-            'Estimated Arrival Time',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: p.ink),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [10, 15, 25, 40].map((mins) {
-              final selected = _etaMinutes == mins;
-              return Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: InkWell(
-                    onTap: () => setState(() => _etaMinutes = mins),
-                    borderRadius: BorderRadius.circular(10),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      decoration: BoxDecoration(
-                        color: selected ? const Color(0xFFDC2626) : p.surfaceAlt,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        '$mins m',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: selected ? Colors.white : p.ink,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: 20),
-          ElevatedButton(
-            onPressed: _submitting ? null : _submit,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFDC2626),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              elevation: 0,
-            ),
-            child: _submitting
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                  )
-                : const Text(
-                    'Confirm & Transmit to ER Triage',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                  ),
-          ),
-        ],
       ),
     );
   }

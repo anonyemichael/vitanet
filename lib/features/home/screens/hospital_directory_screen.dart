@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:vitanet/core/constants/app_colors.dart';
 import 'package:vitanet/data/providers/referral_providers.dart';
-import 'package:vitanet/features/admin/providers/portal_providers.dart';
-import 'package:vitanet/features/admin/services/hospital_api_service.dart';
+import 'package:vitanet/features/portal/data/hospital_api_service.dart';
+import 'package:vitanet/features/home/widgets/emergency_checkin_sheet.dart';
 import 'package:vitanet/shared/widgets/vn_kit.dart';
 
 /// Full searchable directory of affiliated hospitals and emergency trauma centers.
@@ -40,14 +40,8 @@ class _HospitalDirectoryScreenState extends ConsumerState<HospitalDirectoryScree
     }
   }
 
-  void _showPreArrivalModal(BuildContext context, dynamic hospital) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => _PreArrivalSheet(hospital: hospital),
-    );
-  }
+  void _showPreArrivalModal(BuildContext context, dynamic hospital) =>
+      showEmergencyCheckin(context, hospitalId: hospital.id.toString(), hospitalName: hospital.name as String);
 
   @override
   Widget build(BuildContext context) {
@@ -367,138 +361,6 @@ class _HospitalDirectoryScreenState extends ConsumerState<HospitalDirectoryScree
                 );
               },
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PreArrivalSheet extends ConsumerStatefulWidget {
-  final dynamic hospital;
-  const _PreArrivalSheet({required this.hospital});
-
-  @override
-  ConsumerState<_PreArrivalSheet> createState() => _PreArrivalSheetState();
-}
-
-class _PreArrivalSheetState extends ConsumerState<_PreArrivalSheet> {
-  final _ctrl = TextEditingController();
-  int _eta = 15;
-  bool _busy = false;
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    final complaint = _ctrl.text.trim();
-    if (complaint.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please describe the symptom or chief complaint.')),
-      );
-      return;
-    }
-
-    setState(() => _busy = true);
-    try {
-      final res = await ref.read(hospitalApiProvider).emergencyCheckin(
-        widget.hospital.id.toString(),
-        complaint: complaint,
-        etaMinutes: _eta,
-      );
-      ref.invalidate(nearbyFacilitiesProvider);
-      ref.invalidate(patientCasesProvider);
-
-      if (mounted) {
-        Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: const Color(0xFF047857),
-            content: Text('${res.message} Case registered (#${res.caseId})'),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(apiErrorMessage(e))),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final p = VnPalette.of(context);
-    final bottom = MediaQuery.of(context).viewInsets.bottom;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: p.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottom),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.emergency_rounded, color: Color(0xFFDC2626), size: 24),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Emergency Pre-Arrival · ${widget.hospital.name}',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ),
-              IconButton(onPressed: () => Navigator.of(context).pop(), icon: const Icon(Icons.close)),
-            ],
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _ctrl,
-            maxLines: 2,
-            decoration: InputDecoration(
-              hintText: 'Emergency complaint (e.g. Difficulty breathing, severe trauma, acute pain)',
-              filled: true,
-              fillColor: p.surfaceAlt,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [10, 15, 25, 40].map((m) {
-              final active = _eta == m;
-              return Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 3),
-                  child: ChoiceChip(
-                    label: Text('${m}m'),
-                    selected: active,
-                    onSelected: (_) => setState(() => _eta = m),
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: _busy ? null : _submit,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFDC2626),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            child: _busy
-                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Text('Dispatch Pre-Arrival to ER Triage', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),

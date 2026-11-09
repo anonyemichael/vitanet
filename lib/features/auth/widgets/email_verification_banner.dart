@@ -2,8 +2,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:vitanet/features/admin/providers/portal_providers.dart';
-import 'package:vitanet/features/admin/widgets/staff_ui.dart';
+import 'package:vitanet/features/portal/data/portal_providers.dart';
+import 'package:vitanet/features/auth/widgets/staff_ui.dart';
 
 /// Shown to email/password users whose address isn't verified yet. Hospital
 /// administrators must verify before the backend recognises them.

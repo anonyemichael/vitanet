@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vitanet/core/constants/app_colors.dart';
 import 'package:vitanet/data/providers/providers.dart';
-import 'package:vitanet/features/admin/providers/portal_providers.dart';
+import 'package:vitanet/features/portal/data/portal_providers.dart';
 import 'package:vitanet/shared/widgets/vitanet_logo.dart';
 import 'package:vitanet/shared/widgets/vn_kit.dart';
 

@@ -8,7 +8,7 @@ import 'package:vitanet/core/constants/app_colors.dart';
 import 'package:vitanet/core/extensions/context_ext.dart';
 import 'package:vitanet/data/models/user_profile.dart';
 import 'package:vitanet/data/providers/providers.dart';
-import 'package:vitanet/features/admin/providers/portal_providers.dart';
+import 'package:vitanet/features/portal/data/portal_providers.dart';
 import 'package:vitanet/shared/widgets/vitanet_logo.dart';
 import 'package:vitanet/shared/widgets/vn_kit.dart';
 

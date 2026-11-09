@@ -54,7 +54,9 @@ class ReferralStatusCard extends ConsumerStatefulWidget {
       case ReferralStatus.declined:
         return '$h could not take this referral';
       case ReferralStatus.arrived:
-        return 'Visit completed';
+        return "You're at $h — the team has you";
+      case ReferralStatus.closed:
+        return 'Visit finished — your summary is in Visits';
       case ReferralStatus.cancelled:
         return 'Referral cancelled';
       default:
@@ -160,7 +162,8 @@ class _ReferralStatusCardState extends ConsumerState<ReferralStatusCard> {
     final (Color bg, Color fg, IconData icon) = switch (r.status) {
       ReferralStatus.accepted => (const Color(0xFFD1FAE5), const Color(0xFF047857), Icons.check_circle_outline),
       ReferralStatus.declined => (const Color(0xFFFEE2E2), const Color(0xFFB91C1C), Icons.cancel_outlined),
-      ReferralStatus.arrived => (const Color(0xFFCCFBF1), const Color(0xFF0F766E), Icons.task_alt_rounded),
+      ReferralStatus.arrived => (const Color(0xFFCCFBF1), const Color(0xFF0F766E), Icons.local_hospital_outlined),
+      ReferralStatus.closed => (const Color(0xFFCCFBF1), const Color(0xFF0F766E), Icons.task_alt_rounded),
       ReferralStatus.cancelled => (p.surfaceAlt, p.muted, Icons.block_outlined),
       _ => (const Color(0xFFFEF3C7), const Color(0xFFB45309), Icons.schedule_rounded),
     };

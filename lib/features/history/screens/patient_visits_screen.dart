@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vitanet/core/constants/app_colors.dart';
-import 'package:vitanet/features/admin/models/portal_models.dart' as portal;
-import 'package:vitanet/features/admin/providers/portal_providers.dart';
-import 'package:vitanet/features/admin/widgets/portal_common.dart';
+import 'package:vitanet/features/portal/data/portal_models.dart' as portal;
+import 'package:vitanet/features/portal/data/portal_providers.dart';
+import 'package:vitanet/features/auth/widgets/staff_common.dart';
 import 'package:vitanet/shared/widgets/vn_kit.dart';
 
 /// Patient view for active hospital admissions, past inpatient visits,

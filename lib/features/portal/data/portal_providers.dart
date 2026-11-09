@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vitanet/data/providers/providers.dart';
-import 'package:vitanet/features/admin/models/portal_models.dart';
-import 'package:vitanet/features/admin/services/hospital_api_service.dart';
+import 'package:vitanet/features/portal/data/hospital_api_service.dart';
+import 'package:vitanet/features/portal/data/portal_models.dart';
 
 final hospitalApiProvider = Provider<HospitalApiService>((ref) => HospitalApiService());
 
@@ -69,18 +69,18 @@ final staffAccessProvider = FutureProvider<StaffAccess>((ref) async {
   return StaffAccess.fromMe(me);
 });
 
-/// Router rules for staff-related paths. [access] is null while unknown
-/// (loading or failed), in which case nothing is redirected and the portal
-/// gate shows the loading / error state itself.
-String? staffRouteRedirect(String path, StaffAccess? access) {
-  if (access == null) return null;
+/// The router's rules for a signed-in user (the router itself calls this, so
+/// these are the rules the app really uses). [access] is null while unknown
+/// (loading or failed): nothing is forced and the portal gate shows the
+/// loading / error state itself. Staff who chose the personal workspace stay
+/// in the patient app; patients are never let into /admin.
+String? staffRouteRedirect(String path, StaffAccess? access, {AppWorkspace workspace = AppWorkspace.hospital}) {
   if (path == '/admin' || path.startsWith('/admin/')) {
-    return access.kind == StaffAccessKind.none ? '/home' : null;
+    return access?.kind == StaffAccessKind.none ? '/home' : null;
   }
-  if (path == '/home' || path == '/chat') {
-    return access.isPortalUser ? '/admin' : null;
-  }
-  if (path == '/') return access.isPortalUser ? '/admin' : '/home';
+  final toPortal = workspace == AppWorkspace.hospital && (access?.isPortalUser ?? false);
+  if (path == '/') return toPortal ? '/admin' : '/home';
+  if ((path == '/home' || path == '/chat') && toPortal) return '/admin';
   return null;
 }
 
@@ -114,7 +114,7 @@ final dashboardProvider = FutureProvider.autoDispose<Dashboard>(
   (ref) => ref.watch(hospitalApiProvider).getDashboard(),
 );
 
-/// Referrals by status ('new', 'accepted', 'declined').
+/// Referrals by status; a comma list is allowed (e.g. 'accepted,arrived').
 final referralsProvider = FutureProvider.autoDispose.family<List<Referral>, String>(
   (ref, status) => ref.watch(hospitalApiProvider).listReferrals(status: status),
 );
@@ -123,7 +123,10 @@ final referralProvider = FutureProvider.autoDispose.family<Referral, String>(
   (ref, id) => ref.watch(hospitalApiProvider).getReferral(id),
 );
 
+/// `status` may be a comma list, e.g. [activeCaseStatuses].
 typedef CaseQuery = ({String status, bool mine});
+
+const activeCaseStatuses = 'expected,waiting,treatment';
 
 final casesProvider = FutureProvider.autoDispose.family<List<PortalCase>, CaseQuery>(
   (ref, q) => ref.watch(hospitalApiProvider).listCases(status: q.status, mine: q.mine),
@@ -152,6 +155,34 @@ final myHospitalProvider = FutureProvider.autoDispose<Facility>(
 final auditProvider = FutureProvider.autoDispose<List<AuditEntry>>(
   (ref) => ref.watch(hospitalApiProvider).listAudit(),
 );
+
+/// Whether the live connection to the server is up (drives the "Live" dot and
+/// the slow fallback refresh).
+final portalLiveConnectedProvider = StateProvider<bool>((ref) => false);
+
+/// Refresh what a server event of [type] can affect (see PortalLive).
+void invalidateForEvent(Ref ref, String type, String? id) {
+  switch (type) {
+    case 'referral':
+      ref.invalidate(referralsProvider);
+      if (id != null) ref.invalidate(referralProvider(id));
+      ref.invalidate(dashboardProvider);
+    case 'case':
+      ref.invalidate(casesProvider);
+      if (id != null) ref.invalidate(caseProvider(id));
+      ref.invalidate(dashboardProvider);
+    case 'alert':
+      ref.invalidate(alertsProvider);
+    case 'capacity':
+      ref.invalidate(capacityProvider);
+      ref.invalidate(myHospitalProvider);
+      ref.invalidate(dashboardProvider);
+    case 'team':
+      ref.invalidate(capacityProvider);
+      ref.invalidate(teamProvider);
+      ref.invalidate(dashboardProvider);
+  }
+}
 
 /// Refresh everything that a referral / case / capacity change can affect.
 void invalidatePortalData(WidgetRef ref) {

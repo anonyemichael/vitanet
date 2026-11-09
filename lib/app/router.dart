@@ -31,8 +31,8 @@ import 'package:vitanet/features/auth/screens/registration_form_screen.dart';
 import 'package:vitanet/features/auth/screens/patient_completion_screen.dart';
 
 // Hospital portal
-import 'package:vitanet/features/admin/providers/portal_providers.dart';
-import 'package:vitanet/features/admin/screens/portal_gate_screen.dart';
+import 'package:vitanet/features/portal/data/portal_providers.dart';
+import 'package:vitanet/features/portal/gate/portal_gate.dart';
 
 import 'package:vitanet/features/devices/screens/device_connection_screen.dart';
 import 'package:vitanet/features/assessment/screens/assessment_wizard_screen.dart';
@@ -98,31 +98,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       // Staff routing & workspace preference handling:
       if (isUnauthenticated) return null;
 
-      final prefWorkspace = ref.read(preferredWorkspaceProvider);
-
-      // Non-staff patients are never allowed in /admin
-      if (path == '/admin' || path.startsWith('/admin/')) {
-        if (staffAccess?.kind == StaffAccessKind.none) {
-          return '/home';
-        }
-        return null;
-      }
-
-      // If user preferred workspace is personal, always allow personal routes
-      if (prefWorkspace == AppWorkspace.personal) {
-        if (path == '/') return '/home';
-        return null;
-      }
-
-      // If user preferred workspace is hospital and they are staff, route home/chat to /admin
-      if (prefWorkspace == AppWorkspace.hospital && (staffAccess?.isPortalUser ?? false)) {
-        if (path == '/home' || path == '/chat' || path == '/') {
-          return '/admin';
-        }
-      }
-
-      if (path == '/') return '/home';
-      return null;
+      // One rule set, shared with the tests (see staffRouteRedirect).
+      return staffRouteRedirect(path, staffAccess, workspace: ref.read(preferredWorkspaceProvider));
     },
     routes: [
       GoRoute(

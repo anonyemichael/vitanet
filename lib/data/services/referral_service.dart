@@ -70,6 +70,7 @@ abstract final class ReferralStatus {
   static const declined = 'declined';
   static const cancelled = 'cancelled';
   static const arrived = 'arrived';
+  static const closed = 'closed'; // discharged
 }
 
 /// A patient's referral to a hospital.

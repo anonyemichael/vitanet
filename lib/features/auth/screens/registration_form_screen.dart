@@ -6,11 +6,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vitanet/core/constants/app_colors.dart';
 import 'package:vitanet/data/providers/providers.dart';
-import 'package:vitanet/features/admin/models/portal_models.dart';
-import 'package:vitanet/features/admin/providers/portal_providers.dart';
-import 'package:vitanet/features/admin/services/hospital_api_service.dart';
-import 'package:vitanet/features/admin/widgets/portal_common.dart';
-import 'package:vitanet/features/admin/widgets/staff_ui.dart';
+import 'package:vitanet/features/portal/data/portal_models.dart';
+import 'package:vitanet/features/portal/data/portal_providers.dart';
+import 'package:vitanet/features/portal/data/hospital_api_service.dart';
+import 'package:vitanet/features/auth/widgets/staff_common.dart';
+import 'package:vitanet/features/auth/widgets/staff_ui.dart';
 import 'package:vitanet/features/auth/widgets/email_verification_banner.dart';
 import 'package:vitanet/shared/widgets/vn_kit.dart';
 

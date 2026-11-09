@@ -181,18 +181,39 @@ class ReferralSummary {
       );
 }
 
+/// Rule-based placement the server suggests for a new referral.
+class PlacementSuggestion {
+  final int? wardId;
+  final String? wardName;
+  final String? assigneeUid;
+  final String? assigneeName;
+
+  const PlacementSuggestion({this.wardId, this.wardName, this.assigneeUid, this.assigneeName});
+
+  factory PlacementSuggestion.fromJson(Map<String, dynamic> j) => PlacementSuggestion(
+        wardId: _int(j['ward_id']),
+        wardName: _str(j['ward_name']),
+        assigneeUid: _str(j['assignee_uid']),
+        assigneeName: _str(j['assignee_name']),
+      );
+}
+
 class Referral {
   final String id;
   final String hospitalId;
   final String? hospitalName;
-  final String status; // new | accepted | declined | cancelled | arrived
+  final String status; // new | accepted | arrived | closed | declined | cancelled
   final String triageLevel;
+  final String source; // app | checkin
   final ReferralSummary summary;
   final int? etaMinutes;
+  final String? etaAt;
   final String? declineReason;
   final String? caseId;
+  final String? arrivedAt;
   final String createdAt;
   final String updatedAt;
+  final PlacementSuggestion? suggestion;
 
   const Referral({
     required this.id,
@@ -200,15 +221,27 @@ class Referral {
     this.hospitalName,
     required this.status,
     required this.triageLevel,
+    this.source = 'app',
     required this.summary,
     this.etaMinutes,
+    this.etaAt,
     this.declineReason,
     this.caseId,
+    this.arrivedAt,
     required this.createdAt,
     required this.updatedAt,
+    this.suggestion,
   });
 
   String get patientName => summary.patientName ?? 'VitaNet patient';
+
+  /// Minutes until the patient is expected (negative once overdue), from the
+  /// server's absolute ETA so it keeps counting down.
+  int? minutesToArrival({DateTime? now}) {
+    final at = DateTime.tryParse(etaAt ?? '');
+    if (at == null) return etaMinutes;
+    return at.difference((now ?? DateTime.now()).toUtc()).inSeconds ~/ 60;
+  }
 
   factory Referral.fromJson(Map<String, dynamic> j) => Referral(
         id: _str(j['id']) ?? '',
@@ -216,13 +249,76 @@ class Referral {
         hospitalName: _str(j['hospital_name']),
         status: _str(j['status']) ?? 'new',
         triageLevel: _str(j['triage_level']) ?? 'routine',
+        source: _str(j['source']) ?? 'app',
         summary: ReferralSummary.fromJson(_map(j['summary'])),
         etaMinutes: _int(j['eta_minutes']),
+        etaAt: _str(j['eta_at']),
         declineReason: _str(j['decline_reason']),
         caseId: _str(j['case_id']),
+        arrivedAt: _str(j['arrived_at']),
         createdAt: _str(j['created_at']) ?? '',
         updatedAt: _str(j['updated_at']) ?? '',
+        suggestion: j['suggestion'] is Map ? PlacementSuggestion.fromJson(_map(j['suggestion'])) : null,
       );
+}
+
+/// One set of observations recorded for a case (`_vitals_out`), also used as
+/// the body for POST /portal/cases/{id}/vitals.
+class CaseVitals {
+  final int? heartRate;
+  final int? bpSystolic;
+  final int? bpDiastolic;
+  final double? spo2;
+  final double? temperature;
+  final int? respiratoryRate;
+  final int? pain;
+  final bool? alert;
+  final int? earlyWarning;
+  final String? recordedBy;
+  final String? at;
+
+  const CaseVitals({
+    this.heartRate,
+    this.bpSystolic,
+    this.bpDiastolic,
+    this.spo2,
+    this.temperature,
+    this.respiratoryRate,
+    this.pain,
+    this.alert,
+    this.earlyWarning,
+    this.recordedBy,
+    this.at,
+  });
+
+  bool get isEmpty =>
+      heartRate == null && bpSystolic == null && spo2 == null && temperature == null &&
+      respiratoryRate == null && pain == null && alert == null;
+
+  factory CaseVitals.fromJson(Map<String, dynamic> j) => CaseVitals(
+        heartRate: _int(j['heart_rate']),
+        bpSystolic: _int(j['bp_systolic']),
+        bpDiastolic: _int(j['bp_diastolic']),
+        spo2: _double(j['spo2'] ?? j['blood_oxygen']),
+        temperature: _double(j['temperature']),
+        respiratoryRate: _int(j['respiratory_rate']),
+        pain: _int(j['pain']),
+        alert: j['alert'] is bool ? j['alert'] as bool : null,
+        earlyWarning: _int(j['early_warning']),
+        recordedBy: _str(j['recorded_by']),
+        at: _str(j['at']),
+      );
+
+  Map<String, dynamic> toJson() => {
+        if (heartRate != null) 'heart_rate': heartRate,
+        if (bpSystolic != null) 'bp_systolic': bpSystolic,
+        if (bpDiastolic != null) 'bp_diastolic': bpDiastolic,
+        if (spo2 != null) 'blood_oxygen': spo2,
+        if (temperature != null) 'temperature': temperature,
+        if (respiratoryRate != null) 'respiratory_rate': respiratoryRate,
+        if (pain != null) 'pain': pain,
+        if (alert != null) 'alert': alert,
+      };
 }
 
 class TimelineEvent {
@@ -249,7 +345,7 @@ class PortalCase {
   final String? sex;
   final String complaint;
   final String level; // urgent | doctor | routine
-  final String status; // waiting | treatment | discharged
+  final String status; // expected | waiting | treatment | discharged
   final int? wardId;
   final String? wardName;
   final String? bed;
@@ -258,6 +354,10 @@ class PortalCase {
   final String? allergies;
   final List<TimelineEvent> timeline;
   final String? dischargeSummary;
+  final String? outcome; // home | admitted | transferred | left
+  final String? arrivedAt;
+  final CaseVitals? latestVitals;
+  final List<CaseVitals> vitalsHistory;
   final String createdAt;
   final String updatedAt;
   final Referral? referral;
@@ -279,12 +379,20 @@ class PortalCase {
     this.allergies,
     this.timeline = const [],
     this.dischargeSummary,
+    this.outcome,
+    this.arrivedAt,
+    this.latestVitals,
+    this.vitalsHistory = const [],
     required this.createdAt,
     required this.updatedAt,
     this.referral,
   });
 
   bool get isDischarged => status == 'discharged';
+  bool get isExpected => status == 'expected';
+  bool get isActive => !isDischarged;
+  List<String> get allergyList =>
+      (allergies ?? '').split(',').map((a) => a.trim()).where((a) => a.isNotEmpty).toList();
 
   factory PortalCase.fromJson(Map<String, dynamic> j) => PortalCase(
         id: _str(j['id']) ?? '',
@@ -305,6 +413,10 @@ class PortalCase {
             ? (j['timeline'] as List).whereType<Map>().map((e) => TimelineEvent.fromJson(Map<String, dynamic>.from(e))).toList()
             : const [],
         dischargeSummary: _str(j['discharge_summary']),
+        outcome: _str(j['outcome']),
+        arrivedAt: _str(j['arrived_at']),
+        latestVitals: j['latest_vitals'] is Map ? CaseVitals.fromJson(_map(j['latest_vitals'])) : null,
+        vitalsHistory: _list(j['vitals_history'], CaseVitals.fromJson),
         createdAt: _str(j['created_at']) ?? '',
         updatedAt: _str(j['updated_at']) ?? '',
         referral: j['referral'] is Map ? Referral.fromJson(Map<String, dynamic>.from(j['referral'])) : null,
@@ -314,6 +426,7 @@ class PortalCase {
 class DashboardCounts {
   final int incoming;
   final int incomingUrgent;
+  final int expected;
   final int waiting;
   final int inTreatment;
   final int bedsFree;
@@ -324,6 +437,7 @@ class DashboardCounts {
   const DashboardCounts({
     this.incoming = 0,
     this.incomingUrgent = 0,
+    this.expected = 0,
     this.waiting = 0,
     this.inTreatment = 0,
     this.bedsFree = 0,
@@ -335,6 +449,7 @@ class DashboardCounts {
   factory DashboardCounts.fromJson(Map<String, dynamic> j) => DashboardCounts(
         incoming: _int(j['incoming']) ?? 0,
         incomingUrgent: _int(j['incoming_urgent']) ?? 0,
+        expected: _int(j['expected']) ?? 0,
         waiting: _int(j['waiting']) ?? 0,
         inTreatment: _int(j['in_treatment']) ?? 0,
         bedsFree: _int(j['beds_free']) ?? 0,
@@ -351,6 +466,7 @@ class Dashboard {
   final String myName;
   final StaffRole myRole;
   final bool onDuty;
+  final bool acceptingReferrals;
 
   const Dashboard({
     required this.counts,
@@ -359,6 +475,7 @@ class Dashboard {
     this.myName = '',
     this.myRole = StaffRole.doctor,
     this.onDuty = false,
+    this.acceptingReferrals = true,
   });
 
   factory Dashboard.fromJson(Map<String, dynamic> j) {
@@ -370,6 +487,7 @@ class Dashboard {
       myName: _str(me['name']) ?? '',
       myRole: StaffRole.parse(me['role']),
       onDuty: _bool(me['on_duty']),
+      acceptingReferrals: j['accepting_referrals'] != false,
     );
   }
 }
@@ -386,6 +504,7 @@ class Ward {
   final int bedsTotal;
   final int bedsOccupied;
   final bool critical;
+  final List<String> patients;
 
   const Ward({
     required this.id,
@@ -393,6 +512,7 @@ class Ward {
     required this.bedsTotal,
     required this.bedsOccupied,
     this.critical = false,
+    this.patients = const [],
   });
 
   int get bedsFree => (bedsTotal - bedsOccupied).clamp(0, bedsTotal);
@@ -403,6 +523,7 @@ class Ward {
         bedsTotal: _int(j['beds_total']) ?? 0,
         bedsOccupied: _int(j['beds_occupied']) ?? 0,
         critical: _bool(j['critical']),
+        patients: _strList(j['patients']),
       );
 }
 
@@ -462,6 +583,7 @@ class TeamMember {
   final bool onDuty;
   final String? department;
   final String? licenseNumber;
+  final int activeCases;
 
   const TeamMember({
     required this.firebaseUid,
@@ -472,6 +594,7 @@ class TeamMember {
     this.onDuty = false,
     this.department,
     this.licenseNumber,
+    this.activeCases = 0,
   });
 
   factory TeamMember.fromJson(Map<String, dynamic> j) => TeamMember(
@@ -483,6 +606,7 @@ class TeamMember {
         onDuty: _bool(j['on_duty']),
         department: _str(j['department']),
         licenseNumber: _str(j['license_number']),
+        activeCases: _int(j['active_cases']) ?? 0,
       );
 }
 
@@ -502,15 +626,19 @@ class Capacity {
 
 class PortalAlert {
   final String id;
-  final String kind; // referral | vitals | broadcast
-  final String severity; // critical | warning
+  final String kind; // referral | vitals | broadcast | early_warning
+  final String severity; // critical | warning | info
   final String title;
   final String? body;
   final String? department;
   final String? authorName;
   final String? referralId;
   final String? patientUserId;
+  final String? caseId;
   final String at;
+  final int ackCount;
+  final List<String> ackNames;
+  final bool ackedByMe;
 
   const PortalAlert({
     required this.id,
@@ -522,7 +650,11 @@ class PortalAlert {
     this.authorName,
     this.referralId,
     this.patientUserId,
+    this.caseId,
     required this.at,
+    this.ackCount = 0,
+    this.ackNames = const [],
+    this.ackedByMe = false,
   });
 
   factory PortalAlert.fromJson(Map<String, dynamic> j) => PortalAlert(
@@ -535,7 +667,11 @@ class PortalAlert {
         authorName: _str(j['author_name']),
         referralId: _str(j['referral_id']),
         patientUserId: _str(j['patient_user_id']),
+        caseId: _str(j['case_id']),
         at: _str(j['at']) ?? '',
+        ackCount: _int(j['ack_count']) ?? 0,
+        ackNames: _strList(j['ack_names']),
+        ackedByMe: _bool(j['acked_by_me']),
       );
 }
 
@@ -638,45 +774,6 @@ class PrescriptionOrder {
       };
 }
 
-/// Inpatient vitals recorded during clinical observation rounds.
-class InpatientVitals {
-  final int? heartRate;
-  final double? bloodOxygen;
-  final String? bloodPressure;
-  final double? temperature;
-  final int? respiratoryRate;
-  final String? recordedBy;
-  final String? recordedAt;
-
-  const InpatientVitals({
-    this.heartRate,
-    this.bloodOxygen,
-    this.bloodPressure,
-    this.temperature,
-    this.respiratoryRate,
-    this.recordedBy,
-    this.recordedAt,
-  });
-
-  factory InpatientVitals.fromJson(Map<String, dynamic> j) => InpatientVitals(
-        heartRate: _int(j['heart_rate']),
-        bloodOxygen: _double(j['blood_oxygen']),
-        bloodPressure: _str(j['blood_pressure']),
-        temperature: _double(j['temperature']),
-        respiratoryRate: _int(j['respiratory_rate']),
-        recordedBy: _str(j['recorded_by']),
-        recordedAt: _str(j['recorded_at']),
-      );
-
-  Map<String, dynamic> toJson() => {
-        if (heartRate != null) 'heart_rate': heartRate,
-        if (bloodOxygen != null) 'blood_oxygen': bloodOxygen,
-        if (bloodPressure != null) 'blood_pressure': bloodPressure,
-        if (temperature != null) 'temperature': temperature,
-        if (respiratoryRate != null) 'respiratory_rate': respiratoryRate,
-      };
-}
-
 /// Patient-facing view of a hospital admission / visit.
 class PatientHospitalCase {
   final String id;
@@ -714,15 +811,16 @@ class PatientHospitalCase {
   bool get isDischarged => status == 'discharged';
   bool get isInTreatment => status == 'treatment';
   bool get isWaiting => status == 'waiting';
+  bool get isExpected => status == 'expected';
 
   factory PatientHospitalCase.fromJson(Map<String, dynamic> j) => PatientHospitalCase(
         id: _str(j['id']) ?? '',
         hospitalId: _str(j['hospital_id']) ?? '',
         hospitalName: _str(j['hospital_name']) ?? 'VitaNet Hospital',
         hospitalPhone: _str(j['hospital_phone']),
-        ward: _str(j['ward']),
+        ward: _str(j['ward_name'] ?? j['ward']),
         bed: _str(j['bed']),
-        attendingDoctor: _str(j['attending_doctor']),
+        attendingDoctor: _str(j['assignee_name'] ?? j['attending_doctor']),
         status: _str(j['status']) ?? 'waiting',
         level: _str(j['level']) ?? 'routine',
         complaint: _str(j['complaint']) ?? '',
@@ -757,11 +855,12 @@ class EmergencyCheckinResult {
   });
 
   factory EmergencyCheckinResult.fromJson(Map<String, dynamic> j) => EmergencyCheckinResult(
-        referralId: _str(j['referral_id']) ?? '',
+        // The server returns the created referral.
+        referralId: _str(j['referral_id'] ?? j['id']) ?? '',
         caseId: _str(j['case_id']) ?? '',
         hospitalId: _str(j['hospital_id']) ?? '',
-        status: _str(j['status']) ?? 'arriving',
-        etaMinutes: _int(j['eta_minutes']) ?? 15,
+        status: _str(j['status']) ?? 'new',
+        etaMinutes: _int(j['eta_minutes']) ?? 0,
         message: _str(j['message']) ?? 'Emergency check-in confirmed.',
       );
 }

@@ -1,6 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:vitanet/core/network/backend.dart';
-import 'package:vitanet/features/admin/models/portal_models.dart';
+import 'package:vitanet/features/portal/data/portal_models.dart';
 
 /// An error from the portal API, carrying the server's `detail` message
 /// when there is one.
@@ -100,7 +100,7 @@ class HospitalApiService {
             'license_number': (licenseNumber ?? '').isEmpty ? null : licenseNumber,
           }))));
 
-  /// approve | reject | suspend.
+  /// approve | reject | suspend | reinstate.
   Future<StaffMe> reviewStaff(String uid, String action, {String? note, StaffRole? role}) async =>
       StaffMe.fromJson(_obj(await _send(() => _dio.post('admin/staff-requests/${Uri.encodeComponent(uid)}/$action', data: {
             'note': (note ?? '').isEmpty ? null : note,
@@ -129,6 +129,13 @@ class HospitalApiService {
 
   Future<Facility> createHospital(Facility input) async =>
       Facility.fromJson(_obj(await _send(() => _dio.post('portal/hospitals', data: input.toJson()))));
+
+  Future<StaffMe> changeStaffRole(String uid, StaffRole role) async =>
+      StaffMe.fromJson(_obj(await _send(() => _dio.post('admin/staff-requests/${Uri.encodeComponent(uid)}/role', data: {'role': role.api}))));
+
+  /// The Accepting / Paused switch (admins).
+  Future<Facility> setAccepting(bool accepting) async => Facility.fromJson(
+      _obj(await _send(() => _dio.put('portal/hospital/accepting', data: {'accepting_referrals': accepting}))));
 
   Future<Facility> getMyHospital() async =>
       Facility.fromJson(_obj(await _send(() => _dio.get('portal/hospital'))));
@@ -162,12 +169,17 @@ class HospitalApiService {
 
   // ─── Cases ───
 
-  Future<List<PortalCase>> listCases({String? status, bool mine = false}) async => parseList(
+  /// [status] may be a comma list, e.g. `waiting,treatment`.
+  Future<List<PortalCase>> listCases({String? status, bool mine = false, String? query}) async => parseList(
       await _send(() => _dio.get('portal/cases', queryParameters: {
             'status': ?status,
             if (mine) 'mine': true,
+            if (query != null && query.trim().isNotEmpty) 'q': query.trim(),
           })),
       PortalCase.fromJson);
+
+  Future<PortalCase> markArrived(String id) async =>
+      PortalCase.fromJson(_obj(await _send(() => _dio.post('portal/cases/$id/arrived'))));
 
   Future<PortalCase> createCase(NewCaseInput input) async =>
       PortalCase.fromJson(_obj(await _send(() => _dio.post('portal/cases', data: input.toJson()))));
@@ -198,8 +210,20 @@ class HospitalApiService {
   Future<PortalCase> addNote(String id, String text) async =>
       PortalCase.fromJson(_obj(await _send(() => _dio.post('portal/cases/$id/notes', data: {'text': text}))));
 
-  Future<PortalCase> dischargeCase(String id, String summary) async =>
-      PortalCase.fromJson(_obj(await _send(() => _dio.post('portal/cases/$id/discharge', data: {'summary': summary}))));
+  /// [outcome]: home | admitted | transferred | left.
+  Future<PortalCase> dischargeCase(String id, String summary, {String outcome = 'home'}) async =>
+      PortalCase.fromJson(_obj(await _send(
+          () => _dio.post('portal/cases/$id/discharge', data: {'summary': summary, 'outcome': outcome}))));
+
+  /// End of shift: hand every active patient of mine to [toUid].
+  Future<int> handover(String toUid, {String? note, bool endShift = true}) async {
+    final j = _obj(await _send(() => _dio.post('portal/handover', data: {
+          'to_uid': toUid,
+          'note': (note ?? '').trim().isEmpty ? null : note!.trim(),
+          'end_shift': endShift,
+        })));
+    return (j['handed_over'] as num?)?.toInt() ?? 0;
+  }
 
   /// Prescribe a medication for an admitted inpatient.
   Future<PortalCase> orderPrescription(
@@ -218,22 +242,9 @@ class HospitalApiService {
             'instructions': instructions,
           }))));
 
-  /// Record observation vitals during clinical rounds.
-  Future<PortalCase> recordInpatientVitals(
-    String caseId, {
-    int? heartRate,
-    double? bloodOxygen,
-    String? bloodPressure,
-    double? temperature,
-    int? respiratoryRate,
-  }) async =>
-      PortalCase.fromJson(_obj(await _send(() => _dio.post('portal/cases/$caseId/vitals', data: {
-            'heart_rate': ?heartRate,
-            'blood_oxygen': ?bloodOxygen,
-            'blood_pressure': ?bloodPressure,
-            'temperature': ?temperature,
-            'respiratory_rate': ?respiratoryRate,
-          }))));
+  /// Record a set of observations; the server scores them for early warning.
+  Future<PortalCase> recordVitals(String caseId, CaseVitals vitals) async =>
+      PortalCase.fromJson(_obj(await _send(() => _dio.post('portal/cases/$caseId/vitals', data: vitals.toJson()))));
 
   // ─── Alerts, capacity, team, audit ───
 
@@ -249,10 +260,14 @@ class HospitalApiService {
   }) async =>
       PortalAlert.fromJson(_obj(await _send(() => _dio.post('portal/alerts', data: {
             'title': title,
-            'body': body,
+            'message': body,
             'severity': severity,
             'department': (department ?? '').isEmpty ? null : department,
           }))));
+
+  /// "I'm on it" for an alert.
+  Future<PortalAlert> ackAlert(String key) async =>
+      PortalAlert.fromJson(_obj(await _send(() => _dio.post('portal/alerts/${Uri.encodeComponent(key)}/ack'))));
 
   // ─── Patient Integration & Emergency Check-In ───
 
@@ -260,15 +275,15 @@ class HospitalApiService {
   Future<EmergencyCheckinResult> emergencyCheckin(
     String hospitalId, {
     required String complaint,
-    int etaMinutes = 15,
-    String triageLevel = 'urgent',
     Map<String, dynamic>? vitals,
+    double? latitude,
+    double? longitude,
   }) async =>
       EmergencyCheckinResult.fromJson(_obj(await _send(() => _dio.post('facilities/$hospitalId/emergency-checkin', data: {
             'complaint': complaint,
-            'eta_minutes': etaMinutes,
-            'triage_level': triageLevel,
             'vitals': vitals ?? const {},
+            'patient_lat': ?latitude,
+            'patient_lng': ?longitude,
           }))));
 
   /// Patient view of active and past hospital cases, ward bed stays, and discharge summaries.
