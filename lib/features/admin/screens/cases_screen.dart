@@ -372,19 +372,19 @@ class _NewCaseSheetState extends ConsumerState<NewCaseSheet> {
         cap?.wards.where((w) => w.bedsFree > 0).toList() ?? const <Ward>[];
     final team = cap?.team ?? const <TeamMember>[];
     return PortalSheet(
-      title: 'New walk-in case',
+      title: 'New patient entry',
       actions: [
         StaffButton(
           'Cancel',
           kind: StaffButtonKind.secondary,
           onPressed: () => Navigator.of(context).pop(),
         ),
-        StaffButton('Create case', loading: _saving, onPressed: _submit),
+        StaffButton('Create patient record', loading: _saving, onPressed: _submit),
       ],
       children: [
         PortalTextField(
           controller: _name,
-          label: 'Patient name',
+          label: 'Full name',
           capitalization: TextCapitalization.words,
         ),
         const SizedBox(height: 14),
@@ -417,12 +417,12 @@ class _NewCaseSheetState extends ConsumerState<NewCaseSheet> {
         const SizedBox(height: 14),
         PortalTextField(
           controller: _complaint,
-          label: 'Main complaint',
+          label: 'Chief complaint',
           hint: 'Chest pain for 2 hours',
         ),
         const SizedBox(height: 14),
         Text(
-          'Priority',
+          'Triage level',
           style: staffBody(
             13,
             weight: FontWeight.w600,
