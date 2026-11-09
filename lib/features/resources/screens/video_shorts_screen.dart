@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:pointer_interceptor/pointer_interceptor.dart';
 import 'package:vitanet/core/utils/launch_helpers.dart';
 import 'package:vitanet/shared/widgets/vn_kit.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
@@ -27,65 +30,82 @@ class VideoShortsScreen extends StatefulWidget {
 
 class _VideoShortsScreenState extends State<VideoShortsScreen> {
   late final PageController _pageController;
-  late final ShortsControllerPool _pool;
+  ShortsPlayback? _playback;
+  StreamSubscription<YoutubePlayerValue>? _stateSub;
   final _store = VideoEngagementStore.instance;
   int _current = 0;
   bool _isMuted = true;
   bool _isPaused = false;
+  // The cover photo hides the player until the current clip is playing and
+  // the feed has stopped moving, so swipes never show a frozen frame.
+  bool _playing = false;
+  bool _settled = true;
 
   @override
   void initState() {
     super.initState();
     _current = widget.initialIndex.clamp(0, widget.shorts.isEmpty ? 0 : widget.shorts.length - 1);
     _pageController = PageController(initialPage: _current);
-    _pool = ShortsControllerPool(shorts: widget.shorts, initialIndex: _current);
+    if (widget.shorts.isNotEmpty) {
+      final playback = ShortsPlayback(shorts: widget.shorts, initialIndex: _current);
+      _playback = playback;
+      _stateSub = playback.controller.stream.listen(_onPlayerValue);
+    }
   }
 
   @override
   void dispose() {
-    _pool.dispose();
+    _stateSub?.cancel();
+    _playback?.dispose();
     _pageController.dispose();
     super.dispose();
+  }
+
+  void _onPlayerValue(YoutubePlayerValue value) {
+    if (!mounted) return;
+    final state = value.playerState;
+    if (state == PlayerState.ended) {
+      _playback?.replay();
+      return;
+    }
+    final playing = state == PlayerState.playing;
+    if (playing != _playing) setState(() => _playing = playing);
   }
 
   void _onPageChanged(int index) {
     setState(() {
       _current = index;
       _isPaused = false;
-      _pool.onPageChanged(index);
+      _playing = false;
     });
-    final ctrl = _pool.getController(index);
-    if (ctrl != null) {
-      if (!_isMuted) {
-        ctrl.unMute();
-      } else {
-        ctrl.mute();
-      }
-      ctrl.playVideo();
-    }
+    _playback
+      ?..show(index)
+      ..setMuted(_isMuted);
+  }
+
+  bool _onScroll(ScrollNotification n) {
+    if (n.depth != 0) return false;
+    final moving = n is ScrollStartNotification || (n is ScrollUpdateNotification && n.dragDetails != null);
+    final settled = n is ScrollEndNotification;
+    if (moving && _settled) setState(() => _settled = false);
+    if (settled && !_settled) setState(() => _settled = true);
+    return false;
   }
 
   void _toggleMute() {
     setState(() => _isMuted = !_isMuted);
-    final ctrl = _pool.getController(_current);
-    if (ctrl != null) {
-      if (_isMuted) {
-        ctrl.mute();
-      } else {
-        ctrl.unMute();
-      }
-    }
+    _playback?.setMuted(_isMuted);
   }
 
   void _togglePlayPause() {
-    final ctrl = _pool.getController(_current);
-    if (ctrl == null) return;
+    if (_playback == null) return;
     setState(() => _isPaused = !_isPaused);
     if (_isPaused) {
-      ctrl.pauseVideo();
+      _playback!.pause();
     } else {
-      ctrl.playVideo();
-      if (!_isMuted) ctrl.unMute();
+      _playback!
+        ..play()
+        ..setMuted(_isMuted);
     }
   }
 
@@ -94,34 +114,50 @@ class _VideoShortsScreenState extends State<VideoShortsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final playback = _playback;
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
         backgroundColor: Colors.black,
-        body: widget.shorts.isEmpty
+        body: playback == null
             ? Center(
                 child: Text('No shorts available', style: VnText.body(15, color: Colors.white70)),
               )
-            : ListenableBuilder(
-                listenable: _store,
-                builder: (context, _) => PageView.builder(
-                  scrollDirection: Axis.vertical,
-                  physics: const ClampingScrollPhysics(),
-                  controller: _pageController,
-                  itemCount: null,
-                  onPageChanged: _onPageChanged,
-                  itemBuilder: (context, index) {
-                    final video = widget.shorts[index % widget.shorts.length];
-                    return _buildShort(video, index);
-                  },
-                ),
+            : Stack(
+                fit: StackFit.expand,
+                children: [
+                  // The one player, fixed in place under the feed.
+                  Center(
+                    child: AspectRatio(
+                      aspectRatio: 9 / 16,
+                      child: YoutubePlayer(controller: playback.controller, aspectRatio: 9 / 16),
+                    ),
+                  ),
+                  // On the web the player is an iframe that would swallow
+                  // every swipe and tap; the interceptor keeps them in Flutter.
+                  PointerInterceptor(
+                    child: NotificationListener<ScrollNotification>(
+                      onNotification: _onScroll,
+                      child: ListenableBuilder(
+                        listenable: _store,
+                        builder: (context, _) => PageView.builder(
+                          scrollDirection: Axis.vertical,
+                          controller: _pageController,
+                          onPageChanged: _onPageChanged,
+                          itemBuilder: (context, index) => _buildShort(playback.videoAt(index), index),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
       ),
     );
   }
 
   Widget _buildShort(ClinicalVideo short, int index) {
-    final controller = _pool.getController(index);
+    final isCurrent = index == _current;
+    final showVideo = isCurrent && _playing && _settled;
     final liked = _store.isLiked(short.youtubeId);
     final subscribed = _store.isSubscribed(short.channelName);
     final topPad = MediaQuery.paddingOf(context).top;
@@ -129,15 +165,27 @@ class _VideoShortsScreenState extends State<VideoShortsScreen> {
     return Stack(
       fit: StackFit.expand,
       children: [
-        // Cover photo stays underneath while the embed loads.
-        VnNetworkPhoto(url: short.shortsThumbnailUrl, fallbackAsset: videoFallbackPhoto(short)),
-        if (controller != null && index == _current)
-          Center(
-            child: AspectRatio(
-              aspectRatio: 9 / 16,
-              child: YoutubePlayer(controller: controller, aspectRatio: 9 / 16),
-            ),
+        // Cover photo until this clip is actually playing; then the player
+        // underneath shows through.
+        AnimatedOpacity(
+          opacity: showVideo ? 0 : 1,
+          duration: const Duration(milliseconds: 180),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              const ColoredBox(color: Colors.black),
+              VnNetworkPhoto(url: short.shortsThumbnailUrl, fallbackAsset: videoFallbackPhoto(short)),
+              if (isCurrent && !_playing && !_isPaused)
+                const Center(
+                  child: SizedBox(
+                    width: 36,
+                    height: 36,
+                    child: CircularProgressIndicator(strokeWidth: 3, color: Colors.white),
+                  ),
+                ),
+            ],
           ),
+        ),
         const IgnorePointer(
           child: DecoratedBox(
             decoration: BoxDecoration(
@@ -365,7 +413,7 @@ class _VideoShortsScreenState extends State<VideoShortsScreen> {
           right: 0,
           bottom: 0,
           height: 3,
-          child: _ShortProgress(controller: index == _current ? controller : null, video: short),
+          child: _ShortProgress(controller: isCurrent ? _playback?.controller : null, video: short),
         ),
       ],
     );

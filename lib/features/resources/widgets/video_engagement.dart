@@ -110,11 +110,17 @@ class VideoEngagementStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Ticks when watch progress changes. Kept separate from the store's own
+  /// listeners: progress changes every few seconds during playback, and
+  /// rebuilding every screen that shows likes or saves on each tick made the
+  /// player and the library behind it stutter.
+  final ValueNotifier<int> progressListenable = ValueNotifier(0);
+
   void setProgress(String id, double fraction) {
     final clamped = fraction.clamp(0.0, 1.0);
     if ((progressOf(id) - clamped).abs() < 0.01) return;
     _progress[id] = clamped;
-    notifyListeners();
+    progressListenable.value++;
   }
 
   void markNotificationsSeen() {

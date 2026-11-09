@@ -392,7 +392,7 @@ class VideoThumbnail extends StatelessWidget {
           ),
         if (showProgress)
           ListenableBuilder(
-            listenable: store,
+            listenable: store.progressListenable,
             builder: (context, _) {
               final progress = store.progressOf(video.youtubeId);
               if (progress <= 0) return const SizedBox.shrink();

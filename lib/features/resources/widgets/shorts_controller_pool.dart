@@ -3,107 +3,70 @@ import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
 import '../models/clinical_video.dart';
 
-typedef ShortsControllerFactory = YoutubePlayerController Function(String videoId, bool autoPlay);
+typedef ShortsControllerFactory = YoutubePlayerController Function(String videoId);
 
-/// High-performance sliding-window preload pool that maintains a maximum of 3
-/// active controllers in memory at any time:
-/// - currentIndex: actively playing
-/// - currentIndex + 1: pre-initialized and paused at 0:00 for instant swipe-down
-/// - currentIndex - 1: paused in memory for instant back-swipe
-/// - All controllers with (index - currentIndex).abs() > 1 are strictly disposed (controller.close())
-class ShortsControllerPool {
+/// One YouTube player for the whole Shorts feed.
+///
+/// Each embedded player is a full iframe/WebView that downloads YouTube's
+/// player code, so creating one per clip made every swipe slow and kept
+/// several heavy views alive. Instead one player stays mounted and each clip
+/// is loaded into it with `loadVideoById` when its page becomes current.
+class ShortsPlayback {
   final List<ClinicalVideo> shorts;
-  final Map<int, YoutubePlayerController> _pool = {};
-  final ShortsControllerFactory? _controllerFactory;
-  int _currentIndex = 0;
+  final YoutubePlayerController controller;
+  int _loadedIndex;
 
-  ShortsControllerPool({
+  ShortsPlayback({
     required this.shorts,
     required int initialIndex,
     ShortsControllerFactory? controllerFactory,
-  }) : _controllerFactory = controllerFactory {
-    _currentIndex = initialIndex;
-    _updateWindow(initialIndex);
+  })  : _loadedIndex = initialIndex,
+        controller = (controllerFactory ?? _defaultController)(
+          shorts.isEmpty ? '' : shorts[initialIndex % shorts.length].youtubeId,
+        );
+
+  static YoutubePlayerController _defaultController(String videoId) => YoutubePlayerController.fromVideoId(
+        videoId: videoId,
+        autoPlay: true,
+        params: const YoutubePlayerParams(
+          showControls: false,
+          showFullscreenButton: false,
+          showVideoAnnotations: false,
+          mute: true,
+          privacyEnhancedMode: true,
+          strictRelatedVideos: true,
+          origin: 'https://www.youtube-nocookie.com',
+        ),
+      );
+
+  int get loadedIndex => _loadedIndex;
+
+  ClinicalVideo videoAt(int index) => shorts[index % shorts.length];
+
+  /// Loads the clip for page [index] unless it is already loaded.
+  void show(int index) {
+    if (shorts.isEmpty || index == _loadedIndex) return;
+    _loadedIndex = index;
+    _run(() => controller.loadVideoById(videoId: videoAt(index).youtubeId));
   }
 
-  int get currentIndex => _currentIndex;
+  void play() => _run(controller.playVideo);
+  void pause() => _run(controller.pauseVideo);
+  void setMuted(bool muted) => _run(muted ? controller.mute : controller.unMute);
 
-  YoutubePlayerController? getController(int index) => _pool[index];
+  /// Shorts loop: start the clip again when it ends.
+  void replay() => _run(() async {
+        await controller.seekTo(seconds: 0, allowSeekAhead: true);
+        await controller.playVideo();
+      });
 
-  void onPageChanged(int newIndex) {
-    _currentIndex = newIndex;
-    _updateWindow(newIndex);
-  }
+  void dispose() => _run(controller.close);
 
-  void _updateWindow(int current) {
-    if (shorts.isEmpty) return;
-    final activeRange = {current - 1, current, current + 1}
-        .where((idx) => idx >= 0)
-        .toSet();
-
-    // 1. Strictly dispose and close any controller where (index - current).abs() > 1
-    final outOfWindow = _pool.keys.where((idx) => (idx - current).abs() > 1).toList();
-    for (final idx in outOfWindow) {
-      final ctrl = _pool.remove(idx);
-      try {
-        ctrl?.pauseVideo();
-        ctrl?.close();
-      } catch (e) {
-        debugPrint('ShortsControllerPool dispose error at $idx: $e');
-      }
+  static void _run(Future<void> Function() call) {
+    try {
+      call().catchError((Object e) => debugPrint('Shorts player: $e'));
+    } catch (e) {
+      debugPrint('Shorts player: $e');
     }
-
-    // 2. Pre-initialize missing controllers within window [current - 1, current, current + 1]
-    for (final idx in activeRange) {
-      if (!_pool.containsKey(idx)) {
-        final video = shorts[idx % shorts.length];
-        final isCurrent = idx == current;
-        if (_controllerFactory != null) {
-          _pool[idx] = _controllerFactory(video.youtubeId, isCurrent);
-        } else {
-          _pool[idx] = YoutubePlayerController.fromVideoId(
-            videoId: video.youtubeId,
-            autoPlay: isCurrent,
-            params: const YoutubePlayerParams(
-              showControls: false,
-              showFullscreenButton: false,
-              showVideoAnnotations: false,
-              mute: true,
-              loop: true,
-              privacyEnhancedMode: true,
-              strictRelatedVideos: true,
-              origin: 'https://www.youtube-nocookie.com',
-            ),
-          );
-        }
-      }
-    }
-
-    // 3. Play current active video, pause others at 0:00 for instant zero-latency start
-    for (final entry in _pool.entries) {
-      final ctrl = entry.value;
-      if (entry.key == current) {
-        try {
-          ctrl.playVideo();
-        } catch (_) {}
-      } else {
-        try {
-          ctrl.pauseVideo();
-          ctrl.seekTo(seconds: 0.0);
-        } catch (_) {}
-      }
-    }
-  }
-
-  void dispose() {
-    for (final ctrl in _pool.values) {
-      try {
-        ctrl.pauseVideo();
-        ctrl.close();
-      } catch (e) {
-        debugPrint('ShortsControllerPool pool dispose error: $e');
-      }
-    }
-    _pool.clear();
   }
 }

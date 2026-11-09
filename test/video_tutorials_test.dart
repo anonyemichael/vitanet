@@ -10,6 +10,12 @@ class FakeYoutubePlayerController extends Fake implements YoutubePlayerControlle
   bool closed = false;
   bool isPlaying = false;
   double seekSeconds = 0;
+  final List<String> loaded = [];
+
+  @override
+  Future<void> loadVideoById({required String videoId, double? startSeconds, double? endSeconds}) async {
+    loaded.add(videoId);
+  }
 
   @override
   Future<void> playVideo() async {
@@ -135,46 +141,39 @@ void main() {
     });
   });
 
-  group('ShortsControllerPool Sliding-Window Tests', () {
-    test('Maintains maximum of 3 controllers within sliding window [n-1, n, n+1]', () {
+  group('Shorts playback', () {
+    test('Uses one player for the whole feed and loads each clip into it', () {
       final shorts = ClinicalVideoRepository.verifiedShorts;
-
-      final pool = ShortsControllerPool(
+      var created = 0;
+      late FakeYoutubePlayerController fake;
+      final playback = ShortsPlayback(
         shorts: shorts,
         initialIndex: 0,
-        controllerFactory: (videoId, autoPlay) {
-          final fake = FakeYoutubePlayerController();
-          return fake;
+        controllerFactory: (videoId) {
+          created++;
+          expect(videoId, shorts[0].youtubeId);
+          return fake = FakeYoutubePlayerController();
         },
       );
 
-      // At index 0, controllers at 0 and 1 are in memory
-      expect(pool.getController(0), isNotNull);
-      expect(pool.getController(1), isNotNull);
-      expect(pool.getController(2), isNull);
+      expect(created, 1);
+      expect(playback.loadedIndex, 0);
 
-      // Swipe down to index 1 -> window becomes [0, 1, 2]
-      pool.onPageChanged(1);
-      expect(pool.getController(0), isNotNull);
-      expect(pool.getController(1), isNotNull);
-      expect(pool.getController(2), isNotNull);
-      expect(pool.getController(3), isNull);
+      playback.show(0); // already loaded: nothing to do
+      expect(fake.loaded, isEmpty);
 
-      // Swipe down to index 2 -> index 0 must be disposed because (0 - 2).abs() > 1
-      pool.onPageChanged(2);
-      expect(pool.getController(0), isNull);
-      expect(pool.getController(1), isNotNull);
-      expect(pool.getController(2), isNotNull);
-      expect(pool.getController(3), isNotNull);
+      playback.show(1);
+      playback.show(2);
+      playback.show(2);
+      expect(fake.loaded, [shorts[1].youtubeId, shorts[2].youtubeId]);
 
-      // Swipe back up to index 1 -> index 3 must be disposed because (3 - 1).abs() > 1
-      pool.onPageChanged(1);
-      expect(pool.getController(0), isNotNull);
-      expect(pool.getController(1), isNotNull);
-      expect(pool.getController(2), isNotNull);
-      expect(pool.getController(3), isNull);
+      // The feed wraps around, so a large page index maps back into the list.
+      playback.show(shorts.length + 1);
+      expect(fake.loaded.last, shorts[1].youtubeId);
+      expect(created, 1);
 
-      pool.dispose();
+      playback.dispose();
+      expect(fake.closed, isTrue);
     });
   });
 
