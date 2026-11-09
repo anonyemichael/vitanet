@@ -9,21 +9,32 @@ import 'package:vitanet/features/admin/widgets/staff_ui.dart';
 
 /// Real alerts only: new urgent referrals and vitals alerts from patients
 /// with an open referral here (GET /portal/alerts).
-class AlertsScreen extends ConsumerWidget {
+class AlertsScreen extends ConsumerStatefulWidget {
   final bool active;
   const AlertsScreen({super.key, this.active = true});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AlertsScreen> createState() => _AlertsScreenState();
+}
+
+class _AlertsScreenState extends ConsumerState<AlertsScreen> {
+  bool _criticalOnly = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final active = widget.active;
     final value = ref.watch(alertsProvider);
+    final all = value.valueOrNull ?? const <PortalAlert>[];
+    final critical = all.where((a) => a.severity == 'critical').length;
     return AutoRefresh(
       active: active,
       onTick: () => ref.invalidate(alertsProvider),
       child: Column(
         children: [
           PortalHeader(
-            title: 'Alerts',
-            subtitle: 'Urgent referrals, vitals alerts & operational broadcasts',
+            title: 'Clinical alerts',
+            subtitle:
+                'Urgent referrals, vitals alerts & operational broadcasts',
             trailing: StaffIconButton(
               icon: Icons.add_alert_rounded,
               tooltip: 'Broadcast operational alert',
@@ -43,23 +54,49 @@ class AlertsScreen extends ConsumerWidget {
             child: PortalAsyncList<List<PortalAlert>>(
               value: value,
               onRefresh: () => ref.refresh(alertsProvider.future),
-              builder: (list) => list.isEmpty
-                  ? const [
-                      PortalEmpty(
-                        icon: Icons.notifications_none_rounded,
-                        title: 'No alerts right now',
-                        message: 'Urgent referrals and vitals alerts from patients heading here will show up here.',
-                      ),
-                    ]
-                  : [
-                      for (final a in list) ...[
-                        AlertCard(
-                          alert: a,
-                          onTap: a.referralId == null ? null : () => openReferral(context, a.referralId!),
+              header: [
+                Row(
+                  children: [
+                    StaffPill(
+                      label: 'All · ${all.length}',
+                      selected: !_criticalOnly,
+                      onTap: () => setState(() => _criticalOnly = false),
+                    ),
+                    const SizedBox(width: 8),
+                    StaffPill(
+                      label: 'Critical · $critical',
+                      selected: _criticalOnly,
+                      onTap: () => setState(() => _criticalOnly = true),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+              ],
+              builder: (unfiltered) {
+                final list = _criticalOnly
+                    ? unfiltered.where((a) => a.severity == 'critical').toList()
+                    : unfiltered;
+                return list.isEmpty
+                    ? const [
+                        PortalEmpty(
+                          icon: Icons.notifications_none_rounded,
+                          title: 'No alerts right now',
+                          message:
+                              'Urgent referrals and vitals alerts from patients heading here will show up here.',
                         ),
-                        const SizedBox(height: 10),
-                      ],
-                    ],
+                      ]
+                    : [
+                        for (final a in list) ...[
+                          AlertCard(
+                            alert: a,
+                            onTap: a.referralId == null
+                                ? null
+                                : () => openReferral(context, a.referralId!),
+                          ),
+                          const SizedBox(height: 10),
+                        ],
+                      ];
+              },
             ),
           ),
         ],
@@ -72,6 +109,18 @@ class AlertCard extends StatelessWidget {
   final PortalAlert alert;
   final VoidCallback? onTap;
   const AlertCard({super.key, required this.alert, this.onTap});
+
+  /// Clock time for today's alerts, relative time for older ones.
+  static String _clock(String iso) {
+    final t = DateTime.tryParse(iso)?.toLocal();
+    if (t == null) return '';
+    final now = DateTime.now();
+    final sameDay =
+        t.year == now.year && t.month == now.month && t.day == now.day;
+    return sameDay
+        ? '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}'
+        : relativeTime(iso);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -97,7 +146,10 @@ class AlertCard extends StatelessWidget {
             Container(
               width: 40,
               height: 40,
-              decoration: BoxDecoration(color: t.bg, borderRadius: BorderRadius.circular(12)),
+              decoration: BoxDecoration(
+                color: t.bg,
+                borderRadius: BorderRadius.circular(12),
+              ),
               child: Icon(icon, size: 20, color: p.dark ? t.fg : t.strong),
             ),
             const SizedBox(width: 12),
@@ -108,29 +160,61 @@ class AlertCard extends StatelessWidget {
                   Row(
                     children: [
                       Expanded(
-                        child: Text(alert.title, style: staffBody(15, weight: FontWeight.w700, color: p.ink)),
-                      ),
-                      if (alert.department != null && alert.department!.isNotEmpty)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: p.chip,
-                            borderRadius: BorderRadius.circular(4),
+                        child: Text(
+                          alert.title,
+                          style: staffBody(
+                            15,
+                            weight: FontWeight.w700,
+                            color: p.ink,
                           ),
-                          child: Text(alert.department!, style: staffBody(10, weight: FontWeight.bold, color: p.muted)),
                         ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        _clock(alert.at),
+                        style: staffBody(
+                          12,
+                          weight: FontWeight.w600,
+                          color: p.muted,
+                        ),
+                      ),
                     ],
                   ),
                   if ((alert.body ?? '').isNotEmpty) ...[
                     const SizedBox(height: 3),
-                    Text(alert.body!, style: staffBody(13, color: p.body)),
+                    Text(
+                      alert.body!,
+                      style: staffBody(13, color: p.body, height: 1.45),
+                    ),
                   ],
-                  const SizedBox(height: 4),
-                  Text(relativeTime(alert.at), style: staffBody(12, color: p.muted)),
+                  if ((alert.department ?? '').isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      alert.department!,
+                      style: staffBody(
+                        12,
+                        weight: FontWeight.w600,
+                        color: p.muted,
+                      ),
+                    ),
+                  ],
+                  if (onTap != null) ...[
+                    const SizedBox(height: 10),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: StaffButton(
+                        'View referral',
+                        kind: StaffButtonKind.secondary,
+                        height: 40,
+                        radius: 12,
+                        fontSize: 13,
+                        onPressed: onTap,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
-            if (onTap != null) Icon(Icons.chevron_right_rounded, color: p.faint),
           ],
         ),
       ),
@@ -143,7 +227,8 @@ class BroadcastAlertSheet extends ConsumerStatefulWidget {
   const BroadcastAlertSheet({super.key});
 
   @override
-  ConsumerState<BroadcastAlertSheet> createState() => _BroadcastAlertSheetState();
+  ConsumerState<BroadcastAlertSheet> createState() =>
+      _BroadcastAlertSheetState();
 }
 
 class _BroadcastAlertSheetState extends ConsumerState<BroadcastAlertSheet> {
@@ -172,7 +257,9 @@ class _BroadcastAlertSheetState extends ConsumerState<BroadcastAlertSheet> {
     setState(() => _saving = true);
     final r = await runPortalAction(
       context,
-      () => ref.read(hospitalApiProvider).createBroadcastAlert(
+      () => ref
+          .read(hospitalApiProvider)
+          .createBroadcastAlert(
             title: title,
             body: body,
             severity: _severity,
@@ -189,9 +276,14 @@ class _BroadcastAlertSheetState extends ConsumerState<BroadcastAlertSheet> {
   Widget build(BuildContext context) {
     return PortalSheet(
       title: 'Broadcast Facility Alert',
-      subtitle: 'Post an operational notice or priority clinical alert across the department.',
+      subtitle:
+          'Post an operational notice or priority clinical alert across the department.',
       actions: [
-        StaffButton('Cancel', kind: StaffButtonKind.secondary, onPressed: () => Navigator.of(context).pop()),
+        StaffButton(
+          'Cancel',
+          kind: StaffButtonKind.secondary,
+          onPressed: () => Navigator.of(context).pop(),
+        ),
         StaffButton('Broadcast', loading: _saving, onPressed: _submit),
       ],
       children: [
