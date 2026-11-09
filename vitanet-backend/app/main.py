@@ -3,8 +3,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.database.base import Base
 from app.database.connection import engine, SessionLocal
+from app.database.schema_sync import sync_schema
 from app.database.seed_data import seed_hospital_data
 from app.models import *  # noqa: F401, F403 Ensure all models are registered with Base
 from app.routes import (
@@ -18,11 +18,11 @@ from app.routes import (
     vitals,
     hospitals,
     sms_router,
-    admin,
     triage,
     staff,
     ai_proxy,
     portal,
+    portal_live,
     media_proxy,
 )
 from app.dependencies.security import DEV_BYPASS_AUTH
@@ -35,8 +35,9 @@ if DEV_BYPASS_AUTH:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Initialize all database tables automatically
-    Base.metadata.create_all(bind=engine)
+    # Create missing tables and add columns newer than the database.
+    with engine.begin() as conn:
+        sync_schema(conn)
     # Seed default hospital and patient records if empty
     db = SessionLocal()
     try:
@@ -88,11 +89,11 @@ app.include_router(user_settings.router)
 app.include_router(chat.router)
 app.include_router(health_alert.router)
 app.include_router(sms_router.router)
-app.include_router(admin.router)
 app.include_router(triage.router)
 app.include_router(staff.router)
 app.include_router(ai_proxy.router)
 app.include_router(portal.router)
+app.include_router(portal_live.router)
 app.include_router(media_proxy.router)
 
 

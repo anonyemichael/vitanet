@@ -28,8 +28,10 @@ class Referral(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     hospital_id = Column(UUID(as_uuid=True), ForeignKey("hospitals.id"), nullable=False, index=True)
     patient_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
-    status = Column(String(16), nullable=False, default="new")  # new|accepted|declined|cancelled|arrived
-    triage_level = Column(String(16), nullable=False)  # urgent|doctor|pharmacist|self_care
+    # new → accepted → arrived → closed, or declined / cancelled
+    status = Column(String(16), nullable=False, default="new")
+    triage_level = Column(String(16), nullable=False)  # urgent|doctor|pharmacist|self_care|routine
+    source = Column(String(16), nullable=False, default="app")  # app|checkin
     summary = Column(JSON, nullable=False, default=dict)  # consented snapshot shown to staff
     consent_at = Column(DateTime, nullable=False)
     patient_lat = Column(Float, nullable=True)
@@ -38,6 +40,8 @@ class Referral(Base):
     decline_reason = Column(String(500), nullable=True)
     handled_by = Column(String(128), nullable=True)
     case_id = Column(UUID(as_uuid=True), nullable=True)
+    arrived_at = Column(DateTime, nullable=True)
+    brief = Column(JSON, nullable=True)  # cached pre-arrival brief
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
@@ -54,7 +58,10 @@ class PortalCase(Base):
     sex = Column(String(16), nullable=True)
     complaint = Column(String(300), nullable=False)
     level = Column(String(16), nullable=False)  # urgent|doctor|routine
-    status = Column(String(16), nullable=False, default="waiting")  # waiting|treatment|discharged
+    # expected (accepted, on the way) → waiting (arrived) → treatment → discharged
+    status = Column(String(16), nullable=False, default="waiting")
+    arrived_at = Column(DateTime, nullable=True)
+    outcome = Column(String(20), nullable=True)  # home|admitted|transferred|left
     ward_id = Column(Integer, nullable=True)
     bed = Column(String(40), nullable=True)
     assignee_uid = Column(String(128), nullable=True)
@@ -113,3 +120,37 @@ class PortalBroadcast(Base):
     author_name = Column(String(150), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+
+class PortalCaseVitals(Base):
+    """One set of observations recorded by staff for a case."""
+
+    __tablename__ = "portal_case_vitals"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    case_id = Column(UUID(as_uuid=True), ForeignKey("portal_cases.id"), nullable=False, index=True)
+    hospital_id = Column(UUID(as_uuid=True), ForeignKey("hospitals.id"), nullable=False, index=True)
+    heart_rate = Column(Integer, nullable=True)
+    bp_systolic = Column(Integer, nullable=True)
+    bp_diastolic = Column(Integer, nullable=True)
+    spo2 = Column(Float, nullable=True)
+    temperature = Column(Float, nullable=True)
+    respiratory_rate = Column(Integer, nullable=True)
+    pain = Column(Integer, nullable=True)
+    alert = Column(Boolean, nullable=True)  # not fully alert (confused, drowsy…)
+    early_warning = Column(Integer, nullable=True)  # NEWS2-style score
+    recorded_by = Column(String(150), nullable=True)
+    at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+
+class PortalAlertAck(Base):
+    """A staff member saying "I'm on it" for an alert."""
+
+    __tablename__ = "portal_alert_acks"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    hospital_id = Column(UUID(as_uuid=True), ForeignKey("hospitals.id"), nullable=False, index=True)
+    alert_key = Column(String(80), nullable=False, index=True)
+    uid = Column(String(128), nullable=False)
+    name = Column(String(150), nullable=True)
+    at = Column(DateTime, default=datetime.utcnow, nullable=False)

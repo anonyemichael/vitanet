@@ -55,8 +55,8 @@ def test_bypass_ignored_in_production():
 def test_requires_token():
     for method, path in [
         ("get", "/vitals/alice-uid/latest"),
-        ("get", "/admin/stats"),
-        ("get", "/admin/patients"),
+        ("get", "/portal/dashboard"),
+        ("get", "/admin/staff-requests"),
         ("get", "/triage/symptoms"),
         ("post", "/ai/chat/completions"),
     ]:
@@ -109,12 +109,12 @@ def _facility():
 
 
 def test_staff_needs_approval():
-    assert client.get("/admin/stats", headers=h("tok-nurse")).status_code == 403
+    assert client.get("/portal/dashboard", headers=h("tok-nurse")).status_code == 403
     r = client.post("/staff/register", headers=h("tok-nurse"),
                     json={"full_name": "Nurse Joy", "role": "admin", "hospital_id": _facility()})
     assert r.status_code == 200 and r.json()["status"] == "pending"
     # self-requested "admin" grants nothing until approved
-    assert client.get("/admin/stats", headers=h("tok-nurse")).status_code == 403
+    assert client.get("/portal/dashboard", headers=h("tok-nurse")).status_code == 403
     assert client.get("/admin/staff-requests", headers=h("tok-nurse")).status_code == 403
 
 
@@ -127,18 +127,18 @@ def test_unverified_bootstrap_email_is_not_admin():
     r = client.post("/staff/register", headers=h("tok-fakeboss"),
                     json={"full_name": "Fake", "hospital_id": _facility()})
     assert r.json()["status"] == "pending"
-    assert client.get("/admin/stats", headers=h("tok-fakeboss")).status_code == 403
+    assert client.get("/portal/dashboard", headers=h("tok-fakeboss")).status_code == 403
 
 
 def test_bootstrap_admin_approves_staff():
     me = client.get("/staff/me", headers=h("tok-boss"))
     assert me.status_code == 200 and me.json()["status"] == "approved" and me.json()["role"] == "admin"
-    assert client.get("/admin/stats", headers=h("tok-boss")).status_code == 200
+    assert client.get("/portal/dashboard", headers=h("tok-boss")).status_code == 200
     pending = client.get("/admin/staff-requests?status=pending", headers=h("tok-boss")).json()
     assert any(p["firebase_uid"] == "nurse-uid" for p in pending)
     r = client.post("/admin/staff-requests/nurse-uid/approve", headers=h("tok-boss"), json={"role": "nurse"})
     assert r.status_code == 200 and r.json()["status"] == "approved" and r.json()["role"] == "nurse"
-    assert client.get("/admin/stats", headers=h("tok-nurse")).status_code == 200
+    assert client.get("/portal/dashboard", headers=h("tok-nurse")).status_code == 200
     # a nurse can't approve others
     assert client.get("/admin/staff-requests", headers=h("tok-nurse")).status_code == 403
     # an admin can't approve themselves
