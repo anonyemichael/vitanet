@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vitanet/core/constants/app_colors.dart';
 import 'package:vitanet/features/admin/models/portal_models.dart';
 import 'package:vitanet/features/admin/providers/portal_providers.dart';
 import 'package:vitanet/features/admin/screens/hospital_form_screen.dart';
@@ -60,36 +61,61 @@ class PortalSettingsScreen extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const PortalSectionTitle('Profile'),
-                      if (me != null)
-                        StaffCard(
-                          child: Column(children: [
-                            Row(children: [
-                              StaffInitialsAvatar(initialsOf(me.fullName), tone: StaffTone.brand, size: 48, fontSize: 16),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                  Text(me.fullName, style: staffHeading(17, weight: FontWeight.w700, color: p.ink)),
-                                  Text(me.email ?? '', style: staffBody(13, color: p.muted)),
-                                ]),
-                              ),
-                              IconButton(
-                                tooltip: 'Edit profile',
-                                icon: Icon(Icons.edit_outlined, color: p.accent),
-                                onPressed: () => showModalBottomSheet<void>(
-                                  context: context,
-                                  isScrollControlled: true,
-                                  backgroundColor: Colors.transparent,
-                                  builder: (_) => _EditProfileSheet(me: me),
+                      const SizedBox(height: 12),
+                      if (me != null) ...[
+                        // Dark profile banner (design). "Verified" holds: only
+                        // approved staff reach the portal.
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: AppColors.staffNavy,
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          child: Row(children: [
+                            StaffInitialsAvatar(initialsOf(me.fullName), tone: StaffTone.brand, size: 56, fontSize: 18),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                Text(me.fullName,
+                                    style: staffHeading(18, weight: FontWeight.w700, color: const Color(0xFFF1F5F9))),
+                                const SizedBox(height: 2),
+                                Text(
+                                  [
+                                    if ((me.licenseNumber ?? '').isNotEmpty) me.licenseNumber!,
+                                    [me.department, me.role.label].whereType<String>().where((s) => s.isNotEmpty).join(' '),
+                                  ].join(' · '),
+                                  style: staffBody(13, color: const Color(0xFF94A3B8)),
                                 ),
+                              ]),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: const Color(0x262DD4BF),
+                                borderRadius: BorderRadius.circular(10),
                               ),
-                            ]),
-                            const SizedBox(height: 8),
-                            InfoRow('Role', me.role.label),
-                            InfoRow('Department', me.department ?? ''),
-                            InfoRow('License no.', me.licenseNumber ?? ''),
+                              child: Text('Verified',
+                                  style: staffBody(12, weight: FontWeight.w700, color: AppColors.mintLight)),
+                            ),
                           ]),
                         ),
+                        const PortalSectionTitle('Account'),
+                        StaffGroup(children: [
+                          StaffNavRow(
+                            title: 'Profile & credentials',
+                            subtitle: 'License, department, contact',
+                            icon: Icons.person_outline_rounded,
+                            iconTone: StaffTone.indigo,
+                            onTap: () => showModalBottomSheet<void>(
+                              context: context,
+                              isScrollControlled: true,
+                              backgroundColor: Colors.transparent,
+                              builder: (_) => _EditProfileSheet(me: me),
+                            ),
+                          ),
+                        ]),
+                      ],
                       const PortalSectionTitle('Facility'),
                       hospital.when(
                         loading: () => const StaffCard(child: PortalLoading()),
@@ -161,7 +187,7 @@ class PortalSettingsScreen extends ConsumerWidget {
                       ),
                       const PortalSectionTitle('Notifications'),
                       const _NotificationPrefs(),
-                      const PortalSectionTitle('Account'),
+                      const PortalSectionTitle('Security & workspace'),
                       StaffGroup(children: [
                         StaffNavRow(
                           title: 'Change password',
