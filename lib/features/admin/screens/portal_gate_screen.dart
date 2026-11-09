@@ -15,13 +15,19 @@ import 'package:vitanet/shared/widgets/vitanet_logo.dart';
 
 /// Signs the user out after confirmation and returns to the login screen.
 Future<void> confirmAndSignOut(BuildContext context, WidgetRef ref) async {
-  final ok = await confirmPortal(
-    context,
-    title: 'Sign out?',
-    message: "You'll need your email and password (or Google) to sign back in.",
-    confirm: 'Sign out',
-    destructive: true,
-  );
+  // Open cases still assigned to me: warn so they are handed over first.
+  final assigned = ref
+          .read(dashboardProvider)
+          .valueOrNull
+          ?.myCases
+          .where((c) => c.status != 'discharged')
+          .length ??
+      0;
+  final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => _EndSessionDialog(assigned: assigned),
+      ) ??
+      false;
   if (!ok || !context.mounted) return;
   await ref.read(authProvider.notifier).signOut();
   if (context.mounted) context.go('/login');
@@ -242,6 +248,88 @@ class PendingApprovalScreen extends ConsumerWidget {
       primaryLabel: 'Check again',
       primaryLoading: refreshing,
       onPrimary: () => ref.invalidate(staffAccessProvider),
+    );
+  }
+}
+
+/// "End your session?" (design): warns about patients still assigned.
+class _EndSessionDialog extends StatelessWidget {
+  final int assigned;
+  const _EndSessionDialog({required this.assigned});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = StaffPalette.of(context);
+    final amber = p.tone(StaffTone.amber);
+    final patients = assigned == 1 ? '1 patient' : '$assigned patients';
+    return Dialog(
+      backgroundColor: p.card,
+      surfaceTintColor: Colors.transparent,
+      insetPadding: const EdgeInsets.all(24),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(color: p.tone(StaffTone.neutral).bg, borderRadius: BorderRadius.circular(16)),
+                child: Icon(Icons.logout_rounded, color: p.body, size: 26),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text('End your session?', textAlign: TextAlign.center, style: staffHeading(20, color: p.ink)),
+            const SizedBox(height: 10),
+            Text(
+              assigned > 0
+                  ? "You're signing out of the clinical system on this device. You have $patients still assigned to you."
+                  : "You're signing out of the clinical system on this device.",
+              textAlign: TextAlign.center,
+              style: staffBody(14, color: p.body, height: 1.5),
+            ),
+            if (assigned > 0) ...[
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: amber.bg, borderRadius: BorderRadius.circular(14)),
+                child: Row(
+                  children: [
+                    Icon(Icons.warning_amber_rounded, size: 20, color: amber.fg),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text('Hand them over before leaving your shift.',
+                          style: staffBody(13, weight: FontWeight.w600, color: amber.fg)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: 20),
+            if (assigned > 0) ...[
+              StaffButton('Hand over patients first',
+                  height: 52, radius: 16, onPressed: () => Navigator.of(context).pop(false)),
+              const SizedBox(height: 10),
+            ],
+            StaffButton(assigned > 0 ? 'Sign out anyway' : 'Sign out',
+                kind: StaffButtonKind.dangerOutline,
+                height: 52,
+                radius: 16,
+                onPressed: () => Navigator.of(context).pop(true)),
+            const SizedBox(height: 6),
+            Center(
+              child: TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                style: TextButton.styleFrom(minimumSize: const Size(44, 44)),
+                child: Text('Cancel', style: staffBody(14, weight: FontWeight.w600, color: p.body)),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
