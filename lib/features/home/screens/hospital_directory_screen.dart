@@ -7,7 +7,7 @@ import 'package:vitanet/features/portal/data/hospital_api_service.dart';
 import 'package:vitanet/features/home/widgets/emergency_checkin_sheet.dart';
 import 'package:vitanet/shared/widgets/vn_kit.dart';
 
-/// Full searchable directory of affiliated hospitals and emergency trauma centers.
+/// Searchable list of every hospital on VitaNet, with filters for ER, beds and ambulance.
 class HospitalDirectoryScreen extends ConsumerStatefulWidget {
   const HospitalDirectoryScreen({super.key});
 
@@ -121,7 +121,7 @@ class _HospitalDirectoryScreenState extends ConsumerState<HospitalDirectoryScree
                       ),
                       const SizedBox(width: 8),
                       FilterChip(
-                        label: const Text('Ambulance Dispatch'),
+                        label: const Text('Has ambulance'),
                         selected: _ambulanceOnly,
                         onSelected: (val) => setState(() => _ambulanceOnly = val),
                         backgroundColor: p.surfaceAlt,

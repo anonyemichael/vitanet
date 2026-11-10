@@ -90,7 +90,7 @@ class _SendReferralSheetState extends ConsumerState<SendReferralSheet> {
     final name = profile?.name.trim() ?? '';
     final sex = profile?.sex?.trim() ?? '';
     return ReferralRequest(
-      hospitalId: f.id,
+      hospitalId: f.id ?? '',
       consent: _consent,
       triageLevel: referralLevelFor(r.level),
       complaint: _complaint,

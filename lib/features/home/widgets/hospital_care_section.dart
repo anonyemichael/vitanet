@@ -107,7 +107,7 @@ class HospitalCareSection extends ConsumerWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Hospital directory currently syncing',
+                    "Couldn't load nearby hospitals",
                     style: VnText.body(13, color: p.muted),
                   ),
                 ),
@@ -128,7 +128,7 @@ class HospitalCareSection extends ConsumerWidget {
                   border: Border.all(color: p.line),
                 ),
                 child: Text(
-                  'No affiliated hospitals in direct range.',
+                  'No VitaNet hospitals near you yet.',
                   style: VnText.body(13, color: p.muted),
                 ),
               );

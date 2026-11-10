@@ -1,50 +1,9 @@
 import 'package:dio/dio.dart';
+import 'package:vitanet/features/portal/data/portal_models.dart' show Facility;
 
-/// A hospital registered with VitaNet (from `GET /facilities`).
-class Facility {
-  final String id;
-  final String name;
-  final String? address;
-  final double? latitude;
-  final double? longitude;
-  final String? phoneNumber;
-  final bool hasEmergencyRoom;
-  final bool acceptingReferrals;
-  final double? distanceKm;
-  final int? etaMinutes;
-  final int bedsTotal;
-  final int bedsFree;
-
-  const Facility({
-    required this.id,
-    required this.name,
-    this.address,
-    this.latitude,
-    this.longitude,
-    this.phoneNumber,
-    this.hasEmergencyRoom = false,
-    this.acceptingReferrals = false,
-    this.distanceKm,
-    this.etaMinutes,
-    this.bedsTotal = 0,
-    this.bedsFree = 0,
-  });
-
-  factory Facility.fromJson(Map<String, dynamic> j) => Facility(
-        id: j['id'].toString(),
-        name: (j['name'] as String?) ?? 'Hospital',
-        address: j['address'] as String?,
-        latitude: (j['latitude'] as num?)?.toDouble(),
-        longitude: (j['longitude'] as num?)?.toDouble(),
-        phoneNumber: j['phone_number'] as String?,
-        hasEmergencyRoom: j['has_emergency_room'] == true,
-        acceptingReferrals: j['accepting_referrals'] == true,
-        distanceKm: (j['distance_km'] as num?)?.toDouble(),
-        etaMinutes: (j['eta_minutes'] as num?)?.toInt(),
-        bedsTotal: (j['beds_total'] as num?)?.toInt() ?? 0,
-        bedsFree: (j['beds_free'] as num?)?.toInt() ?? 0,
-      );
-}
+// `Facility` (a hospital from `GET /facilities`) is the same shape the portal
+// uses, so the patient side shares that one class instead of keeping a copy.
+export 'package:vitanet/features/portal/data/portal_models.dart' show Facility;
 
 /// Case details the hospital attached once it accepted a referral.
 class ReferralCase {
