@@ -144,7 +144,8 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
   Widget _desk(BuildContext context, _BoardData d) {
     final p = ClinicalPalette.of(context);
     final selection = ref.watch(deskSelectionProvider);
-    Widget column(String title, int count, List<Widget> children) => Expanded(
+    Widget column(String title, int count, List<Widget> children, {int flex = 3}) => Expanded(
+          flex: flex,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -187,7 +188,7 @@ class _BoardScreenState extends ConsumerState<BoardScreen> {
                           ],
                           if (d.incoming.isEmpty && d.expected.isEmpty)
                             const CEmpty(icon: Icons.move_to_inbox_outlined, title: 'Nobody on the way'),
-                        ]),
+                        ], flex: 4),
                         const SizedBox(width: 16),
                         column('In hospital', d.inHospital.length, [
                           if (d.inHospital.isEmpty)
@@ -603,9 +604,18 @@ class IncomingCard extends ConsumerWidget {
                   children: [
                     Row(
                       children: [
-                        LevelChip(r.triageLevel),
-                        if (r.source == 'checkin') ...[const SizedBox(width: 6), const CChip('Check-in', tone: Tone.blue)],
-                        const Spacer(),
+                        Expanded(
+                          child: Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              LevelChip(r.triageLevel),
+                              if (r.source == 'checkin') const CChip('Check-in', tone: Tone.blue),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
                         Text('ETA ', style: cText(12, color: p.muted)),
                         Every(builder: (_) => Text(etaText(r.minutesToArrival()), style: cMono(compact ? 15 : 20, color: p.ink))),
                       ],
@@ -636,13 +646,18 @@ class IncomingCard extends ConsumerWidget {
             child: Row(
               children: [
                 Expanded(
+                  flex: compact ? 2 : 1,
                   child: CButton('Decline',
-                      kind: CButtonKind.secondary, height: compact ? 40 : 44, onPressed: () => showDeclineSheet(context, ref, r)),
+                      kind: CButtonKind.secondary,
+                      height: compact ? 40 : 44,
+                      fontSize: compact ? 14 : 15,
+                      onPressed: () => showDeclineSheet(context, ref, r)),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  flex: 2,
-                  child: CButton('Accept', height: compact ? 40 : 44, onPressed: () => showAcceptSheet(context, ref, r)),
+                  flex: compact ? 3 : 2,
+                  child: CButton('Accept',
+                      height: compact ? 40 : 44, fontSize: compact ? 14 : 15, onPressed: () => showAcceptSheet(context, ref, r)),
                 ),
               ],
             ),
@@ -703,41 +718,49 @@ class CaseRow extends ConsumerWidget {
         onTap: () => openCase(context, ref, c.id),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-          child: Row(
-            children: [
-              CDot(discharged ? p.faint : p.tone(levelTone(c.level)).dot),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text.rich(
-                      TextSpan(children: [
-                        TextSpan(text: c.patientName),
-                        if (ageSex(c.age, c.sex).isNotEmpty)
-                          TextSpan(text: ' · ${ageSex(c.age, c.sex)}', style: cText(15, weight: FontWeight.w500, color: p.muted)),
-                      ]),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: cText(15, weight: FontWeight.w600, color: p.ink),
-                    ),
-                    Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: cText(13, color: p.muted)),
-                  ],
+          child: LayoutBuilder(builder: (context, constraints) {
+            // In a narrow desk column the name matters more than the timer
+            // and the assignee avatar; both are on the record anyway.
+            final narrow = constraints.maxWidth < 380;
+            final tight = constraints.maxWidth < 320;
+            return Row(
+              children: [
+                CDot(discharged ? p.faint : p.tone(levelTone(c.level)).dot),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text.rich(
+                        TextSpan(children: [
+                          TextSpan(text: c.patientName),
+                          if (ageSex(c.age, c.sex).isNotEmpty)
+                            TextSpan(text: ' · ${ageSex(c.age, c.sex)}', style: cText(15, weight: FontWeight.w500, color: p.muted)),
+                        ]),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: cText(15, weight: FontWeight.w600, color: p.ink),
+                      ),
+                      Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: cText(13, color: p.muted)),
+                    ],
+                  ),
                 ),
-              ),
-              if (ews != null && ews >= 5 && !discharged) ...[
-                CChip('EWS $ews', tone: earlyWarningTone(ews)),
-                const SizedBox(width: 8),
+                if (ews != null && ews >= 5 && !discharged) ...[
+                  CChip('EWS $ews', tone: earlyWarningTone(ews)),
+                  const SizedBox(width: 8),
+                ],
+                if (c.isExpected)
+                  _ArrivedButton(portalCase: c)
+                else if (!discharged) ...[
+                  if (!narrow) ...[
+                    Every(builder: (_) => Text(elapsed(c.arrivedAt ?? c.createdAt), style: cMono(13, weight: FontWeight.w500, color: p.body))),
+                    const SizedBox(width: 8),
+                  ],
+                  if (!tight) CAvatar(c.assigneeName ?? '', size: 30),
+                ],
               ],
-              if (c.isExpected)
-                _ArrivedButton(portalCase: c)
-              else if (!discharged) ...[
-                Every(builder: (_) => Text(elapsed(c.arrivedAt ?? c.createdAt), style: cMono(13, weight: FontWeight.w500, color: p.body))),
-                const SizedBox(width: 8),
-                CAvatar(c.assigneeName ?? '', size: 30),
-              ],
-            ],
-          ),
+            );
+          }),
         ),
       ),
     );

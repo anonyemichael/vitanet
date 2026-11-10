@@ -177,7 +177,11 @@ String ageSex(int? age, String? sex) {
 }
 
 /// Short case number shown to staff, e.g. C-3F2A1B.
-String caseRef(String id) => id.isEmpty ? 'C-–' : 'C-${id.replaceAll('-', '').substring(0, 6).toUpperCase()}';
+String caseRef(String id) {
+  final compact = id.replaceAll('-', '');
+  if (compact.isEmpty) return 'C-–';
+  return 'C-${compact.substring(0, compact.length < 6 ? compact.length : 6).toUpperCase()}';
+}
 
 DateTime? parseTime(String? iso) => DateTime.tryParse(iso ?? '')?.toLocal();
 
@@ -378,7 +382,7 @@ class CButton extends StatelessWidget {
           child: SizedBox(
             height: height,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14),
+              padding: EdgeInsets.symmetric(horizontal: height < 44 ? 8 : 14),
               child: Center(widthFactor: 1, child: child),
             ),
           ),
