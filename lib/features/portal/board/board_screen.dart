@@ -709,8 +709,8 @@ class CaseRow extends ConsumerWidget {
         ? '${outcomeLabel(c.outcome)} · ${clockTime(c.updatedAt)}'
         : [
             if (showRef) caseRef(c.id),
-            if (where.isNotEmpty) where else if (c.isExpected) 'On the way' else 'Waiting area',
-            caseStatusLabel(c.status),
+            if (where.isNotEmpty) where else if (!c.isExpected) 'Waiting area',
+            caseStatusLabel(c.status), // "On the way" / "Waiting" / "In treatment"
           ].join(' · ');
     return Material(
       color: selected ? p.primaryTint : Colors.transparent,

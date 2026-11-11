@@ -20,6 +20,10 @@ class BackendConfig {
   );
   static const String _prefsKey = 'backend_base_url';
 
+  /// Dev builds: `--dart-define=BACKEND_PINNED=true` keeps the build-time URL
+  /// (e.g. a local server) instead of the one in Firestore.
+  static const bool _pinned = bool.fromEnvironment('BACKEND_PINNED');
+
   static String _baseUrl = _buildDefault;
 
   static String get baseUrl => _baseUrl;
@@ -28,6 +32,7 @@ class BackendConfig {
 
   /// Call once after Firebase is initialised. Never throws.
   static Future<void> load() async {
+    if (_pinned) return;
     try {
       final prefs = await SharedPreferences.getInstance();
       final cached = prefs.getString(_prefsKey);

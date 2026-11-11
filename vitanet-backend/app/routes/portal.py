@@ -270,10 +270,23 @@ def my_hospital(staff: StaffAccount = Depends(facility_staff), db: Session = Dep
     return _hospital_out(h, reg, db)
 
 
+def _registration(db: Session, staff: StaffAccount) -> FacilityRegistration:
+    """The portal settings row for the staff member's hospital. Hospitals that
+    were seeded (not created through the portal) have none yet, so one is made
+    on first use — paused until an admin switches it on."""
+    reg = db.query(FacilityRegistration).filter(FacilityRegistration.hospital_id == staff.hospital_id).first()
+    if reg is None:
+        reg = FacilityRegistration(hospital_id=staff.hospital_id, created_by=staff.firebase_uid,
+                                   accepting_referrals=False)
+        db.add(reg)
+        db.flush()
+    return reg
+
+
 @router.put("/portal/hospital")
 def update_hospital(payload: HospitalIn, staff: StaffAccount = Depends(facility_admin), db: Session = Depends(get_db)):
     h = db.query(Hospital).filter(Hospital.id == staff.hospital_id).first()
-    reg = db.query(FacilityRegistration).filter(FacilityRegistration.hospital_id == staff.hospital_id).first()
+    reg = _registration(db, staff)
     for k in ("name", "address", "latitude", "longitude", "phone_number", "has_emergency_room",
               "has_ambulance", "ambulance_available"):
         setattr(h, k, getattr(payload, k))
@@ -287,7 +300,7 @@ def update_hospital(payload: HospitalIn, staff: StaffAccount = Depends(facility_
 @router.put("/portal/hospital/accepting")
 def set_accepting(payload: AcceptingIn, staff: StaffAccount = Depends(facility_admin), db: Session = Depends(get_db)):
     """The Accepting / Paused switch on the Board and Hospital screens."""
-    reg = db.query(FacilityRegistration).filter(FacilityRegistration.hospital_id == staff.hospital_id).first()
+    reg = _registration(db, staff)
     reg.accepting_referrals = payload.accepting_referrals
     _audit(db, staff, "facility.accepting" if payload.accepting_referrals else "facility.paused")
     db.commit()
@@ -518,12 +531,13 @@ def list_referrals(status: Optional[str] = Query(default=None), staff: StaffAcco
     q = db.query(Referral).filter(Referral.hospital_id == staff.hospital_id)
     if status:
         q = q.filter(Referral.status.in_([s.strip() for s in status.split(",") if s.strip()]))
-    return [_referral_out(r) for r in q.order_by(Referral.created_at.desc()).limit(200)]
+    return [_with_suggestion(db, staff, r) for r in q.order_by(Referral.created_at.desc()).limit(200)]
 
 
-@router.get("/portal/referrals/{referral_id}")
-def get_referral(referral_id: UUID, staff: StaffAccount = Depends(facility_staff), db: Session = Depends(get_db)):
-    r = _get_referral(db, staff, referral_id)
+def _with_suggestion(db: Session, staff: StaffAccount, r: Referral) -> Dict[str, Any]:
+    """Referral payload plus, while it is still new, the suggested ward and
+    clinician — so the Accept sheet is pre-filled from the Board card as well
+    as from the referral page."""
     out = _referral_out(r)
     if r.status == "new":
         ward = portal_rules.suggest_ward(db, staff.hospital_id, r.triage_level)
@@ -533,6 +547,11 @@ def get_referral(referral_id: UUID, staff: StaffAccount = Depends(facility_staff
             "assignee_uid": who.firebase_uid if who else None, "assignee_name": who.full_name if who else None,
         }
     return out
+
+
+@router.get("/portal/referrals/{referral_id}")
+def get_referral(referral_id: UUID, staff: StaffAccount = Depends(facility_staff), db: Session = Depends(get_db)):
+    return _with_suggestion(db, staff, _get_referral(db, staff, referral_id))
 
 
 @router.post("/portal/referrals/{referral_id}/accept")

@@ -2,6 +2,9 @@
 import os
 
 os.environ["DATABASE_URL"] = os.environ.get("PORTAL_TEST_DB", "sqlite:///./portal_test.db")
+# The flow below assumes an empty database; an interrupted run must not poison the next one.
+if os.environ["DATABASE_URL"] == "sqlite:///./portal_test.db" and os.path.exists("portal_test.db"):
+    os.remove("portal_test.db")
 os.environ["BOOTSTRAP_ADMIN_EMAILS"] = "boss@example.com,boss2@example.com"
 os.environ["ENVIRONMENT"] = "production"
 

@@ -471,7 +471,8 @@ class _AcceptSheetState extends ConsumerState<AcceptSheet> {
                     subtitle: '${m.role.label} · ${m.onDuty ? 'on shift' : 'off shift'} · '
                         '${m.activeCases} patient${m.activeCases == 1 ? '' : 's'}',
                     selected: _assignee == m.firebaseUid,
-                    onTap: () => setState(() => _assignee = _assignee == m.firebaseUid ? null : m.firebaseUid),
+                    // "Leave unassigned" below is the explicit way to clear it.
+                    onTap: () => setState(() => _assignee = m.firebaseUid),
                   ),
                   const SizedBox(height: 6),
                 ],

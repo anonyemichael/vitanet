@@ -60,9 +60,16 @@ class StaffAccess {
 
 /// Staff status for the signed-in (non-anonymous) user, from GET /staff/me.
 /// This — not the Firestore profile role — decides portal access.
+/// Dev builds against a backend running with DEV_BYPASS_AUTH:
+/// `--dart-define=DEV_PORTAL_GUEST=true` lets a guest sign-in ask /staff/me
+/// too (the backend answers as its dev user). Off in every normal build.
+const bool _devPortalGuest = bool.fromEnvironment('DEV_PORTAL_GUEST');
+
 final staffAccessProvider = FutureProvider<StaffAccess>((ref) async {
   final uid = ref.watch(authProvider.select(
-    (s) => s.status == AuthStatus.authenticated ? s.user?.uid : null,
+    (s) => s.status == AuthStatus.authenticated || (_devPortalGuest && s.status == AuthStatus.anonymous)
+        ? s.user?.uid
+        : null,
   ));
   if (uid == null) return StaffAccess.none;
   final me = await ref.watch(hospitalApiProvider).getStaffMe();

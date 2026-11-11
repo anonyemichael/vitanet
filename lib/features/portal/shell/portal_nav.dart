@@ -42,12 +42,17 @@ void openCase(BuildContext context, WidgetRef ref, String id) {
   Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => CaseRecordPage(caseId: id)));
 }
 
-/// After accepting on a phone, replace the referral page with the new record;
-/// on desk, show the record in the pane.
+/// After accepting on a phone, show the new record. If the referral page is
+/// open it is closed first so Back returns to the Board; from a Board card the
+/// record is simply pushed (replacing would remove the portal itself). On desk,
+/// the record opens in the pane.
 void showCaseAfterAccept(BuildContext context, WidgetRef ref, String caseId) {
   if (DetailPaneScope.hasPane(context)) {
     ref.read(deskSelectionProvider.notifier).state = (kind: 'case', id: caseId);
     return;
   }
-  Navigator.of(context).pushReplacement(MaterialPageRoute<void>(builder: (_) => CaseRecordPage(caseId: caseId)));
+  final nav = Navigator.of(context);
+  final onReferralPage = context.findAncestorWidgetOfExactType<ReferralPage>() != null;
+  if (onReferralPage && nav.canPop()) nav.pop();
+  nav.push(MaterialPageRoute<void>(builder: (_) => CaseRecordPage(caseId: caseId)));
 }
