@@ -114,16 +114,6 @@ def seed_hospital_data(db: Session):
         db.commit()
         logger.info("Seeded %d care circle members", len(circle_members))
 
-    if db.query(VitalReading).filter(VitalReading.user_id == demo_user_id).count() == 0:
-        readings = [
-            VitalReading(user_id=demo_user_id, vital_type=VitalType.HEART_RATE, value=74.0, source="device"),
-            VitalReading(user_id=demo_user_id, vital_type=VitalType.BLOOD_OXYGEN, value=98.0, source="device"),
-            VitalReading(user_id=demo_user_id, vital_type=VitalType.TEMPERATURE, value=36.8, source="device"),
-            VitalReading(user_id=demo_user_id, vital_type=VitalType.BP_SYSTOLIC, value=120.0, source="device"),
-            VitalReading(user_id=demo_user_id, vital_type=VitalType.BP_DIASTOLIC, value=80.0, source="device"),
-            VitalReading(user_id=demo_user_id, vital_type=VitalType.RESPIRATORY_RATE, value=16.0, source="device"),
-        ]
-        db.add_all(readings)
-        db.commit()
-        logger.info("Seeded %d vitals readings for demo user", len(readings))
+    # Vitals are never seeded: every reading in the database comes from a
+    # real device sync or a clinician's entry.
 

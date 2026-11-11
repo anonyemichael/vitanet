@@ -317,9 +317,3 @@ class TriageHistoryNotifier extends StateNotifier<List<TriageResult>> {
     state = [];
   }
 }
-
-// --- Device Connection State (Mock Backend) ---
-final deviceConnectionProvider = FutureProvider<Map<String, bool>>((ref) async {
-  final api = ref.watch(apiServiceProvider);
-  return api.getDeviceConnections();
-});

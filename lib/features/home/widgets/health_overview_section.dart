@@ -50,16 +50,23 @@ class _HealthOverviewSectionState extends ConsumerState<HealthOverviewSection> {
             .read(healthServiceProvider)
             .fetchBiometrics();
         if (biometrics.isNotEmpty && mounted) {
-          var any = false;
+          final fromDevice = <String, double>{};
           biometrics.forEach((key, value) {
             final doubleVal = double.tryParse(value.toString());
             if (doubleVal != null) {
               ref.read(liveVitalsProvider.notifier).setVital(key, doubleVal);
-              any = true;
+              fromDevice[key] = doubleVal;
             }
           });
-          if (any) {
+          if (fromDevice.isNotEmpty) {
             ref.read(vitalsLastSyncProvider.notifier).state = DateTime.now();
+            // Keep the signed-in user's backend record in step with the
+            // watch, so health alerts and a hospital they're referred to
+            // see the same real readings.
+            final me = ref.read(authProvider).user;
+            if (me != null && !me.isAnonymous) {
+              await ref.read(apiServiceProvider).postDeviceVitals(me.uid, fromDevice);
+            }
             return;
           }
         }

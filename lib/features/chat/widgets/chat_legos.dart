@@ -273,12 +273,13 @@ class _HeartRateCheckCardState extends State<HeartRateCheckCard> with SingleTick
             child: Stack(
               alignment: Alignment.center,
               children: [
+                // Indeterminate: a measurement has no honest percentage.
                 AnimatedBuilder(
                   animation: _controller,
                   builder: (context, child) {
                     return CustomPaint(
                       painter: _DottedCircularProgressPainter(
-                        progress: 0.78, // Mock progress
+                        progress: 0.35,
                         color: const Color(0xFFE11D48),
                         rotation: _controller.value * 2 * math.pi,
                       ),
@@ -286,13 +287,7 @@ class _HeartRateCheckCardState extends State<HeartRateCheckCard> with SingleTick
                     );
                   },
                 ),
-                Text(
-                  '78%',
-                  style: context.textTheme.titleMedium?.copyWith(
-                    color: const Color(0xFFE11D48),
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                const Icon(Icons.favorite_rounded, color: Color(0xFFE11D48), size: 22),
               ],
             ),
           ),
@@ -350,10 +345,12 @@ class HeartRateResultCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bpm = payload['bpm'] ?? 76;
-    final min = payload['min'] ?? 68;
-    final avg = payload['avg'] ?? 76;
-    final max = payload['max'] ?? 88;
+    // No measured values, no card: numbers are never invented.
+    if (payload['bpm'] == null) return const SizedBox.shrink();
+    final bpm = payload['bpm'];
+    final min = payload['min'] ?? bpm;
+    final avg = payload['avg'] ?? bpm;
+    final max = payload['max'] ?? bpm;
 
     return Container(
       margin: const EdgeInsets.only(top: AppSpacing.sm),

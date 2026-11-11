@@ -47,50 +47,28 @@ class ApiService {
     }
   }
 
-  /// Fetches the connection status of various health monitoring devices.
-  Future<Map<String, bool>> getDeviceConnections() async {
-    try {
-      if (kDebugMode) {
-        print('--- API REQUEST: Get Device Connections ---');
-      }
-      return {
-        'heart_rate': true,
-        'blood_oxygen': true,
-        'temperature': true,
-        'respiratory_rate': false,
-      };
-    } catch (e) {
-      debugPrint('Error fetching device connections from backend: $e');
-      return {
-        'heart_rate': true,
-        'blood_oxygen': false,
-        'temperature': false,
-        'respiratory_rate': false,
-      };
-    }
-  }
-
   /// Runs live Machine Learning disease and severity triage predictions.
+  /// Only vitals that were really measured are sent; nothing is invented.
   Future<MLTriagePrediction?> predictTriage({
     required List<String> symptoms,
-    int age = 40,
-    String gender = 'M',
-    double heartRate = 80.0,
-    double temperature = 37.0,
-    double bloodOxygen = 98.0,
-    double systolicBp = 120.0,
-    double diastolicBp = 80.0,
+    int? age,
+    String? gender,
+    double? heartRate,
+    double? temperature,
+    double? bloodOxygen,
+    double? systolicBp,
+    double? diastolicBp,
   }) async {
     try {
       final response = await _dio.post('triage/predict', data: {
         'symptoms': symptoms,
-        'age': age,
-        'gender': gender,
-        'heart_rate': heartRate,
-        'temperature': temperature,
-        'blood_oxygen': bloodOxygen,
-        'systolic_bp': systolicBp,
-        'diastolic_bp': diastolicBp,
+        'age': ?age,
+        'gender': ?gender,
+        'heart_rate': ?heartRate,
+        'temperature': ?temperature,
+        'blood_oxygen': ?bloodOxygen,
+        'systolic_bp': ?systolicBp,
+        'diastolic_bp': ?diastolicBp,
       });
       return MLTriagePrediction.fromJson(response.data);
     } catch (e) {
@@ -138,6 +116,35 @@ class ApiService {
     } catch (e) {
       debugPrint('ApiService: getLatestVitals failed ($e)');
       return {};
+    }
+  }
+
+  /// Health Connect / Apple Health keys -> backend vital types.
+  static const _vitalTypeFor = {
+    'heart_rate': 'heart_rate',
+    'blood_oxygen': 'blood_oxygen',
+    'temperature': 'temperature',
+    'respiratory_rate': 'respiratory_rate',
+    'systolic_bp': 'bp_systolic',
+    'diastolic_bp': 'bp_diastolic',
+  };
+
+  /// Sends readings that came from the user's watch / health platform to
+  /// their own backend record, so alerts and the hospital see real data.
+  /// Keys the backend doesn't know are skipped. Returns how many were sent.
+  Future<int> postDeviceVitals(String userId, Map<String, double> readings) async {
+    final body = [
+      for (final e in readings.entries)
+        if (_vitalTypeFor[e.key] != null)
+          {'vital_type': _vitalTypeFor[e.key], 'value': e.value, 'source': 'device'},
+    ];
+    if (body.isEmpty) return 0;
+    try {
+      await _dio.post('vitals/$userId/batch', data: {'readings': body});
+      return body.length;
+    } catch (e) {
+      debugPrint('ApiService: postDeviceVitals failed ($e)');
+      return 0;
     }
   }
 

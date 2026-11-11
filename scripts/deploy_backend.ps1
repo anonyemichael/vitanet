@@ -113,8 +113,8 @@ for i in $(seq 1 45); do
   fi
   sleep 2
 done
-if [ "$OK" = "1" ] && [ "$(curl -s -o /dev/null -w '%{http_code}' 127.0.0.1:8000/admin/stats)" = "401" ]; then
-  echo "DEPLOYED OK: API up and /admin requires sign-in"
+if [ "$OK" = "1" ] && [ "$(curl -s -o /dev/null -w '%{http_code}' 127.0.0.1:8000/portal/dashboard)" = "401" ]; then
+  echo "DEPLOYED OK: API up and the portal requires sign-in"
 else
   echo "HEALTH CHECK FAILED - rolling back"
   rm -rf "$LIVE/app"; mv "$LIVE/app.previous" "$LIVE/app"

@@ -450,19 +450,17 @@ User message: "$userMessage"
     required List<String> symptoms,
     String? primarySymptom,
   }) async {
-    final hr = _vitals['heart_rate'] ?? 80.0;
-    final temp = _vitals['temperature'] ?? 37.0;
-    final o2 = _vitals['blood_oxygen'] ?? 98.0;
-    final age = _profile?.age ?? 40;
-    final gender = _profile?.sex ?? 'M';
-
+    // Only readings that really came from the watch / health platform are
+    // sent. Missing ones stay missing; the server scores without them.
     final ml = await ApiService().predictTriage(
       symptoms: symptoms,
-      age: age,
-      gender: gender,
-      heartRate: hr,
-      temperature: temp,
-      bloodOxygen: o2,
+      age: _profile?.age,
+      gender: _profile?.sex,
+      heartRate: _vitals['heart_rate'],
+      temperature: _vitals['temperature'],
+      bloodOxygen: _vitals['blood_oxygen'],
+      systolicBp: _vitals['systolic_bp'],
+      diastolicBp: _vitals['diastolic_bp'],
     );
 
     if (ml != null) {

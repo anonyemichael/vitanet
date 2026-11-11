@@ -57,14 +57,20 @@ class _DeviceConnectionScreenState extends ConsumerState<DeviceConnectionScreen>
       try {
         final biometrics = await service.fetchBiometrics();
         if (mounted) {
+          final fromDevice = <String, double>{};
           biometrics.forEach((key, value) {
             final v = _parse(value);
             if (v != null) {
               ref.read(liveVitalsProvider.notifier).setVital(key, v);
               _syncedKeys.add(key);
+              fromDevice[key] = v;
               count++;
             }
           });
+          final me = ref.read(authProvider).user;
+          if (fromDevice.isNotEmpty && me != null && !me.isAnonymous) {
+            await ref.read(apiServiceProvider).postDeviceVitals(me.uid, fromDevice);
+          }
         }
       } catch (e) {
         debugPrint('Error fetching immediate biometrics: $e');

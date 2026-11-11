@@ -19,8 +19,6 @@ class VitalType(str, enum.Enum):
     BLOOD_OXYGEN = "blood_oxygen"
     RESPIRATORY_RATE = "respiratory_rate"
 
-# python -m app.scripts.seed_vitals <your-test-user-uuid>
-
 class VitalReading(Base):
     __tablename__ = "vital_readings"
 
@@ -29,7 +27,7 @@ class VitalReading(Base):
     vital_type = Column(SqlEnum(VitalType), nullable=False)
     value = Column(Float, nullable=False)
     recorded_at = Column(DateTime, default=datetime.utcnow, index=True)
-    source = Column(String, default="simulated")  # simulated | device | manual
+    source = Column(String, default="device")  # device (watch / health platform) | manual (typed in)
 
 class UserVitalSettings(Base):
     __tablename__ = "user_vital_settings"

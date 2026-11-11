@@ -135,9 +135,9 @@ class _VitalsSheetState extends ConsumerState<VitalsSheet> {
       gap: 14,
       actions: [CButton('Save vitals', loading: _saving, onPressed: _save)],
       children: [
-        pair(_field('hr', _hr, 'Heart rate (bpm)', '72'), _field('bp', _bp, 'Blood pressure', '120/80', type: TextInputType.text)),
-        pair(_field('spo2', _spo2, 'SpO₂ (%)', '98'), _field('temp', _temp, 'Temp (°C)', '36.8')),
-        pair(_field('rr', _rr, 'Resp. rate (/min)', '16'), _field('pain', _pain, 'Pain (0–10)', '0')),
+        pair(_field('hr', _hr, 'Heart rate (bpm)', 'bpm'), _field('bp', _bp, 'Blood pressure', 'systolic/diastolic', type: TextInputType.text)),
+        pair(_field('spo2', _spo2, 'SpO₂ (%)', '%'), _field('temp', _temp, 'Temp (°C)', '°C')),
+        pair(_field('rr', _rr, 'Resp. rate (/min)', 'breaths/min'), _field('pain', _pain, 'Pain (0–10)', '0 to 10')),
         Row(
           children: [
             Expanded(

@@ -10,18 +10,21 @@ router = APIRouter(prefix="/triage", tags=["triage"], dependencies=[Depends(get_
 
 @router.post("/predict", response_model=TriagePredictResponse)
 def predict_triage(payload: TriagePredictRequest):
-    """Predict disease and clinical severity using ML models trained on 377 symptoms and vitals."""
+    """Predict disease and clinical severity using ML models trained on 377 symptoms and vitals.
+
+    Only vitals the client actually measured are passed on. The API never
+    invents a reading: a vital that was not measured is simply absent, and the
+    model scores severity from symptoms and whatever was measured."""
     try:
-        result = ml_service.predict_triage(
-            symptoms=payload.symptoms,
-            age=payload.age or 40,
-            gender=payload.gender or "M",
-            heart_rate=payload.heart_rate or 80.0,
-            temperature=payload.temperature or 37.0,
-            blood_oxygen=payload.blood_oxygen or 98.0,
-            systolic_bp=payload.systolic_bp or 120.0,
-            diastolic_bp=payload.diastolic_bp or 80.0,
-        )
+        measured = {
+            k: v for k, v in {
+                "age": payload.age, "gender": payload.gender,
+                "heart_rate": payload.heart_rate, "temperature": payload.temperature,
+                "blood_oxygen": payload.blood_oxygen,
+                "systolic_bp": payload.systolic_bp, "diastolic_bp": payload.diastolic_bp,
+            }.items() if v is not None
+        }
+        result = ml_service.predict_triage(symptoms=payload.symptoms, **measured)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Inference error: {str(e)}")

@@ -122,21 +122,22 @@ def test_ml_symptoms_list():
 
 def test_patient_vitals_endpoints():
     demo_id = "00000000-0000-0000-0000-000000000001"
-    # 1. Fetch latest
+    # 1. Nothing is seeded: a fresh account has no readings at all.
     response = client.get(f"/vitals/{demo_id}/latest")
     assert response.status_code == 200
     data = response.json()
-    assert "heart_rate" in data
-    assert data["heart_rate"]["value"] == 74.0
+    assert "heart_rate" in data and data["heart_rate"] is None
 
-    # 2. Post new reading
+    # 2. A reading from a device is stored and becomes the latest.
     post_resp = client.post(
         f"/vitals/{demo_id}",
         json={"vital_type": "heart_rate", "value": 78.0, "source": "device"}
     )
     assert post_resp.status_code == 200
     reading = post_resp.json()
-    assert reading["value"] == 78.0
+    assert reading["value"] == 78.0 and reading["source"] == "device"
+    latest = client.get(f"/vitals/{demo_id}/latest").json()
+    assert latest["heart_rate"]["value"] == 78.0
 
 
 def test_care_circles_endpoints():
