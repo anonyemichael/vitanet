@@ -27,3 +27,4 @@ firebase-admin
 google-genai
 resend
 openai
+africastalking==2.0.3
