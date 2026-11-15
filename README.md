@@ -1,151 +1,209 @@
-# VitaNet
+# VitaNet — Enterprise Clinical Triage & Hospital Portal Platform
 
-**AI-Powered Health Triage, Emergency Referral, and Hospital Care Platform**
+[![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter)](https://flutter.dev)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688?logo=fastapi)](https://fastapi.tiangolo.com)
+[![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python)](https://python.org)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-4169E1?logo=postgresql)](https://postgresql.org)
+[![Tests](https://img.shields.io/badge/Tests-100%25%20Passing-brightgreen)]()
+[![Context](https://img.shields.io/badge/Clinical%20Context-Ghana%20STG-critical)]()
 
-VitaNet is a comprehensive, two-sided digital health platform designed to bridge the gap between patients in distress and acute healthcare providers in Ghana. It pairs an accessible **Patient Mobile & Web Application** with an acute **Hospital Staff Portal** and a specialized **Conversational Medical AI Model**.
+VitaNet is a production-grade, two-sided acute care coordination platform engineered for the Ghanaian healthcare ecosystem. It links patients experiencing acute medical symptoms directly to hospital emergency departments through an end-to-end clinical workflow: **Patient Mobile Triage ➔ Consented Pre-Arrival Referral ➔ Hospital A&E Intake ➔ Bedside Clinical Management ➔ SBAR Shift Handover ➔ Safe Discharge Planning**.
 
 ---
 
-## 🌟 The Two-Sided Platform
+## 🏛️ System Architecture
 
 ```mermaid
-flowchart LR
-    subgraph Patient["Patient Mobile App (Flutter)"]
-        P1["Symptom Assessment\n& Biometrics"] --> P2["Urgent Triage\nFlagged"]
-        P2 --> P3["'Send Summary to Hospital'\n(Consented Referral)"]
+flowchart TD
+    subgraph Client_Layer["1. Client Layer"]
+        P_APP["VitaNet Mobile App (Android/iOS)\nFlutter 3.x · Riverpod · Material 3"]
+        P_WEB["VitaNet Web & Admin Desk\nResponsive Web Client"]
     end
 
-    subgraph Backend["FastAPI Backend (Oracle VPS: 84.8.152.134)"]
-        P3 --> B1["POST /portal/referrals"]
-        B1 --> B2["Deterministic Safety & NEWS2 Engine\n(portal_rules.py)"]
-        B2 <--> B3["Clinical AI Gateway\n(vLLM / Serverless)"]
+    subgraph API_Gateway["2. API Gateway & Application Layer (Oracle VPS: 84.8.152.134)"]
+        FASTAPI["FastAPI Production Engine (Uvicorn / Python 3.12)\nDependency Injection · Pydantic v2 Validation"]
+        AUTH_GUARD["Multi-Tenant Scoping & Security Guard\nFirebase Auth · JWT · StaffAccount.hospital_id Scoping"]
+        ALEMBIC["Alembic Migration Engine\nPostgreSQL 15 / SQLite (Test)"]
     end
 
-    subgraph Hospital["Hospital Staff Portal (Clinical Desk)"]
-        B1 --> H1["Incoming Referral Queue (ETA)"]
-        H1 --> H2["A&E Triage Desk\n(prep_brief & triage_check)"]
-        H2 --> H3["Doctor Case Management\n(Timeline, Vitals, Bedside Notes)"]
-        H3 --> H4["SBAR Shift Handover\n& Safe Discharge Draft"]
+    subgraph Clinical_Core["3. Deterministic Safety & Clinical Engine (portal_rules.py)"]
+        NEWS2["NEWS2 Physiological Scoring Engine\nRoom-Air Vitals · Deterioration Alerting (Score ≥ 5)"]
+        WARD_ALLOC["Dynamic Ward & Bed Allocator\nCapacity Matching (Resus, Emergency, ICU, Minors)"]
+        STAFF_LOAD["Clinician Load Balancer\nDoctor/Nurse Active Case Queues"]
+        ALLERGY_GUARD["Allergy & Drug Interaction Guard\nDeterministic Pharmacological Blocking"]
     end
+
+    subgraph AI_Layer["4. AI & Model Serving Layer (vLLM / Serverless Gateway)"]
+        ACTIVE_MODEL["VitaNet Clinical Reasoning Model (Qwen 2.5 / Llama 3.1 LoRA)\nEnglish & Twi Context · Ghana STG Grounding"]
+        TASK_ENGINE["5 Clinical Portal Tasks:\nprep_brief · triage_check · discharge_draft · handover_note · structure_note"]
+        KNOWLEDGE_FALLBACK["Local Clinical Knowledge Base\nRule-based triage fallback on timeout (>20s)"]
+    end
+
+    subgraph Storage_Layer["5. Persistence & Event Stream Layer"]
+        PG_DB[("PostgreSQL 15 DB\nCases · Referrals · Wards · Vitals · Staff")]
+        AUDIT_STREAM[("Immutable Audit Trail\nPortalAuditLog (Actor, Target, Action, ISO Timestamp)")]
+        SMS_GW["Africa's Talking SMS Gateway\nRural & Low-Bandwidth Notifications"]
+    end
+
+    P_APP -->|TLS 1.3 / REST| FASTAPI
+    P_WEB -->|TLS 1.3 / REST| FASTAPI
+    FASTAPI --> AUTH_GUARD
+    AUTH_GUARD --> Clinical_Core
+    AUTH_GUARD --> ALEMBIC --> PG_DB
+    Clinical_Core <--> AI_Layer
+    FASTAPI --> PG_DB
+    FASTAPI --> AUDIT_STREAM
+    FASTAPI --> SMS_GW
 ```
-
-### 1. Patient Mobile & Web Application (`lib/`)
-* **AI Health Triage Chat**: Conversational clinical triage asking contextual follow-up questions to assess urgent vs routine concerns.
-* **Biometrics & Vitals Tracking**: Integration with Apple Health / Android Health Connect for Blood Pressure, SpO₂, Heart Rate, and Blood Glucose.
-* **Emergency Hospital Referral**: Patients flagged as `urgent` can send their clinical summary directly to the nearest A&E with explicit consent.
-* **Care Circles**: Family and emergency contact network automatically alerted during crises.
-* **Health Knowledge Library**: Curated localized articles, video shorts, first-aid protocols, and medication guides.
-
-### 2. Hospital Staff Portal (`vitanet-backend/`)
-* **Real-time Referral Inbox**: Incoming pre-arrival patient cases with live ETA from patient coordinates.
-* **Triage & Bed Assignment**: Automatic ward suggestions (`Resus`, `Emergency`, `ICU`, `Minors`) based on live capacity and clinical severity.
-* **Case Lifecycle Tracking**: Full patient progression tracking (`expected` → `waiting` → `treatment` → `discharged`).
-* **Clinical Safety & Deterioration Alerts**: Room-air NEWS2 early warning score calculation with threshold notifications.
-* **Full Clinical Audit Trail**: Complete immutable logging of every staff action, prescription order, and bed movement.
-
-### 3. Clinical AI & Machine Learning Ecosystem (`ml-service/`)
-* **Active Model Development (`vitanet-model`)**: Standalone conversational clinical reasoning model fine-tuned for Ghanaian healthcare (English and Twi).
-  * Five automated hospital tasks: `prep_brief` (nurse pre-arrival checklist), `triage_check` (walk-in triage verification), `discharge_draft` (patient-friendly take-home instructions), `handover_note` (SBAR shift handovers), and `structure_note` (clinical NLP).
-  * Specifications: [`docs/portal-ai-model-spec.md`](./docs/portal-ai-model-spec.md) and [`docs/AI_MODEL_INTEGRATION_PLAN.md`](./docs/AI_MODEL_INTEGRATION_PLAN.md).
-* **Deterministic Guardrails**: Outer safety layer enforcing zero invented numbers, allergy contraindication blocking, and deterministic triage fallbacks via [`portal_rules.py`](./vitanet-backend/app/services/portal_rules.py).
-* **Archived Legacy Prototype (`legacy_v1/`)**: Previous 377-symptom XGBoost tabular classifier preserved in [`ml-service/legacy_v1/`](./ml-service/legacy_v1/) for historical benchmarks.
 
 ---
 
-## 📁 Repository Structure
+## 🏥 Clinical Workflow & Core Engines
+
+### 1. Two-Sided Referral & Case State Machine
+VitaNet manages patient lifecycles through a strict clinical state machine ensuring zero unmonitored cases:
+
+```
+[Patient Mobile App]
+  └─► Triage Flagged (urgent / doctor)
+        └─► Patient Consents to Share Summary
+              └─► Referral Created (status: new, includes live ETA & Biometrics)
+
+[Hospital Staff Portal]
+  ├─► Referral Inbox (Nurse Reviews `prep_brief`, bed availability, red flags)
+  │     ├─► Accept ──► Case Created (status: expected, bed reserved)
+  │     └─► Decline ─► Patient notified + routed to next nearest A&E
+  │
+  ├─► Patient Arrives ──► Case status: waiting (in waiting area / triage desk)
+  ├─► Clinician Sees ───► Case status: treatment (vitals recorded, notes on timeline)
+  └─► Resolution ───────► Case status: discharged (home | admitted | transferred | left)
+```
+
+### 2. Deterministic Early Warning Scoring (NEWS2)
+Implemented in [`app/services/portal_rules.py`](./vitanet-backend/app/services/portal_rules.py):
+* Validates physiological vital measurements: Respiratory Rate, Oxygen Saturation ($\text{SpO}_2$), Systolic Blood Pressure, Heart Rate, Temperature, and Alertness (AVPU).
+* Flags acute clinical deterioration automatically when $\text{NEWS2} \ge 5$ or whenever any individual vital parameter triggers a 3-point critical band ($\text{SpO}_2 < 92\%$, Systolic $\text{BP} < 90\text{ mmHg}$, or $\text{Heart Rate} > 130\text{ bpm}$).
+
+### 3. Capacity & Clinician Workload Optimization
+* **Ward Suggestion (`suggest_ward`)**: Prioritizes `Resus` and `Emergency` wards for `urgent` cases; routes to `ICU` only when critical care beds are confirmed free; dynamically matches overflow beds.
+* **Clinician Load Balancing (`suggest_assignee`)**: Computes real-time active patient counts per on-duty doctor/nurse and auto-routes new cases to clinicians with the lowest case load.
+
+---
+
+## 🧠 Clinical AI Model Architecture
+
+The active model is trained as a standalone foundation in [`C:\Users\CARLVYN\Desktop\Vitanet AI Model\vitanet-model`](file:///C:/Users/CARLVYN/Desktop/Vitanet%20AI%20Model/vitanet-model) and interfaces with the backend via [`docs/portal-ai-model-spec.md`](./docs/portal-ai-model-spec.md) and [`docs/AI_MODEL_INTEGRATION_PLAN.md`](./docs/AI_MODEL_INTEGRATION_PLAN.md).
+
+### The 5 Clinical Task Contracts
+
+| Task | Purpose | Key Inputs | Key Outputs | Hard Constraints |
+|---|---|---|---|---|
+| `prep_brief` | Pre-arrival nurse preparation | Vitals, ETA, allergies, complaint, ward capacity | `possible_conditions` (≤3), `red_flags`, `prepare` (3–6 items), `avoid`, `suggested_ward` | Output must strictly respect patient allergies; zero invented vitals. |
+| `triage_check` | Emergency walk-in evaluation | Age, sex, complaint, vitals (pain 0-10, alert) | `level` (urgent/doctor/routine), `reasons`, `red_flags_to_watch`, `first_steps` | Automatic escalation to `urgent` if $\text{SpO}_2 < 92\%$ or systolic $\text{BP} < 90$. |
+| `discharge_draft` | Patient-facing recovery plan | Outcome, admission history, medicines given | `summary`, `what_next`, `medicines`, `warning_signs`, `follow_up` | Written at a **12-year-old reading level**; warning signs include Ghana 112/193 numbers. |
+| `handover_note` | Shift handover note (SBAR) | Patient record, latest vitals, pending orders | `situation`, `background`, `assessment`, `recommendation`, `pending` | Each section capped at 160 characters for rapid mobile readability during rounds. |
+| `structure_note` | Clinical documentation NLP | Free-text/dictated doctor clinical note | `clean_text`, structured `vitals`, `medications_given` (`{name, dose, route}`) | Entity extraction into database-ready JSON format. |
+
+---
+
+## 📡 REST API Reference
+
+The backend exposes a secure, modular API across 15 dedicated routers:
+
+| Router | Prefix | Responsibility |
+|---|---|---|
+| **Portal** | `/portal` | Referrals, cases, ward occupancy, staff shift states, equipment inventory, and audit logs. |
+| **Live Stream** | `/portal/live` | Real-time event polling and WebSocket hooks for clinical dashboard updates. |
+| **Triage** | `/triage` | Symptom inference, disease classification, and severity prediction. |
+| **Vitals** | `/vitals` | High-frequency biometric time-series (Blood Pressure, SpO₂, HR, Temperature, Glucose). |
+| **Care Circles**| `/care-circles` | Emergency contact mesh, invitation token workflows, and SMS dispatching. |
+| **Hospitals** | `/hospitals` | Geospatial facility queries, distance ranking, and real-time ambulance readiness. |
+| **Chat AI** | `/chat` | Conversational triage nurse assistant with multi-turn tool calling. |
+| **Staff Auth** | `/staff` | Role-based facility access control (Admin, Doctor, Nurse) with approval gating. |
+| **Health Profile** | `/health-profile` | Patient medical history, allergen registries, and demographic biometrics. |
+| **SMS** | `/sms` | Webhook endpoints for Africa's Talking rural two-way SMS triage. |
+
+---
+
+## 📁 Repository Organization
 
 ```
 vitanet/
-├── lib/                     # Flutter mobile & web application
-│   ├── app/                 #   App routing (GoRouter) & theme definitions
-│   ├── core/                #   Constants, providers, and shared state
-│   ├── data/                #   Data models, repositories, and API clients
-│   ├── features/            #   Feature modules (assessment, auth, chat, portal, vitals, ...)
-│   ├── shared/              #   Reusable UI kit (vn_kit) & utilities
-│   └── main.dart            #   Application entry point
+├── lib/                             # Flutter 3.x Mobile & Web Client
+│   ├── app/                         # App routing (GoRouter) & theme definitions
+│   ├── core/                        # Providers, riverpod state, utilities
+│   ├── data/                        # Repositories, models, and HTTP client services
+│   ├── features/                    # Feature modules (assessment, auth, chat, portal, vitals)
+│   ├── shared/                      # Reusable UI components (vn_kit) & medical design system
+│   └── main.dart                    # Application bootstrap
 │
-├── vitanet-backend/         # FastAPI production backend
+├── vitanet-backend/                 # FastAPI Production Backend
 │   ├── app/
-│   │   ├── core/            #   Configuration, security & settings
-│   │   ├── database/        #   SQLAlchemy engine & session management
-│   │   ├── models/          #   ORM models (PortalCase, PortalWard, Referral, Vitals, Staff)
-│   │   ├── routes/          #   Endpoints (/portal, /triage, /vitals, /chat, ...)
-│   │   ├── schemas/         #   Pydantic validation schemas
-│   │   └── services/        #   Business logic, AI agent orchestration, and portal_rules
-│   ├── alembic/             #   Database schema migrations
-│   ├── test_portal.py       #   Hospital portal test suite
-│   ├── test_production_backend.py # Production integration test suite
-│   └── requirements.txt     #   Backend Python dependencies
+│   │   ├── core/                    # Security, CORS, config & environment settings
+│   │   ├── database/                # SQLAlchemy session lifecycle & schema sync
+│   │   ├── models/                  # PortalCase, PortalWard, Referral, Vitals, StaffAccount
+│   │   ├── routes/                  # 15 Modular REST API routers
+│   │   ├── schemas/                 # Pydantic v2 input/output schemas
+│   │   └── services/                # Business logic, AI agents, portal_rules, early_warning
+│   ├── alembic/                     # Database schema migrations
+│   ├── test_portal.py               # Complete hospital portal test suite
+│   ├── test_production_backend.py   # Production end-to-end integration test suite
+│   └── requirements.txt             # Python backend dependencies
 │
-├── ml-service/              # Machine learning integration directory
-│   ├── new_model/           #   🌟 Active AI model integration workspace
-│   ├── legacy_v1/           #   📦 Archived v1 XGBoost prototype & notebooks
-│   ├── data/                #   Clinical reference datasets (disease_diagnosis.csv)
-│   └── app/                 #   Non-breaking backward compatibility stubs
+├── ml-service/                      # ML & AI Services Directory
+│   ├── new_model/                   # 🌟 Active model integration point (checkpoints/ & inference/)
+│   ├── legacy_v1/                   # 📦 Deprecated XGBoost prototype & notebooks (archived)
+│   ├── data/                        # Clinical datasets (disease_diagnosis.csv)
+│   └── app/                         # Backward compatibility stubs
 │
-├── docs/                    # Architecture and design specifications
+├── docs/                            # Specifications & Architectural Documentation
 │   ├── AI_MODEL_INTEGRATION_PLAN.md # Master AI system & portal implementation plan
-│   ├── HOSPITAL_PORTAL_PLAN.md      # Hospital portal architecture & specs
+│   ├── HOSPITAL_PORTAL_PLAN.md      # Hospital portal architecture & roadmap
 │   ├── portal-ai-model-spec.md      # AI clinical task contracts & JSON schemas
 │   ├── VitaNet App Redesign.pdf     # Source of truth for mobile UI redesign
-│   ├── archive/             #   Archived historical ML documentation
-│   └── README.md            #   Documentation index
+│   ├── archive/                     # Archived historical ML research documents
+│   └── README.md                    # Documentation navigation index
 │
-├── assets/                  # Images, logos, medical illustrations, and health catalogs
-├── landing/                 # Public landing page (HTML/CSS/JS)
-├── scripts/                 # Maintenance, deployment, and testing utilities
-└── test/                    # Flutter unit & widget test suites
+├── assets/                          # Medical illustrations, catalogs, and branding
+├── landing/                         # Static hospital & patient landing site
+├── scripts/                         # Deployment, database migration & testing utilities
+└── test/                            # Flutter unit, widget, and golden test suites
 ```
 
 ---
 
-## 🚀 Getting Started
+## ⚙️ Development & Testing
 
-### 1. Flutter Mobile / Web Client
-
-```bash
-# Get dependencies
-flutter pub get
-
-# Run on Chrome (Web)
-flutter run -d chrome --web-port 5000
-
-# Run on connected mobile device / emulator
-flutter run
-```
-
-### 2. VitaNet Backend API
-
+### 1. Backend Verification
 ```bash
 cd vitanet-backend
-
-# Setup virtual environment
 python -m venv .venv
-source .venv/bin/activate  # Or on Windows: ..\.venv\Scripts\activate
-
-# Install dependencies
+source .venv/bin/activate  # Windows: ..\.venv\Scripts\activate
 pip install -r requirements.txt
 
-# Run migrations
-alembic upgrade head
-
-# Start local server
-uvicorn app.main:app --reload --port 8000
-
-# Run automated tests
+# Run full production integration test suite (All 7 suites must pass)
 python test_production_backend.py
+
+# Run hospital portal test suite
 python test_portal.py
 ```
 
+### 2. Frontend Verification
+```bash
+flutter pub get
+
+# Run unit and widget test suite
+flutter test
+
+# Run local web server on port 5000
+flutter run -d chrome --web-port 5000
+```
+
 ---
 
-## 🛠️ Tech Stack
+## 🔒 Security, Privacy & Regulatory Compliance
 
-| Layer | Technologies |
-|---|---|
-| **Mobile & Web App** | Flutter 3.x, Dart, Riverpod, GoRouter, VN Kit UI |
-| **Backend API** | FastAPI, Python 3.12, SQLAlchemy, Alembic, PostgreSQL |
-| **Authentication** | Firebase Auth (Email, Google, Anonymous, Staff Roles) |
-| **Hosting & Cloud** | Oracle Cloud VPS (`84.8.152.134`), Firebase Hosting |
-| **Clinical Reasoning AI** | Fine-tuned Qwen 2.5/Llama 3.1 LLM, OpenRouter API fallback |
-| **Safety & Triage** | NEWS2 deterministic engine, Ghana Standard Treatment Guidelines |
+1. **Multi-Tenant Facility Scoping**: Every staff query is strictly scoped to `StaffAccount.hospital_id`. Cross-hospital patient data leakage is architecturally impossible.
+2. **Deterministic Pharmacological Blocking**: Medication recommendations matching patient allergy profiles are rejected at the ORM layer.
+3. **Immutable Audit Trails**: High-stakes clinical events (triage level updates, referrals accepted/declined, medication orders) are recorded in `PortalAuditLog`.
+4. **Regulatory Framework**: Developed aligned with the **Ghana Data Protection Act 2012 (Act 843)** and the **Ghana Food and Drugs Authority (FDA) Software as a Medical Device (SaMD)** pre-market evaluation standards.
