@@ -59,11 +59,14 @@ env/
 
 # ─── ML / Data Artifacts ─────────────────────────────────────────────────────
 # Large model & dataset files — track with Git LFS instead
-ml-service/notebooks/*.pkl
+*.pkl
+**/*.pkl
+ml-service/**/*.pkl
 ml-service/data/*.csv
 *.h5
 *.hdf5
 *.onnx
+scratchpad/
 
 # Jupyter
 .ipynb_checkpoints/

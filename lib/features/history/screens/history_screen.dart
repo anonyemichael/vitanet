@@ -122,7 +122,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   Widget _buildList(VnPalette p, List<TriageResult> sessions, bool wide, TriageResult? selected) {
     final counts = {for (final l in TriageLevel.values) l: sessions.where((s) => s.level == l).length};
     return ListView(
-      physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
+      physics: const VnAlwaysScrollablePhysics(),
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
       children: [
         VnTopBar(

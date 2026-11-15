@@ -180,10 +180,10 @@ class _HealthOverviewSectionState extends ConsumerState<HealthOverviewSection> {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      'Live · Connected device',
+                      'Live',
                       style: VnText.body(
                         12,
-                        weight: FontWeight.w600,
+                        weight: FontWeight.w700,
                         color: p.isDark
                             ? const Color(0xFF6EE7B7)
                             : const Color(0xFF047857),
@@ -191,35 +191,17 @@ class _HealthOverviewSectionState extends ConsumerState<HealthOverviewSection> {
                     ),
                   ],
                 )
-              : Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      hasReadings ? 'Not live' : 'No device connected',
-                      style: VnText.body(
-                        12,
-                        weight: FontWeight.w600,
-                        color: p.muted,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    VnLink(
-                      label: hasReadings ? 'Sync' : 'Connect',
-                      fontSize: 13,
-                      weight: FontWeight.w700,
-                      onTap: () =>
-                          context.push('/device-connection/heart_rate'),
-                    ),
-                  ],
-                ),
+              : null,
+          action: hasReadings ? (isFresh ? null : 'Sync') : 'Connect',
+          onAction: () => context.push('/device-connection/heart_rate'),
         ),
-        if (!hasReadings) ...[
-          const SizedBox(height: 4),
-          Text(
-            'Connect a watch to see live vitals',
-            style: VnText.body(13, color: p.muted),
-          ),
-        ],
+        const SizedBox(height: 4),
+        Text(
+          hasReadings
+              ? (isFresh ? 'Live readings from connected device' : 'Last recorded vitals · Tap to sync')
+              : 'Connect a watch or tracker to see live vitals',
+          style: VnText.body(13, color: p.muted),
+        ),
         const SizedBox(height: 12),
         LayoutBuilder(
           builder: (context, c) {

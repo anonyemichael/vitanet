@@ -480,7 +480,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 720),
                 child: ListView(
-                  physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
+                  physics: const VnAlwaysScrollablePhysics(),
                   controller: _scroll,
                   padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
                   children: [

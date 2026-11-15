@@ -10,8 +10,8 @@ final navBarVisibleProvider = StateProvider<bool>((ref) => true);
 /// Universal scroll notification listener logic for auto-hide.
 /// Returns false so notifications continue bubbling normally.
 bool handleScrollNotification(ScrollNotification notification, WidgetRef ref) {
-  // Only process vertical scrolling on the primary scroll view
-  if (notification.metrics.axis != Axis.vertical || notification.depth != 0) {
+  // Only process vertical scrolling
+  if (notification.metrics.axis != Axis.vertical) {
     return false;
   }
 
@@ -26,12 +26,12 @@ bool handleScrollNotification(ScrollNotification notification, WidgetRef ref) {
   if (notification is ScrollUpdateNotification) {
     final delta = notification.scrollDelta;
     if (delta != null) {
-      // Meaningful threshold to filter out finger tremors, mousewheel jitter, and micro-movements
-      if (delta > 8.0) {
+      // Meaningful threshold to avoid jittery flutter animations during fast scrolling
+      if (delta > 16.0) {
         if (ref.read(navBarVisibleProvider)) {
           ref.read(navBarVisibleProvider.notifier).state = false;
         }
-      } else if (delta < -8.0) {
+      } else if (delta < -16.0) {
         if (!ref.read(navBarVisibleProvider)) {
           ref.read(navBarVisibleProvider.notifier).state = true;
         }

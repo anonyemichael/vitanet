@@ -53,7 +53,8 @@ account belongs to **one hospital**; every query is scoped to that hospital.
 - Seeded demo hospital data only in staging, never in production.
 
 ## Delivery phases
-1. **Backend** — facility scoping, referrals, cases, capacity, audit, team endpoints + tests.
+1. **Backend** — facility scoping, referrals, cases, capacity, audit, team endpoints + tests (Completed).
 2. **Portal UI** — all screens above, empty/loading/error states, no demo fallbacks.
 3. **Patient app** — "Send to hospital" consent sheet + referral status card on triage result & home.
-4. **Test on staging** (VPS staging copy + Firebase preview) → production deploy (needs owner approval).
+4. **AI Clinical Copilot & Model Integration** — See [AI_MODEL_INTEGRATION_PLAN.md](./AI_MODEL_INTEGRATION_PLAN.md) and [portal-ai-model-spec.md](./portal-ai-model-spec.md). Five automated clinical tasks (`prep_brief`, `triage_check`, `discharge_draft`, `handover_note`, `structure_note`) with deterministic fallback in [portal_rules.py](../vitanet-backend/app/services/portal_rules.py).
+5. **Test on staging** (VPS staging copy + Firebase preview) → production deploy (needs owner approval).

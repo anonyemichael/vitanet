@@ -210,7 +210,7 @@ class _AssessmentWizardScreenState extends ConsumerState<AssessmentWizardScreen>
                     const SizedBox(height: 22),
                     Expanded(
                       child: SingleChildScrollView(
-                        physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
+                        physics: const VnAlwaysScrollablePhysics(),
                         child: AnimatedSwitcher(
                           duration: const Duration(milliseconds: 220),
                           child: KeyedSubtree(

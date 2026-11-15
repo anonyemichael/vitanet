@@ -181,7 +181,7 @@ class _SlideView extends StatelessWidget {
     return LayoutBuilder(builder: (context, c) {
       final imageH = (c.maxHeight - 170).clamp(200.0, 400.0);
       return SingleChildScrollView(
-        physics: const ClampingScrollPhysics(),
+        physics: const VnAlwaysScrollablePhysics(),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [

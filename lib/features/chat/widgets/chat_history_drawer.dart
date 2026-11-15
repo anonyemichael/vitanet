@@ -246,7 +246,7 @@ class _ChatHistoryContentState extends ConsumerState<ChatHistoryContent> {
                     ));
                   }
                   return ListView(
-                    physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
+                    physics: const VnAlwaysScrollablePhysics(),
                     padding: EdgeInsets.zero,
                     children: items,
                   );

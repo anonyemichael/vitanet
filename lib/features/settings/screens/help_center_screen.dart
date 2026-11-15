@@ -78,7 +78,7 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 720),
             child: ListView(
-              physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
+              physics: const VnAlwaysScrollablePhysics(),
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
               children: [
                 const VnTopBar(title: 'Help center'),

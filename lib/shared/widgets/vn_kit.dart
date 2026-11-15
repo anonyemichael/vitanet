@@ -557,6 +557,7 @@ class VnButton extends StatelessWidget {
   final double fontSize;
   final bool loading;
   final bool expand;
+  final EdgeInsetsGeometry? padding;
   final List<BoxShadow>? shadow;
 
   const VnButton({
@@ -572,6 +573,7 @@ class VnButton extends StatelessWidget {
     this.fontSize = 16,
     this.loading = false,
     this.expand = true,
+    this.padding,
     this.shadow,
   });
 
@@ -611,7 +613,7 @@ class VnButton extends StatelessWidget {
         child: InkWell(
           onTap: loading ? null : onPressed,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18),
+            padding: padding ?? const EdgeInsets.symmetric(horizontal: 18),
             child: Center(child: child),
           ),
         ),
@@ -639,6 +641,7 @@ class VnOutlineButton extends StatelessWidget {
   final Color? background;
   final double fontSize;
   final bool expand;
+  final EdgeInsetsGeometry? padding;
   final Widget? leading;
 
   const VnOutlineButton({
@@ -653,6 +656,7 @@ class VnOutlineButton extends StatelessWidget {
     this.background,
     this.fontSize = 15,
     this.expand = true,
+    this.padding,
     this.leading,
   });
 
@@ -674,7 +678,7 @@ class VnOutlineButton extends StatelessWidget {
         child: SizedBox(
           height: height,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: padding ?? const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
@@ -981,7 +985,11 @@ class VnAvatar extends StatelessWidget {
             : null,
         image: image == null
             ? null
-            : DecorationImage(image: image!, fit: BoxFit.cover),
+            : DecorationImage(
+                image: image!,
+                fit: BoxFit.cover,
+                onError: (_, _) {},
+              ),
       ),
       alignment: Alignment.center,
       child: image != null
@@ -1134,16 +1142,15 @@ class VnProgressBar extends StatelessWidget {
 
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Enterprise Responsive Scroll Physics
+// Enterprise Responsive Scroll Physics (Zero-Bounce, Silky Glide)
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// High-responsiveness clamping scroll physics.
+/// High-responsiveness, ultra-smooth clamping scroll physics.
 ///
-/// 1. Clamps strictly to viewport bounds (eliminating infinite white overscroll).
-/// 2. Reduces [dragStartDistanceMotionThreshold] to 3.5 logical pixels (down
-///    from the default 18.0px dead zone), initiating list tracking immediately
-///    when the finger touches and moves.
-/// 3. Retains native Android ballistic fling simulations.
+/// 1. Completely eliminates wobbly, jiggly bounce oscillations at viewport boundaries.
+/// 2. Strictly clamps to content bounds with zero rubber-band distortion.
+/// 3. Delivers a feather-light, effortless glide with low friction (0.0028) and
+///    a responsive 3.5px drag start threshold to eliminate touch friction.
 class VnScrollPhysics extends ClampingScrollPhysics {
   const VnScrollPhysics({super.parent});
 
@@ -1154,13 +1161,56 @@ class VnScrollPhysics extends ClampingScrollPhysics {
 
   @override
   double get dragStartDistanceMotionThreshold => 3.5;
+
+  @override
+  double get minFlingVelocity => 50.0;
+
+  @override
+  double get maxFlingVelocity => 8000.0;
+
+  @override
+  Simulation? createBallisticSimulation(ScrollMetrics position, double velocity) {
+    final tolerance = toleranceFor(position);
+    if (position.outOfRange) {
+      double? end;
+      if (position.pixels > position.maxScrollExtent) {
+        end = position.maxScrollExtent;
+      }
+      if (position.pixels < position.minScrollExtent) {
+        end = position.minScrollExtent;
+      }
+      return ScrollSpringSimulation(
+        const SpringDescription(mass: 1.0, stiffness: 450.0, damping: 45.0),
+        position.pixels,
+        end!,
+        0.0,
+        tolerance: tolerance,
+      );
+    }
+    if (velocity.abs() < tolerance.velocity) {
+      return null;
+    }
+    if (velocity > 0.0 && position.pixels >= position.maxScrollExtent) {
+      return null;
+    }
+    if (velocity < 0.0 && position.pixels <= position.minScrollExtent) {
+      return null;
+    }
+    // Ultra-smooth feather-light glide: friction at 0.0028 allows effortless flings
+    // with zero resistance and zero bounce at boundaries.
+    return ClampingScrollSimulation(
+      position: position.pixels,
+      velocity: velocity,
+      friction: 0.0028,
+      tolerance: tolerance,
+    );
+  }
 }
 
-/// Always-scrollable variant that maintains immediate 3.5px drag response,
-/// hard boundary clamping, and support for pull-to-refresh even when content
-/// fits within the viewport.
-class VnAlwaysScrollablePhysics extends AlwaysScrollableScrollPhysics {
-  const VnAlwaysScrollablePhysics({super.parent = const VnScrollPhysics()});
+/// Always-scrollable variant that maintains strict boundary clamping (zero bounce)
+/// and frictionless ballistic glide across all screens.
+class VnAlwaysScrollablePhysics extends ClampingScrollPhysics {
+  const VnAlwaysScrollablePhysics({super.parent});
 
   @override
   VnAlwaysScrollablePhysics applyTo(ScrollPhysics? ancestor) {
@@ -1168,9 +1218,53 @@ class VnAlwaysScrollablePhysics extends AlwaysScrollableScrollPhysics {
   }
 
   @override
+  bool shouldAcceptUserOffset(ScrollMetrics position) => true;
+
+  @override
   double get dragStartDistanceMotionThreshold => 3.5;
+
+  @override
+  double get minFlingVelocity => 50.0;
+
+  @override
+  double get maxFlingVelocity => 8000.0;
+
+  @override
+  Simulation? createBallisticSimulation(ScrollMetrics position, double velocity) {
+    final tolerance = toleranceFor(position);
+    if (position.outOfRange) {
+      double? end;
+      if (position.pixels > position.maxScrollExtent) {
+        end = position.maxScrollExtent;
+      }
+      if (position.pixels < position.minScrollExtent) {
+        end = position.minScrollExtent;
+      }
+      return ScrollSpringSimulation(
+        const SpringDescription(mass: 1.0, stiffness: 450.0, damping: 45.0),
+        position.pixels,
+        end!,
+        0.0,
+        tolerance: tolerance,
+      );
+    }
+    if (velocity.abs() < tolerance.velocity) {
+      return null;
+    }
+    if (velocity > 0.0 && position.pixels >= position.maxScrollExtent) {
+      return null;
+    }
+    if (velocity < 0.0 && position.pixels <= position.minScrollExtent) {
+      return null;
+    }
+    return ClampingScrollSimulation(
+      position: position.pixels,
+      velocity: velocity,
+      friction: 0.0028,
+      tolerance: tolerance,
+    );
+  }
 }
 
-
-/// Canonical responsive clamping physics instance.
+/// Canonical responsive scroll physics instance.
 const vnClampingPhysics = VnAlwaysScrollablePhysics();

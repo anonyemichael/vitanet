@@ -330,7 +330,7 @@ class _PatientCompletionScreenState
                   ),
                   Expanded(
                     child: SingleChildScrollView(
-                      physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
+                      physics: const VnAlwaysScrollablePhysics(),
                       padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
                       child: AnimatedSwitcher(
                         duration: const Duration(milliseconds: 220),

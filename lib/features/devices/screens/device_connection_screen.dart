@@ -212,7 +212,7 @@ class _DeviceConnectionScreenState extends ConsumerState<DeviceConnectionScreen>
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 640),
             child: ListView(
-              physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
+              physics: const VnAlwaysScrollablePhysics(),
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
               children: [
                 VnTopBar(title: 'Devices & data', onBack: _back),

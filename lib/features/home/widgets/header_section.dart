@@ -60,66 +60,95 @@ class HeaderSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SizedBox(
-          height: 52,
-          child: Row(
-            children: [
-              Semantics(
-                button: true,
-                label: 'Profile',
-                excludeSemantics: true,
-                child: InkWell(
-                  customBorder: const CircleBorder(),
-                  onTap: () => StatefulNavigationShell.of(context).goBranch(3),
-                  child: VnAvatar(
-                    name: fullName.isEmpty ? 'VitaNet' : fullName,
-                    size: 48,
-                    image: photo == null
-                        ? null
-                        : ResizeImage(NetworkImage(photo), width: 96, height: 96),
-                  ),
+        // Top utility & brand bar: Avatar + VitaNet title on left, Notification bell on right
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Semantics(
+              button: true,
+              label: 'Profile',
+              excludeSemantics: true,
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: () => StatefulNavigationShell.of(context).goBranch(3),
+                child: VnAvatar(
+                  name: fullName.isEmpty ? 'VitaNet' : fullName,
+                  size: 42,
+                  image: photo == null
+                      ? null
+                      : ResizeImage(NetworkImage(photo), width: 84, height: 84),
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            ),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(_date(), style: VnText.body(13, color: p.muted)),
                     Text(
-                      firstName.isEmpty ? _greeting() : '${_greeting()}, $firstName',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: VnText.heading(20, color: p.ink),
+                      'VitaNet',
+                      style: VnText.heading(16, weight: FontWeight.w800, color: p.ink),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: p.brand.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        'HEALTH',
+                        style: TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.5,
+                          color: p.brand,
+                        ),
+                      ),
                     ),
                   ],
                 ),
-              ),
-              VnIconButton(
-                icon: Icons.notifications_none_rounded,
-                tooltip: unread ? 'Notifications, unread' : 'Notifications',
-                size: 46,
-                bordered: true,
-                onPressed: () => context.push('/notifications'),
-                badge: unread
-                    ? Positioned(
-                        top: 9,
-                        right: 10,
-                        child: Container(
-                          width: 9,
-                          height: 9,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFDC2626),
-                            shape: BoxShape.circle,
-                            border: Border.all(color: p.surface, width: 2),
-                          ),
+                Text(
+                  _date(),
+                  style: VnText.body(12, color: p.muted, weight: FontWeight.w500),
+                ),
+              ],
+            ),
+            const Spacer(),
+            VnIconButton(
+              icon: Icons.notifications_none_rounded,
+              tooltip: unread ? 'Notifications, unread' : 'Notifications',
+              size: 42,
+              iconSize: 21,
+              bordered: true,
+              onPressed: () => context.push('/notifications'),
+              badge: unread
+                  ? Positioned(
+                      top: 7,
+                      right: 8,
+                      child: Container(
+                        width: 9,
+                        height: 9,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDC2626),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: p.surface, width: 2),
                         ),
-                      )
-                    : null,
-              ),
-            ],
-          ),
+                      ),
+                    )
+                  : null,
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        // Spacious, unconstrained greeting headline (zero folding / truncation)
+        Text(
+          firstName.isEmpty ? _greeting() : '${_greeting()}, $firstName',
+          style: VnText.heading(24, color: p.ink, weight: FontWeight.w800, height: 1.2),
+          softWrap: true,
         ),
         if (staffAccess?.isPortalUser == true) ...[
           const SizedBox(height: 14),
@@ -183,7 +212,7 @@ class HeaderSection extends ConsumerWidget {
             ),
           ),
         ],
-        const SizedBox(height: 22),
+        const SizedBox(height: 16),
         Hero(
           tag: 'home_search_bar',
           child: Material(
@@ -192,6 +221,7 @@ class HeaderSection extends ConsumerWidget {
               borderRadius: BorderRadius.circular(16),
               side: BorderSide(color: p.line),
             ),
+            clipBehavior: Clip.antiAlias,
             child: InkWell(
               borderRadius: BorderRadius.circular(16),
               onTap: () => _openSearch(context),
@@ -200,19 +230,22 @@ class HeaderSection extends ConsumerWidget {
                 label: 'Search health, vitals, medicines',
                 excludeSemantics: true,
                 child: SizedBox(
-                  height: 52,
+                  height: 50,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Row(
                       children: [
-                        Icon(Icons.search_rounded, size: 20, color: p.muted),
-                        const SizedBox(width: 10),
+                        Icon(Icons.search_rounded, size: 21, color: p.muted),
+                        const SizedBox(width: 12),
                         Expanded(
-                          child: Text('Search health, vitals, medicines…',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: VnText.body(15, color: p.muted)),
+                          child: Text(
+                            'Search health, vitals, medicines…',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: VnText.body(14, color: p.muted),
+                          ),
                         ),
+                        Icon(Icons.mic_none_rounded, size: 20, color: p.brand),
                       ],
                     ),
                   ),
@@ -272,24 +305,21 @@ class SymptomCheckHero extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 16),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 260),
-                  child: Text(
-                    'Not feeling well? Check your symptoms in 2 minutes.',
-                    style: VnText.heading(22, color: Colors.white, height: 1.3),
-                  ),
+                Text(
+                  'Not feeling well? Check your symptoms in 2 minutes.',
+                  style: VnText.heading(21, color: Colors.white, height: 1.25),
                 ),
                 const SizedBox(height: 16),
                 Row(
                   children: [
                     Expanded(
-                      flex: 13,
                       child: VnButton(
-                        label: 'Start a check',
+                        label: 'Start check',
                         icon: Icons.chat_bubble_outline_rounded,
                         height: 48,
                         radius: 14,
-                        fontSize: 14,
+                        fontSize: 13.5,
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
                         background: Colors.white,
                         foreground: AppColors.brand,
                         onPressed: () => StatefulNavigationShell.of(context).goBranch(1),
@@ -297,12 +327,13 @@ class SymptomCheckHero extends StatelessWidget {
                     ),
                     const SizedBox(width: 10),
                     Expanded(
-                      flex: 10,
                       child: VnOutlineButton(
                         label: 'Guided form',
+                        icon: Icons.assignment_outlined,
                         height: 48,
                         radius: 14,
-                        fontSize: 14,
+                        fontSize: 13.5,
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
                         background: Colors.white.withValues(alpha: 0.14),
                         borderColor: Colors.transparent,
                         foreground: Colors.white,

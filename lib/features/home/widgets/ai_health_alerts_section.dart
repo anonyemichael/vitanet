@@ -90,6 +90,8 @@ class _AiHealthAlertsSectionState extends ConsumerState<AiHealthAlertsSection> {
             minWidth: box.maxWidth + 40,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
+              primary: false,
+              physics: const ClampingScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
               itemCount: insights.length,
               separatorBuilder: (_, _) => const SizedBox(width: 12),

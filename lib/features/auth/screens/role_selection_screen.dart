@@ -220,7 +220,7 @@ class _EnterpriseHeroPanel extends StatelessWidget {
     return Container(
       color: AppColors.staffNavy,
       child: SingleChildScrollView(
-        physics: const ClampingScrollPhysics(),
+        physics: const VnAlwaysScrollablePhysics(),
         padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 40),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

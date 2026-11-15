@@ -297,7 +297,7 @@ class _HomeSearchScreenState extends ConsumerState<HomeSearchScreen> {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 720),
             child: ListView(
-              physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
+              physics: const VnAlwaysScrollablePhysics(),
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
               children: [
                 Row(

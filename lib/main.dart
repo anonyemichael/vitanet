@@ -72,13 +72,15 @@ class AppScrollBehavior extends MaterialScrollBehavior {
 
   @override
   ScrollPhysics getScrollPhysics(BuildContext context) {
-    switch (getPlatform(context)) {
-      case TargetPlatform.iOS:
-      case TargetPlatform.macOS:
-        return const BouncingScrollPhysics();
-      default:
-        return const VnScrollPhysics();
-    }
+    return const VnAlwaysScrollablePhysics();
+  }
+
+  @override
+  Widget buildOverscrollIndicator(
+      BuildContext context, Widget child, ScrollableDetails details) {
+    // Avoid shader-based texture stretching on mobile GPU drivers;
+    // VnAlwaysScrollablePhysics handles smooth boundary elasticity natively.
+    return child;
   }
 }
 

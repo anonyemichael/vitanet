@@ -235,7 +235,7 @@ class _HealthLibraryScreenState extends ConsumerState<HealthLibraryScreen> {
             onRefresh: _onPullToRefresh,
             child: CustomScrollView(
               controller: _scrollController,
-              physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
+              physics: const VnAlwaysScrollablePhysics(),
               slivers: [
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
