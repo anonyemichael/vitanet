@@ -1,6 +1,7 @@
 # app/routes/ai_proxy.py
-"""Server-side proxy for the AI and web-search providers the app uses, so the
-API keys live only on the server (never inside the app bundle)."""
+"""Server-side AI helpers for the app: the health-report note (VitaNet model) and the web-search proxies, so API
+keys live only on the server (never inside the app bundle). The old OpenRouter/Gemini chat relay is removed: the app
+chats through POST /chat/{user_id} (app/services/ai_agent.py), which uses the VitaNet model and its tools."""
 import os
 import time
 from collections import defaultdict, deque
@@ -8,22 +9,20 @@ from typing import Deque, Dict, List
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse
+
+from pydantic import BaseModel, Field
 
 from app.dependencies.security import CurrentUser, get_current_user
+from app.services import ai_client
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
-OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 TAVILY_URL = "https://api.tavily.com/search"
 GOOGLE_CSE_URL = "https://www.googleapis.com/customsearch/v1"
 
 RATE_LIMIT_PER_MINUTE = int(os.getenv("AI_RATE_LIMIT_PER_MINUTE", "30"))
 _calls: Dict[str, Deque[float]] = defaultdict(deque)
-
-
-def _keys(name: str) -> List[str]:
-    return [k.strip() for k in os.getenv(name, "").split(",") if k.strip()]
 
 
 def _rate_limit(uid: str) -> None:
@@ -36,55 +35,33 @@ def _rate_limit(uid: str) -> None:
     window.append(now)
 
 
-def _openrouter_headers(key: str) -> dict:
-    return {
-        "Authorization": f"Bearer {key}",
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://vitanet-62e40.web.app",
-        "X-Title": "VitaNet",
-    }
+class HealthReportIn(BaseModel):
+    metric_name: str = Field(max_length=60)
+    current_value: str = Field(max_length=20)
+    unit: str = Field(default="", max_length=20)
+    avg: str = Field(default="", max_length=20)
+    high: str = Field(default="", max_length=20)
+    low: str = Field(default="", max_length=20)
 
 
-@router.post("/chat/completions")
-async def chat_completions(request: Request, current: CurrentUser = Depends(get_current_user)):
+@router.post("/health-report")
+def health_report(payload: HealthReportIn, current: CurrentUser = Depends(get_current_user)):
+    """Short plain-language note about one vital, written by the VitaNet model (replaces the old Gemini call made
+    from the app). When the model is offline the app still gets a factual summary of the numbers."""
     _rate_limit(current.uid)
-    keys = _keys("OPENROUTER_API_KEYS")
-    if not keys:
-        raise HTTPException(status_code=503, detail="AI is not configured on the server")
-    body = await request.json()
-
-    if body.get("stream"):
-        # Find a key that accepts the request, then stream its response through.
-        client = httpx.AsyncClient(timeout=httpx.Timeout(120, connect=15))
-        last_status, last_text = 502, "AI provider unavailable"
-        for key in keys:
-            req = client.build_request("POST", OPENROUTER_URL, json=body, headers=_openrouter_headers(key))
-            resp = await client.send(req, stream=True)
-            if resp.status_code == 200:
-                async def relay(r=resp):
-                    try:
-                        async for chunk in r.aiter_raw():
-                            yield chunk
-                    finally:
-                        await r.aclose()
-                        await client.aclose()
-
-                return StreamingResponse(relay(), media_type="text/event-stream")
-            last_status = resp.status_code
-            last_text = (await resp.aread()).decode(errors="ignore")[:500]
-            await resp.aclose()
-            if resp.status_code not in (401, 402, 403, 429):
-                break
-        await client.aclose()
-        return JSONResponse(status_code=last_status, content={"error": last_text})
-
-    async with httpx.AsyncClient(timeout=httpx.Timeout(120, connect=15)) as client:
-        last = None
-        for key in keys:
-            last = await client.post(OPENROUTER_URL, json=body, headers=_openrouter_headers(key))
-            if last.status_code not in (401, 402, 403, 429):
-                break
-        return JSONResponse(status_code=last.status_code, content=last.json())
+    p = payload
+    prompt = (
+        f"Explain this health reading to the user in under 4 short sentences, plain language, no diagnosis, using only "
+        f"these numbers. Metric: {p.metric_name}. Current: {p.current_value} {p.unit}. Recent average: {p.avg} {p.unit}. "
+        f"Highest: {p.high} {p.unit}. Lowest: {p.low} {p.unit}. If a value could be a danger sign, say to seek care."
+    )
+    text = ai_client.complete_text(prompt, max_tokens=220)
+    source = "vitanet" if text else "summary"
+    if not text:
+        text = (f"Your latest {p.metric_name.lower()} is {p.current_value} {p.unit}. Over recent readings it averaged "
+                f"{p.avg} {p.unit} (lowest {p.low}, highest {p.high}). The VitaNet assistant is offline, so this is "
+                f"only a summary of your numbers; if you feel unwell, contact a clinician.").replace("  ", " ")
+    return {"report": text, "source": source}
 
 
 @router.post("/search/tavily")

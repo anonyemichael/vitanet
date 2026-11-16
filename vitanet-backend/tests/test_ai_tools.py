@@ -176,3 +176,27 @@ def test_model_answer_used_only_when_it_passes_checks(monkeypatch):
 def test_no_model_configured_uses_rules(monkeypatch):
     monkeypatch.setattr(portal_ai.settings, "PORTAL_AI_URL", "")
     assert portal_ai.run_task(INPUTS["structure_note"])[1]["source"] == "rules"
+
+
+# ---------------------------------------------------------------- no third-party model; offline is safe
+def test_offline_chat_still_warns_on_danger_signs(monkeypatch):
+    from app.services import ai_agent, ai_client
+    monkeypatch.setattr(ai_client.settings, "AI_BASE_URL", "")
+    saved = []
+    monkeypatch.setattr(ai_agent.chat_service, "save_message", lambda *a, **k: saved.append(k))
+    out = ai_agent.run_agent(None, "00000000-0000-0000-0000-000000000000", "My son is fitting and very hot")
+    assert out["offline"] is True and out["reply"].startswith("⚠️") and "112" in out["reply"]
+
+
+def test_health_alert_falls_back_to_template(monkeypatch):
+    from app.services import ai_client, health_alert_service
+    monkeypatch.setattr(ai_client.settings, "AI_BASE_URL", "")
+    msg = health_alert_service.generate_alert_message("heart_rate", 128, 76.0, "urgent")
+    assert "128" in msg and "76.0" in msg
+
+
+def test_buttons_carry_real_links():
+    hospitals = [{"id": "h1", "name": "Ridge Hospital", "address": "Castle Rd, Accra", "phone_number": "030 222 8382"}]
+    block = ai_blocks.build_action_buttons({"get_nearby_hospitals"}, hospitals)
+    urls = {b.action: b.url for b in block.buttons}
+    assert urls["call_hospital"] == "tel:0302228382" and urls["get_directions"].startswith("https://www.google.com/maps/")

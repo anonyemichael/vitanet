@@ -237,6 +237,27 @@ class ChatMessagesNotifier extends StateNotifier<List<ChatMessage>> {
     ];
   }
 
+  /// Adds the buttons / card that came with an assistant reply (call a hospital, directions, ...).
+  void attachExtras(String id, {List<ChatAction>? actions, String? widgetType, Map<String, dynamic>? widgetPayload}) {
+    state = [
+      for (final msg in state)
+        if (msg.id == id)
+          ChatMessage(
+            id: msg.id,
+            role: msg.role,
+            text: msg.text,
+            timestamp: msg.timestamp,
+            imagePath: msg.imagePath,
+            actions: (actions == null || actions.isEmpty) ? msg.actions : actions,
+            widgetType: widgetType ?? msg.widgetType,
+            widgetPayload: widgetPayload ?? msg.widgetPayload,
+            quickReplies: msg.quickReplies,
+          )
+        else
+          msg
+    ];
+  }
+
   void setMessages(List<ChatMessage> messages) => state = messages;
 
   void clear() => state = [];

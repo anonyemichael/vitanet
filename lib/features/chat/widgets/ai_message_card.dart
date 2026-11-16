@@ -156,7 +156,8 @@ class AiMessageCard extends StatelessWidget {
     return OutlinedButton.icon(
       onPressed: () async {
         final payload = action.payload;
-        if (payload.isNotEmpty && payload.startsWith('http')) {
+        // http(s) links (maps, articles) and tel: links (call the hospital) come from the VitaNet backend
+        if (payload.isNotEmpty && (payload.startsWith('http') || payload.startsWith('tel:'))) {
           final url = Uri.tryParse(payload);
           if (url != null) {
             try {

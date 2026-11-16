@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:vitanet/core/network/backend.dart';
@@ -8,19 +10,26 @@ import 'package:vitanet/data/models/triage_result.dart';
 import 'package:vitanet/data/models/user_profile.dart';
 import 'package:vitanet/data/services/api_service.dart';
 
-/// Direct Gemini AI service — no backend relay needed.
-/// Builds a rich system prompt from user profile + live vitals.
+/// VitaNet AI service.
+///
+/// The app no longer talks to any outside AI (Gemini / OpenRouter were removed). Every chat message goes to our own
+/// backend, `POST /chat/{uid}`, where the VitaNet model answers with its tools (your vitals and profile, nearby
+/// hospitals, pharmacies, medicine look-up, symptom checker, ...) and the safety layer adds a danger-sign warning
+/// when needed. The backend keeps the conversation history, the system prompt and the profile, so none of that is
+/// built here any more. Health-trend notes come from `POST /ai/health-report`.
 class AiService {
   static const _uuid = Uuid();
+  static const _offline =
+      'VitaNet AI is unavailable right now. Please try again in a moment. If you feel very unwell, call 112 or 193.';
 
   UserProfile? _profile;
   Map<String, double> _vitals = {};
-  List<TriageResult> _pastTriages = [];
   int _questionCount = 0;
-  String? _currentAddress;
-  bool _isGeocoding = false;
 
-  final List<Map<String, String>> _history = [];
+  /// Buttons and card from the most recent reply (call the hospital, directions, notify a caregiver, ...).
+  List<ChatAction> lastActions = const [];
+  String? lastWidgetType;
+  Map<String, dynamic>? lastWidgetPayload;
 
   void updateContext(
     UserProfile? profile, {
@@ -28,404 +37,111 @@ class AiService {
     Map<String, double>? vitals,
   }) {
     _profile = profile;
-    _pastTriages = pastTriages ?? [];
     if (vitals != null) _vitals = vitals;
-    
-    if (_profile?.latitude != null && _profile?.longitude != null && _currentAddress == null && !_isGeocoding) {
-      _fetchAddress(_profile!.latitude!, _profile!.longitude!);
-    }
   }
 
-  Future<void> _fetchAddress(double lat, double lon) async {
-    _isGeocoding = true;
-    try {
-      final url = Uri.parse('https://nominatim.openstreetmap.org/reverse?lat=$lat&lon=$lon&format=json');
-      final response = await http.get(url, headers: {'User-Agent': 'VitaNet/1.0'});
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data != null && data['display_name'] != null) {
-          _currentAddress = data['display_name'];
-        }
-      }
-    } catch (_) {
-    } finally {
-      _isGeocoding = false;
-    }
-  }
-
+  /// Conversation history now lives on the server; this only restores the question counter for the UI.
   void loadHistory(List<ChatMessage> messages, UserProfile? profile) {
+    _profile = profile ?? _profile;
     _questionCount = messages.where((m) => m.role == MessageRole.user).length;
-    _history.clear();
-    for (final m in messages) {
-      if (m.role == MessageRole.user) {
-        _history.add({'role': 'user', 'content': m.text});
-      } else if (m.role == MessageRole.assistant) {
-        _history.add({'role': 'model', 'content': m.text});
-      }
-    }
   }
 
-  String _buildSystemPrompt() {
-    final buf = StringBuffer();
-    buf.writeln(
-      'You are VitaNet AI, a compassionate and knowledgeable health assistant acting as a virtual triage nurse. '
-      'If the user is asking about symptoms or a potential medical condition, you must follow WHO guidelines for medical triage: DO NOT give a diagnosis based on just one symptom, and ALWAYS ask follow-up questions (duration, severity) before suggesting a condition. '
-      'HOWEVER, if the user asks a direct question (e.g., finding a hospital, checking operating hours, asking for general health info, or asking their location), DO NOT force them to provide symptoms. Give them a direct and straight answer immediately. '
-      'Do not blindly recommend the hospital for minor symptoms, but for severe cases, direct them to a hospital. '
-      'Factor in the user\'s geographic location for regional diseases. '
-      'You are free to answer questions about the user\'s location (e.g., if they ask "where am I") using their Location Address. Do not print raw latitude/longitude numerical coordinates in the chat, use them only to generate links. '
-      'When the user needs to find a hospital, clinic, lab, or pharmacy near them, you MUST provide a clickable Google Maps search link. '
-      'If real-time web search results are provided in your context, you MUST use them to list the actual names, addresses, and details of the facilities directly in the chat, in addition to providing the Google Maps link. Do NOT say you cannot list them. '
-      'If you have their exact location coordinates in the patient profile below, you have ALL the information you need. DO NOT ask the user to confirm their city or region. Format the link EXACTLY like this: [Find a nearby <facility>](https://www.google.com/maps/search/<facility>/@<LATITUDE>,<LONGITUDE>,14z) (replace <facility> with hospital, clinic, lab, or pharmacy, and replace <LATITUDE> and <LONGITUDE> with the numbers). '
-      'If you do NOT have their coordinates in the profile, ONLY THEN should you politely ask for their city, or format the link like this: [Find a nearby <facility>](https://www.google.com/maps/search/<facility>+near+me) '
-      'Format responses clearly. Use bullet points for lists. Keep responses under 300 words unless detail is critical.',
-    );
+  String? get _uid => Firebase.apps.isEmpty ? null : FirebaseAuth.instance.currentUser?.uid;
 
-    if (_profile != null) {
-      buf.writeln('\n--- PATIENT PROFILE ---');
-      if (_profile!.latitude != null && _profile!.longitude != null) {
-        buf.writeln('Location Coordinates: ${_profile!.latitude}, ${_profile!.longitude} (Use these to generate the Google Maps URL, but do not print the raw numbers to the user.)');
-        if (_currentAddress != null) {
-          buf.writeln('Location Address: $_currentAddress');
-        }
-      } else {
-        buf.writeln('Location: Unknown (If needed, politely ask the user what city they are in. DO NOT guess.)');
-      }
-      buf.writeln('Name: ${_profile!.name}');
-      if (_profile!.age != null) buf.writeln('Age: ${_profile!.age}');
-      if (_profile!.sex != null) buf.writeln('Biological Sex: ${_profile!.sex}');
-      if (_profile!.bloodType != null) buf.writeln('Blood Type: ${_profile!.bloodType}');
-      if (_profile!.height != null) buf.writeln('Height: ${_profile!.height} cm');
-      if (_profile!.weight != null) buf.writeln('Weight: ${_profile!.weight} kg');
-      if (_profile!.preExistingConditions.isNotEmpty) {
-        buf.writeln('Conditions: ${_profile!.preExistingConditions.join(', ')}');
-      }
-      if (_profile!.allergies.isNotEmpty) {
-        buf.writeln('Allergies: ${_profile!.allergies.join(', ')}');
-      }
-      if (_profile!.medications.isNotEmpty) {
-        buf.writeln('Medications: ${_profile!.medications.join(', ')}');
-      }
-      buf.writeln('Smoking: ${_profile!.smoking ? 'Yes' : 'No'}');
-      buf.writeln('Alcohol: ${_profile!.alcohol ? 'Yes' : 'No'}');
-      if (_profile!.exerciseFrequency != null) {
-        buf.writeln('Exercise: ${_profile!.exerciseFrequency}');
-      }
-    }
-
-    if (_vitals.isNotEmpty) {
-      buf.writeln('\n--- LIVE VITALS (from connected devices) ---');
-      if (_vitals.containsKey('heart_rate')) {
-        buf.writeln('Heart Rate: ${_vitals['heart_rate']!.round()} bpm');
-      }
-      if (_vitals.containsKey('blood_oxygen')) {
-        buf.writeln('Blood Oxygen (SpO2): ${_vitals['blood_oxygen']!.toStringAsFixed(1)}%');
-      }
-      if (_vitals.containsKey('temperature')) {
-        buf.writeln('Body Temperature: ${_vitals['temperature']!.toStringAsFixed(1)}°C');
-      }
-      if (_vitals.containsKey('respiratory_rate')) {
-        buf.writeln('Respiratory Rate: ${_vitals['respiratory_rate']!.round()} breaths/min');
-      }
-    }
-
-    if (_pastTriages.isNotEmpty) {
-      buf.writeln('\n--- RECENT TRIAGE HISTORY ---');
-      for (final t in _pastTriages.take(3)) {
-        buf.writeln('• ${t.primarySymptom}: ${t.level.name} (${t.timestamp.toLocal().toString().split(' ')[0]})');
-      }
-    }
-
-    return buf.toString();
-  }
-
-  Future<String?> _searchTavily(String query) async {
-
-    try {
-      final response = await http.post(
-        BackendConfig.uri('ai/search/tavily'),
-        headers: await BackendConfig.authHeaders(),
-        body: jsonEncode({
-          'query': query,
-          'search_depth': 'basic',
-          'include_answer': true,
-          'max_results': 3,
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data['answer'] != null) {
-          return 'Tavily Answer: ${data['answer']}\nSources: ${(data['results'] as List).map((e) => e['title']).join(', ')}';
-        }
-        return (data['results'] as List)
-            .map((e) => '${e['title']}: ${e['content']}')
-            .join('\n');
-      }
-    } catch (e) {
-      debugPrint('Tavily search error: $e');
-    }
-    return null;
-  }
-
-  Future<String?> _searchGoogle(String query) async {
-
-    try {
-      final url = BackendConfig.uri('ai/search/google').replace(queryParameters: {'q': query, 'num': '3'});
-      final response = await http.get(url, headers: await BackendConfig.authHeaders());
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final items = data['items'] as List?;
-        if (items != null && items.isNotEmpty) {
-          return items.map((e) => '${e['title']}: ${e['snippet']}').join('\n');
-        }
-      }
-    } catch (e) {
-      debugPrint('Google search error: $e');
-    }
-    return null;
-  }
-
-  Future<String?> _checkSearchIntent(String userMessage) async {
-
-    final prompt = '''
-You are an intent classifier. Does the user's message require fetching real-time information from the web (e.g., live operating hours, today's news, current events, or searching for specific places/hospitals/clinics near them)?
-If yes, reply strictly in this format: YES: <optimized search query>
-If no, reply strictly: NO
-
-User message: "$userMessage"
-''';
-
-    final body = {
-      'model': 'google/gemini-2.5-flash',
-      'messages': [{'role': 'user', 'content': prompt}],
-      'temperature': 0.1,
-      'max_tokens': 30,
-    };
-
-    try {
-      final response = await http.post(
-        BackendConfig.uri('ai/chat/completions'),
-        headers: await BackendConfig.authHeaders(),
-        body: jsonEncode(body),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final text = data['choices'][0]['message']['content'] as String? ?? '';
-        if (text.trim().startsWith('YES:')) {
-          return text.substring(4).trim();
-        }
-      }
-    } catch (e) {
-      debugPrint('Intent check error: $e');
-    }
-    return null;
-  }
-
+  /// Sends the message to the VitaNet assistant and yields the reply. The backend answers in one piece (tools run
+  /// on the server first), so this yields once; buttons and cards are left in [lastActions] / [lastWidgetType].
   Stream<String> getResponseStream(String userMessage, {String? base64Image}) async* {
-    _questionCount++;
-
-
-    // Check if web search is needed
-    String? searchContext;
-    final searchQuery = await _checkSearchIntent(userMessage);
-    if (searchQuery != null && searchQuery.isNotEmpty) {
-      String? results = await _searchTavily(searchQuery);
-      results ??= await _searchGoogle(searchQuery);
-      
-      if (results != null && results.isNotEmpty) {
-        searchContext = '\n--- REAL-TIME WEB SEARCH RESULTS ---\nQuery: $searchQuery\n$results\nUse this live information to answer the user accurately.';
-      }
-    }
-
-    final messages = <Map<String, dynamic>>[];
-    var systemPrompt = _buildSystemPrompt();
-    if (searchContext != null) {
-      systemPrompt += searchContext;
-    }
-    messages.add({'role': 'system', 'content': systemPrompt});
-    
-    for (final msg in _history) {
-      messages.add({
-        'role': msg['role'] == 'model' ? 'assistant' : 'user',
-        'content': msg['content']
-      });
-    }
-
-    if (base64Image != null) {
-      messages.add({
-        'role': 'user',
-        'content': [
-          {'type': 'text', 'text': userMessage},
-          {
-            'type': 'image_url',
-            'image_url': {
-              'url': 'data:image/jpeg;base64,$base64Image'
-            }
-          }
-        ]
-      });
-    } else {
-      messages.add({'role': 'user', 'content': userMessage});
-    }
-
-    final body = {
-      'model': 'google/gemini-2.5-flash',
-      'messages': messages,
-      'temperature': 0.7,
-      'max_tokens': 1024,
-      'top_p': 0.95,
-      'stream': true,
-    };
-
-    final request = http.Request('POST', BackendConfig.uri('ai/chat/completions'));
-    request.headers.addAll(await BackendConfig.authHeaders());
-    request.body = jsonEncode(body);
-
-    try {
-      final response = await http.Client().send(request);
-      if (response.statusCode != 200) {
-        final err = await response.stream.bytesToString();
-        debugPrint('OpenRouter stream error ${response.statusCode}: $err');
-        yield 'VitaNet AI is unavailable right now. Please try again in a moment. If you feel very unwell, call 112.';
-        return;
-      }
-
-      String fullText = '';
-      await for (var line in response.stream.transform(utf8.decoder).transform(const LineSplitter())) {
-        if (line.startsWith('data: ') && line != 'data: [DONE]') {
-          try {
-            final data = jsonDecode(line.substring(6)) as Map<String, dynamic>;
-            final choices = data['choices'] as List?;
-            if (choices != null && choices.isNotEmpty) {
-              final delta = choices[0]['delta'] as Map<String, dynamic>?;
-              if (delta != null && delta['content'] != null) {
-                final chunk = delta['content'] as String;
-                fullText += chunk;
-                yield fullText;
-              }
-            }
-          } catch (e) {
-            // Ignore parse errors on incomplete chunks
-          }
-        }
-      }
-
-      _history.add({'role': 'user', 'content': userMessage});
-      _history.add({'role': 'model', 'content': fullText});
-      if (_history.length > 40) {
-        _history.removeRange(0, _history.length - 40);
-      }
-    } catch (e) {
-      debugPrint('AiService stream error: $e');
-      yield 'Connection error. Check your internet and try again.';
-    }
+    final messages = await getResponse(userMessage, base64Image: base64Image);
+    yield messages.first.text;
   }
 
-  Future<List<ChatMessage>> getResponse(
-    String userMessage, {
-    String? base64Image,
-  }) async {
+  Future<List<ChatMessage>> getResponse(String userMessage, {String? base64Image}) async {
     _questionCount++;
+    lastActions = const [];
+    lastWidgetType = null;
+    lastWidgetPayload = null;
 
-
-    // Check if web search is needed
-    String? searchContext;
-    final searchQuery = await _checkSearchIntent(userMessage);
-    if (searchQuery != null && searchQuery.isNotEmpty) {
-      String? results = await _searchTavily(searchQuery);
-      results ??= await _searchGoogle(searchQuery);
-      
-      if (results != null && results.isNotEmpty) {
-        searchContext = '\n--- REAL-TIME WEB SEARCH RESULTS ---\nQuery: $searchQuery\n$results\nUse this live information to answer the user accurately.';
-      }
+    final uid = _uid;
+    if (uid == null) {
+      return [_message('Please sign in to chat with the VitaNet assistant. If you feel very unwell, call 112 or 193.')];
     }
-
-    // Build conversation history for context
-    final messages = <Map<String, dynamic>>[];
-    var systemPrompt = _buildSystemPrompt();
-    if (searchContext != null) {
-      systemPrompt += searchContext;
-    }
-    messages.add({'role': 'system', 'content': systemPrompt});
-    
-    for (final msg in _history) {
-      messages.add({
-        'role': msg['role'] == 'model' ? 'assistant' : 'user',
-        'content': msg['content']
-      });
-    }
-
-    if (base64Image != null) {
-      messages.add({
-        'role': 'user',
-        'content': [
-          {'type': 'text', 'text': userMessage},
-          {
-            'type': 'image_url',
-            'image_url': {
-              'url': 'data:image/jpeg;base64,$base64Image'
-            }
-          }
-        ]
-      });
-    } else {
-      messages.add({'role': 'user', 'content': userMessage});
-    }
-
-    final body = {
-      'model': 'google/gemini-2.5-flash',
-      'messages': messages,
-      'temperature': 0.7,
-      'max_tokens': 1024,
-      'top_p': 0.95,
-    };
 
     try {
-      final response = await http.post(
-        BackendConfig.uri('ai/chat/completions'),
-        headers: await BackendConfig.authHeaders(),
-        body: jsonEncode(body),
-      );
+      final response = await http
+          .post(
+            BackendConfig.uri('chat/$uid'),
+            headers: await BackendConfig.authHeaders(),
+            body: jsonEncode({
+              'message': userMessage,
+              'image_base64': ?base64Image,
+            }),
+          )
+          .timeout(const Duration(seconds: 90));
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        final choices = data['choices'] as List?;
-        if (choices != null && choices.isNotEmpty) {
-          final message = choices[0]['message'] as Map<String, dynamic>?;
-          if (message != null) {
-            final text = message['content'] as String? ?? '';
-            // Add to history for context
-            _history.add({'role': 'user', 'content': userMessage});
-            _history.add({'role': 'model', 'content': text});
-            // Keep history manageable (last 20 turns)
-            if (_history.length > 40) {
-              _history.removeRange(0, _history.length - 40);
-            }
-            return [
-              ChatMessage(
-                id: _uuid.v4(),
-                role: MessageRole.assistant,
-                text: text,
-                timestamp: DateTime.now(),
-              ),
-            ];
-          }
-        }
-        return [_errorMessage('Empty response from AI.')];
-      } else {
-        debugPrint('OpenRouter error ${response.statusCode}: ${response.body}');
-        return [_errorMessage('VitaNet AI is unavailable right now. Please try again in a moment. If you feel very unwell, call 112.')];
+      if (response.statusCode != 200) {
+        debugPrint('VitaNet chat error ${response.statusCode}: ${response.body}');
+        return [_message(_offline)];
       }
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final reply = (data['reply'] as String?)?.trim();
+      _readBlocks((data['blocks'] as List?) ?? const []);
+      return [
+        ChatMessage(
+          id: _uuid.v4(),
+          role: MessageRole.assistant,
+          text: (reply == null || reply.isEmpty) ? _offline : reply,
+          timestamp: DateTime.now(),
+          actions: lastActions.isEmpty ? null : lastActions,
+          widgetType: lastWidgetType,
+          widgetPayload: lastWidgetPayload,
+        ),
+      ];
     } catch (e) {
       debugPrint('AiService error: $e');
-      return [_errorMessage('Connection error. Check your internet and try again.')];
+      return [_message('Connection error. Check your internet and try again. If you feel very unwell, call 112 or 193.')];
     }
   }
 
-  ChatMessage _errorMessage(String text) => ChatMessage(
+  /// Backend blocks -> the app's existing cards and buttons.
+  void _readBlocks(List blocks) {
+    final actions = <ChatAction>[];
+    for (final raw in blocks) {
+      if (raw is! Map) continue;
+      final b = Map<String, dynamic>.from(raw);
+      switch (b['type']) {
+        case 'hospital_recommendation':
+          final km = (b['distance_km'] as num?)?.toDouble();
+          lastWidgetType = 'hospital_recommendation';
+          lastWidgetPayload = {
+            'name': b['name'],
+            if (km != null) 'distance': '${km.toStringAsFixed(1)} km away from you',
+            if (b['est_time_min'] != null) 'estTime': '${b['est_time_min']} min',
+            if (b['crowd_level'] != null) 'crowdLevel': b['crowd_level'],
+            if (b['address'] != null) 'address': b['address'],
+          };
+          break;
+        case 'action_buttons':
+          for (final btn in (b['buttons'] as List? ?? const [])) {
+            if (btn is! Map) continue;
+            actions.add(ChatAction(
+              label: '${btn['label'] ?? ''}',
+              type: switch (btn['action']) {
+                'call_hospital' => 'call',
+                'get_directions' => 'directions',
+                'notify_caregiver' => 'notify',
+                'emergency_checkin' => 'assessment',
+                _ => 'button',
+              },
+              payload: '${btn['url'] ?? ''}',
+            ));
+          }
+          break;
+      }
+    }
+    lastActions = actions;
+  }
+
+  ChatMessage _message(String text) => ChatMessage(
         id: _uuid.v4(),
         role: MessageRole.assistant,
         text: text,
@@ -486,9 +202,13 @@ User message: "$userMessage"
 
   void reset() {
     _questionCount = 0;
-    _history.clear();
+    lastActions = const [];
+    lastWidgetType = null;
+    lastWidgetPayload = null;
   }
 
+  /// Short note about one health metric, written by the VitaNet model on the server (a plain summary of the numbers
+  /// when the model is offline).
   Future<String> generateHealthReport({
     required String metricName,
     required String currentValue,
@@ -497,38 +217,26 @@ User message: "$userMessage"
     required String high,
     required String low,
   }) async {
-
-    final prompt = '''
-You are a medical AI assistant analyzing health data for a user.
-Provide a concise, professional, and easy-to-understand analysis of this metric based on WHO guidelines. 
-Keep it under 4 sentences and use bullet points if necessary. Do not provide a formal diagnosis.
-
-Metric: $metricName
-Current: $currentValue $unit
-Average (recent): $avg $unit
-Highest (recent): $high $unit
-Lowest (recent): $low $unit
-''';
-
-    final body = {
-      'model': 'google/gemini-2.5-flash',
-      'messages': [{'role': 'user', 'content': prompt}],
-      'temperature': 0.7,
-      'max_tokens': 300,
-    };
-
     try {
-      final response = await http.post(
-        BackendConfig.uri('ai/chat/completions'),
-        headers: await BackendConfig.authHeaders(),
-        body: jsonEncode(body),
-      );
-
+      final response = await http
+          .post(
+            BackendConfig.uri('ai/health-report'),
+            headers: await BackendConfig.authHeaders(),
+            body: jsonEncode({
+              'metric_name': metricName,
+              'current_value': currentValue,
+              'unit': unit,
+              'avg': avg,
+              'high': high,
+              'low': low,
+            }),
+          )
+          .timeout(const Duration(seconds: 60));
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return data['choices'][0]['message']['content'] ?? 'Unable to generate report.';
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        return (data['report'] as String?) ?? 'Unable to generate report.';
       }
-      return 'VitaNet AI is unavailable right now. Please try again in a moment. If you feel very unwell, call 112.';
+      return _offline;
     } catch (e) {
       return 'Connection error. Check your internet and try again.';
     }

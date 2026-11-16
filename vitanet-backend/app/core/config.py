@@ -9,15 +9,12 @@ class Settings(BaseSettings):
     FIREBASE_CREDENTIALS_PATH: str = ""
     RESEND_API_KEY: str = ""
     
-    GEMINI_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-2.5-flash"
-    OPENROUTER_API_KEYS: str = ""
-
-    # Chat model (OpenAI-compatible). Default: Gemini via OpenRouter. For the VitaNet model served with vLLM, set
-    # AI_BASE_URL=http://<server>:8000/v1, AI_MODEL=vitanet-27b, AI_API_KEY=<server key>.
-    AI_BASE_URL: str = "https://openrouter.ai/api/v1"
-    AI_MODEL: str = "google/gemini-2.5-flash"
+    # The VitaNet model (OpenAI-compatible server, e.g. vLLM). Gemini / OpenRouter are no longer used.
+    # Empty AI_BASE_URL = the assistant is offline: the app is told so, danger-sign warnings and triage still work.
+    AI_BASE_URL: str = ""            # e.g. http://<model-server>:8000/v1
+    AI_MODEL: str = "vitanet-27b"
     AI_API_KEY: str = ""
+    AI_TIMEOUT_S: float = 60.0
 
     # Hospital-portal model (the 5 JSON tasks). Empty URL = the portal uses its rule-based output only.
     PORTAL_AI_URL: str = ""

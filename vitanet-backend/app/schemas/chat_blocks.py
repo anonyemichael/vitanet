@@ -40,6 +40,7 @@ class ActionButton(BaseModel):
     label: str
     action: str
     target_id: Optional[str] = None
+    url: Optional[str] = None   # what the app opens when tapped: tel:..., a maps link; None = handled in the app
 
 
 class ActionButtonsBlock(BaseModel):

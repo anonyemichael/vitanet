@@ -6,26 +6,22 @@ import logging
 import json
 from uuid import UUID
 
-import openai
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models.chat import MessageRole
 from app.schemas.chat_blocks import TextBlock
-from app.services import ai_blocks, ai_tools, chat_service, user_settings_service
+from app.services import ai_blocks, ai_client, ai_tools, chat_service, user_settings_service
 from app.services.ai_system_prompt import build_system_prompt
 from app.services.safety import SafetyLayer
 
 logger = logging.getLogger(__name__)
 
-# Use OpenRouter or Gemini fallback keys
-or_keys = settings.OPENROUTER_API_KEYS.split(",") if settings.OPENROUTER_API_KEYS else []
-api_key = (or_keys[0].strip() if or_keys else settings.GEMINI_API_KEY) or "sk-vitanet-placeholder-key"
-# Which model serves the chat is configuration, not code: today Gemini through OpenRouter; when the VitaNet model is
-# served (an OpenAI-compatible /v1/chat/completions, e.g. vLLM), set AI_BASE_URL / AI_MODEL / AI_API_KEY.
-client = openai.OpenAI(base_url=settings.AI_BASE_URL, api_key=settings.AI_API_KEY or api_key)
-
+# The chat is answered by the VitaNet model only (app/services/ai_client.py: AI_BASE_URL / AI_MODEL / AI_API_KEY).
 MODEL = settings.AI_MODEL
+OFFLINE_REPLY = ("The VitaNet assistant is offline right now, so I can't answer in detail. If you feel very unwell, "
+                 "have a fit, trouble breathing, chest pain, heavy bleeding or a child who cannot drink, go to the "
+                 "nearest hospital now or call 112 / 193. You can still use Assess Symptoms and Find Hospital.")
 MAX_TOOL_ITERATIONS = 5   # e.g. hospitals -> propose_action -> answer
 safety = SafetyLayer()
 
@@ -58,6 +54,12 @@ def run_agent(
     db: Session, user_id: UUID, user_message: str, image_base64: str | None = None
 ) -> dict:
     chat_service.save_message(db, user_id, MessageRole.USER, content=user_message)
+
+    client = ai_client.get_client()
+    if client is None:   # no model server configured: say so, but still warn about danger signs
+        reply = safety.apply(user_message, OFFLINE_REPLY)
+        chat_service.save_message(db, user_id, MessageRole.ASSISTANT, content=reply)
+        return {"reply": reply, "blocks": [TextBlock(content=reply).model_dump()], "offline": True}
     user_settings = user_settings_service.get_or_create_settings(db, user_id)
     contents = _history_contents(db, user_id)
     
@@ -168,7 +170,7 @@ def run_agent(
             blocks.append(TextBlock(content=reply))
     except Exception:
         logger.exception("AI chat request failed for user %s", user_id)
-        reply = "I'm having trouble connecting right now. Please try again shortly."
+        reply = safety.apply(user_message, OFFLINE_REPLY)
         chat_service.save_message(db, user_id, MessageRole.ASSISTANT, content=reply)
         blocks.append(TextBlock(content=reply))
 

@@ -310,6 +310,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     if (isFirst) {
       ref.read(isAiTypingProvider.notifier).state = false;
+    } else if (aiService.lastActions.isNotEmpty || aiService.lastWidgetType != null) {
+      ref.read(chatMessagesProvider.notifier).attachExtras(
+            responseId,
+            actions: aiService.lastActions,
+            widgetType: aiService.lastWidgetType,
+            widgetPayload: aiService.lastWidgetPayload,
+          );
     }
 
     if (isVoice && fullResponse.isNotEmpty) {

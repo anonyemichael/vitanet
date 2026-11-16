@@ -1,27 +1,13 @@
 # app/services/health_alert_service.py
-import os
 from uuid import UUID
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 
-from google import genai
-from google.genai import types
 from app.core.config import settings as app_settings
 from app.models.health_alert import HealthAlert, AlertSeverity, AlertStatus
 from app.models.vitals import VitalType
-from app.services import vitals_service, care_circle_activity_service, care_circle_service
+from app.services import ai_client, vitals_service, care_circle_activity_service, care_circle_service
 from app.models.care_circle_activity import ActivityType
-
-_client = None
-
-def get_genai_client():
-    global _client
-    if _client is None and app_settings.GEMINI_API_KEY:
-        try:
-            _client = genai.Client(api_key=app_settings.GEMINI_API_KEY)
-        except Exception:
-            _client = None
-    return _client
 
 # Simple absolute thresholds — deviation from the user's own 7-day baseline
 THRESHOLDS = {
@@ -36,25 +22,18 @@ ESCALATION_DELAY_SECONDS = 30  # short for demo purposes; would be 15-30 min in 
 
 
 def generate_alert_message(vital_type: str, latest_value: float, avg_value: float, severity: str) -> str:
-    """Use Gemini for a natural-language alert message — simple text call, no tools needed."""
-    ai_client = get_genai_client()
-    if ai_client:
-        prompt = (
-            f"Write a short (1-2 sentence), calm, plain-language health alert for a care app. "
-            f"Vital: {vital_type}. Latest reading: {latest_value}. Recent average: {avg_value}. "
-            f"Severity: {severity}. Do not diagnose. Do not use markdown."
-        )
-        try:
-            response = ai_client.models.generate_content(
-                model=app_settings.GEMINI_MODEL,
-                contents=prompt,
-                config=types.GenerateContentConfig(temperature=0.2, max_output_tokens=120),
-            )
-            return (response.text or "").strip()
-        except Exception:
-            pass
-    # Fallback if Gemini unavailable — never let alerting silently break
-    return f"Your {vital_type.replace('_', ' ')} reading ({latest_value}) is outside your usual range (avg {avg_value})."
+    """A calm 1-2 sentence alert written by the VitaNet model; a fixed template when the model is offline, so
+    alerting never depends on the model being up."""
+    label = vital_type.replace("_", " ")
+    prompt = (
+        f"Write a short (1-2 sentence), calm, plain-language health alert for a care app. "
+        f"Vital: {label}. Latest reading: {latest_value}. Recent average: {avg_value}. "
+        f"Severity: {severity}. Do not diagnose. Do not use markdown. Use only these numbers."
+    )
+    text = ai_client.complete_text(prompt, max_tokens=120)
+    if text:
+        return text
+    return f"Your {label} reading ({latest_value}) is outside your usual range (avg {avg_value})."
 
 
 def check_vital_for_alert(db: Session, user_id: UUID, vital_type: str, latest_value: float) -> HealthAlert | None:
