@@ -1,8 +1,8 @@
 # app/schemas/health_profile.py
 from uuid import UUID
 from datetime import datetime
-from typing import Optional
-from pydantic import BaseModel, ConfigDict
+from typing import List, Optional
+from pydantic import BaseModel, ConfigDict, Field
 from app.models.health_profile import ExerciseFrequency
 
 
@@ -40,3 +40,22 @@ class AllergyOut(BaseModel):
     id: UUID
     allergen: str
     created_at: datetime
+
+
+class AppProfileSync(BaseModel):
+    """The app's profile screen, as one message (lib/data/models/user_profile.dart)."""
+    name: Optional[str] = Field(default=None, max_length=150)
+    age: Optional[int] = Field(default=None, ge=0, le=130)
+    sex: Optional[str] = Field(default=None, max_length=32)
+    dob: Optional[str] = Field(default=None, max_length=40)
+    conditions: List[str] = Field(default_factory=list, max_length=50)
+    allergies: List[str] = Field(default_factory=list, max_length=50)
+    medications: List[str] = Field(default_factory=list, max_length=50)
+    family_history: List[str] = Field(default_factory=list, max_length=50)
+    blood_type: Optional[str] = Field(default=None, max_length=8)
+    height_cm: Optional[float] = Field(default=None, gt=0, lt=300)
+    weight_kg: Optional[float] = Field(default=None, gt=0, lt=500)
+    smoking: Optional[bool] = None
+    alcohol: Optional[bool] = None
+    exercise_frequency: Optional[str] = Field(default=None, max_length=20)   # "Never" | "Sometimes" | "Mostly"
+    bio: Optional[str] = Field(default=None, max_length=2000)

@@ -1,6 +1,6 @@
 # app/services/vitals_service.py
 from uuid import UUID
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 
 from app.models.vitals import VitalReading, VitalType,UserVitalSettings
@@ -18,7 +18,7 @@ def create_reading(db: Session, user_id: UUID, payload: VitalReadingCreate) -> V
         vital_type=payload.vital_type,
         value=payload.value,
         source=payload.source or "manual",
-        recorded_at=payload.recorded_at or datetime.utcnow(),
+        recorded_at=_naive_utc(payload.recorded_at) or datetime.utcnow(),
     )
     db.add(reading)
     db.commit()
@@ -26,21 +26,34 @@ def create_reading(db: Session, user_id: UUID, payload: VitalReadingCreate) -> V
     return reading
 
 
-def create_readings_batch(db: Session, user_id: UUID, payload: VitalReadingBatchCreate) -> list[VitalReading]:
-    """Creates all readings in the batch as a single transaction, sharing one timestamp
-    so paired vitals (e.g. BP systolic/diastolic) always match exactly."""
-    shared_ts = datetime.utcnow()
+def _naive_utc(ts):
+    """Times are stored as UTC without a zone; a device time in the future is treated as now."""
+    if ts is None:
+        return None
+    if ts.tzinfo is not None:
+        ts = ts.astimezone(timezone.utc).replace(tzinfo=None)
+    return min(ts, datetime.utcnow())
 
-    readings = [
-        VitalReading(
-            user_id=user_id,
-            vital_type=r.vital_type,
-            value=r.value,
-            source=r.source or "manual",
-            recorded_at=r.recorded_at or shared_ts,
-        )
-        for r in payload.readings
-    ]
+
+def create_readings_batch(db: Session, user_id: UUID, payload: VitalReadingBatchCreate) -> list[VitalReading]:
+    """Creates the NEW readings in the batch as one transaction and returns only those (so alerts fire once).
+
+    Readings without a time share one timestamp, so paired vitals (BP systolic/diastolic) match exactly. A reading
+    that carries the time it was measured (from the watch) and is already stored is skipped: the app sends the
+    newest watch reading every few minutes, and the same measurement must not be counted twice."""
+    shared_ts = datetime.utcnow()
+    readings, seen = [], set()
+    for r in payload.readings:
+        at = _naive_utc(r.recorded_at)
+        if at is not None:
+            key = (r.vital_type, at)
+            if key in seen or db.query(VitalReading.id).filter(
+                    VitalReading.user_id == user_id, VitalReading.vital_type == r.vital_type,
+                    VitalReading.recorded_at == at).first():
+                continue
+            seen.add(key)
+        readings.append(VitalReading(user_id=user_id, vital_type=r.vital_type, value=r.value,
+                                     source=r.source or "manual", recorded_at=at or shared_ts))
     db.add_all(readings)
     db.commit()
     for reading in readings:

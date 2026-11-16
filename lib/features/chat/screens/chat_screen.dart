@@ -13,6 +13,7 @@ import 'package:vitanet/core/providers/shared_state.dart';
 import 'package:vitanet/core/utils/launch_helpers.dart';
 import 'package:vitanet/data/models/chat_message.dart';
 import 'package:vitanet/data/providers/providers.dart';
+import 'package:vitanet/data/services/vitals_sync.dart';
 import 'package:vitanet/data/services/voice_service.dart';
 
 import 'package:vitanet/features/chat/widgets/ai_message_card.dart';
@@ -280,6 +281,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         debugPrint('Error encoding image: $e');
       }
     }
+
+    // Send the newest watch reading first, so the assistant answers with it (at most 4 s wait).
+    try {
+      await ref.read(vitalsSyncProvider).syncNow().timeout(const Duration(seconds: 4));
+    } catch (_) {}
 
     final aiService = ref.read(aiServiceProvider);
     final stream = aiService.getResponseStream(

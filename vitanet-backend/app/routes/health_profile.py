@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.database.connection import get_db
 from app.dependencies.security import CurrentUser, get_current_user, owned_user_id
 from app.schemas.health_profile import (
-    AllergyCreate, AllergyOut, AllergyReplace, HealthProfileOut, HealthProfileUpdate
+    AllergyCreate, AllergyOut, AllergyReplace, AppProfileSync, HealthProfileOut, HealthProfileUpdate
 )
 from app.services import health_profile_service
 
@@ -37,3 +37,10 @@ def replace_allergies(user_id: Annotated[UUID, Depends(owned_user_id)], payload:
 @router.get("/{user_id}/allergies", response_model=list[AllergyOut])
 def list_allergies(user_id: Annotated[UUID, Depends(owned_user_id)], db: Session = Depends(get_db)):
     return health_profile_service.get_allergies(db, user_id)
+
+
+@router.put("/{user_id}/from-app")
+def sync_from_app(user_id: Annotated[UUID, Depends(owned_user_id)], payload: AppProfileSync, db: Session = Depends(get_db)):
+    """The whole profile screen in one call, so the assistant's tools see the same profile as the app."""
+    health_profile_service.sync_from_app(db, user_id, payload)
+    return {"status": "saved"}

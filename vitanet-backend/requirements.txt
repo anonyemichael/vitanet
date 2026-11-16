@@ -28,3 +28,4 @@ resend
 openai
 PyYAML>=6.0
 africastalking
+python-multipart>=0.0.9

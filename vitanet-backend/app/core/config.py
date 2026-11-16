@@ -22,6 +22,15 @@ class Settings(BaseSettings):
     PORTAL_AI_KEY: str = ""
     PORTAL_AI_TIMEOUT_S: float = 20.0
 
+    # SMS line (Africa's Talking). Empty AT_API_KEY = replies are worked out but not sent.
+    AT_USERNAME: str = "sandbox"
+    AT_API_KEY: str = ""
+    AT_SHORTCODE: str = ""           # your short code / sender id, e.g. "12345"
+    SMS_WEBHOOK_TOKEN: str = ""      # if set, the callback URL must end with ?token=<this>
+    SMS_HASH_SECRET: str = ""        # phone numbers are stored only as a keyed hash; set a long random string
+    SMS_MAX_PER_HOUR: int = 15       # replies per phone number per hour (each SMS costs money)
+    SMS_MAX_SEGMENTS: int = 3        # longest reply, in SMS parts
+
     class Config:
         env_file = ".env"
         extra = "ignore"

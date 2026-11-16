@@ -12,6 +12,7 @@ import 'package:vitanet/app/router.dart';
 import 'package:vitanet/app/theme.dart';
 import 'package:vitanet/data/providers/providers.dart';
 import 'package:vitanet/data/services/daily_med_service.dart';
+import 'package:vitanet/data/services/vitals_sync.dart';
 import 'package:vitanet/features/settings/settings_providers.dart';
 import 'package:vitanet/shared/widgets/vn_kit.dart';
 
@@ -91,6 +92,11 @@ class VitaNetApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeModeProvider);
     final textScale = ref.watch(textScaleProvider);
+    // Keep watch readings flowing to the app and the backend on every screen
+    // once someone is signed in (also as a guest). start() only runs once.
+    if (ref.watch(authProvider.select((a) => a.user != null))) {
+      ref.read(vitalsSyncProvider).start();
+    }
 
     return MaterialApp.router(
       title: 'VitaNet',

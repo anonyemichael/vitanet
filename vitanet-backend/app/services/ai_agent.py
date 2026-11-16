@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.models.chat import MessageRole
 from app.schemas.chat_blocks import TextBlock
-from app.services import ai_blocks, ai_client, ai_tools, chat_service, user_settings_service
+from app.services import ai_blocks, ai_client, ai_tools, chat_service
 from app.services.ai_system_prompt import build_system_prompt
 from app.services.safety import SafetyLayer
 
@@ -60,10 +60,8 @@ def run_agent(
         reply = safety.apply(user_message, OFFLINE_REPLY)
         chat_service.save_message(db, user_id, MessageRole.ASSISTANT, content=reply)
         return {"reply": reply, "blocks": [TextBlock(content=reply).model_dump()], "offline": True}
-    user_settings = user_settings_service.get_or_create_settings(db, user_id)
     contents = _history_contents(db, user_id)
-    
-    sys_prompt = build_system_prompt(db, user_id, user_settings)
+    sys_prompt = build_system_prompt()
     messages = [{"role": "system", "content": sys_prompt}] + contents
 
     if image_base64:

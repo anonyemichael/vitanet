@@ -13,6 +13,13 @@ from app.database.base import Base
 
 # Columns added after their table first shipped: table -> {column: SQL type + default}
 ADDED_COLUMNS = {
+    "health_profiles": {
+        "conditions": "JSON NULL",
+        "medications": "JSON NULL",
+        "family_history": "JSON NULL",
+        "blood_type": "VARCHAR(8) NULL",
+        "age_years": "INTEGER NULL",
+    },
     "portal_referrals": {
         "source": "VARCHAR(16) NOT NULL DEFAULT 'app'",
         "arrived_at": "TIMESTAMP NULL",

@@ -116,9 +116,10 @@ class SafetyLayer:
             f.kind = "crisis" if "crisis" in kinds else "emergency"
         return f
 
-    def apply(self, message, reply):
+    def apply(self, message, reply, banners=None):
         """The reply with a warning line in front when a danger sign is described and the reply does not already
-        open with a referral. Never blocks or alters the model's own text."""
+        open with a referral. Never blocks or alters the model's own text. `banners` overrides the warning wording
+        (the SMS line uses shorter ones)."""
         f = self.check(message)
         if not f.triggered:
             return reply
@@ -129,7 +130,7 @@ class SafetyLayer:
             opening = "".join(re.split(r"(?<=[.!?])(?=\s)", text)[:4])
             if refers_first(opening):
                 return reply
-        return f"{self.banners[f.kind]}\n\n{reply}"
+        return f"{(banners or self.banners)[f.kind]}\n\n{reply}"
 
 
 if __name__ == "__main__":

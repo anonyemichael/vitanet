@@ -1,16 +1,11 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vitanet/data/providers/providers.dart';
+import 'package:vitanet/data/services/vitals_sync.dart';
 import 'package:vitanet/shared/widgets/vn_kit.dart';
-
-/// When readings were last pulled successfully from a real source (device /
-/// health platform, or the signed-in user's backend record). `null` means no
-/// source has delivered data this session.
-final vitalsLastSyncProvider = StateProvider<DateTime?>((ref) => null);
 
 /// Readings older than this are not presented as "live".
 const _freshWindow = Duration(minutes: 2);
@@ -34,57 +29,13 @@ class _HealthOverviewSectionState extends ConsumerState<HealthOverviewSection> {
   }
 
   void _startLiveUpdates() {
-    _fetchAndUpdateVitals();
-    _timer = Timer.periodic(const Duration(minutes: 2), (_) {
-      _fetchAndUpdateVitals();
-      // Re-evaluate freshness so a stale source stops showing as "Live".
+    // The readings themselves are kept up to date app-wide by VitalsSync
+    // (lib/data/services/vitals_sync.dart); this only asks for a fresh read
+    // now and re-checks every 2 minutes whether they still count as "Live".
+    ref.read(vitalsSyncProvider).syncNow();
+    _timer = Timer.periodic(VitalsSync.interval, (_) {
       if (mounted) setState(() {});
     });
-  }
-
-  Future<void> _fetchAndUpdateVitals() async {
-    if (!mounted) return;
-    try {
-      if (!kIsWeb) {
-        final biometrics = await ref
-            .read(healthServiceProvider)
-            .fetchBiometrics();
-        if (biometrics.isNotEmpty && mounted) {
-          final fromDevice = <String, double>{};
-          biometrics.forEach((key, value) {
-            final doubleVal = double.tryParse(value.toString());
-            if (doubleVal != null) {
-              ref.read(liveVitalsProvider.notifier).setVital(key, doubleVal);
-              fromDevice[key] = doubleVal;
-            }
-          });
-          if (fromDevice.isNotEmpty) {
-            ref.read(vitalsLastSyncProvider.notifier).state = DateTime.now();
-            // Keep the signed-in user's backend record in step with the
-            // watch, so health alerts and a hospital they're referred to
-            // see the same real readings.
-            final me = ref.read(authProvider).user;
-            if (me != null && !me.isAnonymous) {
-              await ref.read(apiServiceProvider).postDeviceVitals(me.uid, fromDevice);
-            }
-            return;
-          }
-        }
-      }
-      // Only a signed-in (non-guest) account has its own backend vitals
-      // record; never fall back to a shared demo user.
-      final user = ref.read(authProvider).user;
-      if (user == null || user.isAnonymous) return;
-      final backendVitals = await ref
-          .read(apiServiceProvider)
-          .getLatestVitals(user.uid);
-      if (backendVitals.isNotEmpty && mounted) {
-        backendVitals.forEach((key, val) {
-          ref.read(liveVitalsProvider.notifier).setVital(key, val);
-        });
-        ref.read(vitalsLastSyncProvider.notifier).state = DateTime.now();
-      }
-    } catch (_) {}
   }
 
   @override

@@ -105,7 +105,11 @@ def get_health_profile(db, user_id):
         "weight_kg": profile.weight_kg,
         "bio": profile.bio,
         "allergies": [a.allergen for a in allergies],
-        "age": _age(user.date_of_birth) if user else None,
+        "conditions": profile.conditions or [],
+        "medications": profile.medications or [],
+        "family_history": profile.family_history or [],
+        "blood_type": profile.blood_type,
+        "age": (_age(user.date_of_birth) if user and user.date_of_birth else None) or profile.age_years,
         "biological_sex": user.biological_sex if user else None,
     }
 

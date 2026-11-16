@@ -48,7 +48,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         );
         if (!mounted) return;
         final profile = ref.read(userProfileProvider);
-        if (profile != null) {
+        final me = ref.read(authProvider).user;
+        if (profile == null && me != null) {
+          // no profile yet (e.g. a guest): still give the assistant the location for nearby hospitals
+          ref.read(apiServiceProvider).putLocation(me.uid, position.latitude, position.longitude);
+        }
+        if (profile != null) {   // saving the profile also sends the location to the backend
           final updatedProfile = profile.copyWith(
             latitude: position.latitude,
             longitude: position.longitude,

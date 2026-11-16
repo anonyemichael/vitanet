@@ -2,7 +2,7 @@
 import uuid
 import enum
 from datetime import datetime
-from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Enum as SqlEnum, Boolean, Float
+from sqlalchemy import JSON, Column, String, Text, DateTime, ForeignKey, Enum as SqlEnum, Boolean, Float, Integer
 from sqlalchemy import Uuid as UUID
 from app.database.base import Base
 
@@ -23,6 +23,12 @@ class HealthProfile(Base):
     height_cm = Column(Float, nullable=True)
     weight_kg = Column(Float, nullable=True)
     bio = Column(Text, nullable=True)
+    # filled from the app's profile screen (PUT /health-profile/{id}/from-app)
+    conditions = Column(JSON, nullable=True)          # ["Hypertension", ...]
+    medications = Column(JSON, nullable=True)         # ["Metformin 500mg", ...]
+    family_history = Column(JSON, nullable=True)
+    blood_type = Column(String(8), nullable=True)
+    age_years = Column(Integer, nullable=True)        # used when no date of birth is given
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 

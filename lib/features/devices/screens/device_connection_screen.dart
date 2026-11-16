@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:vitanet/data/providers/providers.dart';
+import 'package:vitanet/data/services/vitals_sync.dart';
 import 'package:vitanet/features/resources/widgets/resource_media.dart';
 import 'package:vitanet/shared/widgets/vn_kit.dart';
 
@@ -39,15 +40,6 @@ class _DeviceConnectionScreenState extends ConsumerState<DeviceConnectionScreen>
     }
   }
 
-  /// Health values arrive as "NumericHealthValue - numericValue: 72".
-  static double? _parse(Object? value) {
-    final text = value?.toString() ?? '';
-    final direct = double.tryParse(text);
-    if (direct != null) return direct;
-    final m = RegExp(r'(-?\d+(?:\.\d+)?)\s*$').firstMatch(text);
-    return m == null ? null : double.tryParse(m.group(1)!);
-  }
-
   Future<void> _syncDevice() async {
     setState(() => _isSyncing = true);
     final service = ref.read(healthServiceProvider);
@@ -55,22 +47,10 @@ class _DeviceConnectionScreenState extends ConsumerState<DeviceConnectionScreen>
     var count = 0;
     if (hasPermissions) {
       try {
-        final biometrics = await service.fetchBiometrics();
+        final fromDevice = await ref.read(vitalsSyncProvider).syncNow();
         if (mounted) {
-          final fromDevice = <String, double>{};
-          biometrics.forEach((key, value) {
-            final v = _parse(value);
-            if (v != null) {
-              ref.read(liveVitalsProvider.notifier).setVital(key, v);
-              _syncedKeys.add(key);
-              fromDevice[key] = v;
-              count++;
-            }
-          });
-          final me = ref.read(authProvider).user;
-          if (fromDevice.isNotEmpty && me != null && !me.isAnonymous) {
-            await ref.read(apiServiceProvider).postDeviceVitals(me.uid, fromDevice);
-          }
+          _syncedKeys.addAll(fromDevice.keys);
+          count = fromDevice.length;
         }
       } catch (e) {
         debugPrint('Error fetching immediate biometrics: $e');

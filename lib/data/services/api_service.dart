@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:vitanet/data/models/user_profile.dart';
 import 'package:flutter/foundation.dart';
 import 'package:vitanet/core/network/backend.dart';
 
@@ -130,13 +131,21 @@ class ApiService {
   };
 
   /// Sends readings that came from the user's watch / health platform to
-  /// their own backend record, so alerts and the hospital see real data.
-  /// Keys the backend doesn't know are skipped. Returns how many were sent.
-  Future<int> postDeviceVitals(String userId, Map<String, double> readings) async {
+  /// their own backend record, so the assistant, alerts and the hospital see
+  /// real data. [measuredAt] (when the watch took each reading) lets the
+  /// backend skip a reading it already has. Keys the backend doesn't know are
+  /// skipped. Returns how many were sent.
+  Future<int> postDeviceVitals(String userId, Map<String, double> readings,
+      {Map<String, DateTime> measuredAt = const {}}) async {
     final body = [
       for (final e in readings.entries)
         if (_vitalTypeFor[e.key] != null)
-          {'vital_type': _vitalTypeFor[e.key], 'value': e.value, 'source': 'device'},
+          {
+            'vital_type': _vitalTypeFor[e.key],
+            'value': e.value,
+            'source': 'device',
+            if (measuredAt[e.key] != null) 'recorded_at': measuredAt[e.key]!.toUtc().toIso8601String(),
+          },
     ];
     if (body.isEmpty) return 0;
     try {
@@ -145,6 +154,45 @@ class ApiService {
     } catch (e) {
       debugPrint('ApiService: postDeviceVitals failed ($e)');
       return 0;
+    }
+  }
+
+  /// Copies the profile screen to the backend (PUT /health-profile/{id}/from-app), so the
+  /// assistant's get_health_profile tool sees the same age, conditions, medicines and allergies.
+  Future<bool> syncProfile(String userId, UserProfile p) async {
+    try {
+      await _dio.put('health-profile/$userId/from-app', data: {
+        'name': p.name.trim().isEmpty ? null : p.name.trim(),
+        'age': p.age,
+        'sex': p.sex,
+        'dob': p.dob,
+        'conditions': p.preExistingConditions,
+        'allergies': p.allergies,
+        'medications': p.medications,
+        'family_history': p.familyMedicalHistory,
+        'blood_type': p.bloodType,
+        'height_cm': (p.height ?? 0) > 0 ? p.height : null,
+        'weight_kg': (p.weight ?? 0) > 0 ? p.weight : null,
+        'smoking': p.smoking,
+        'alcohol': p.alcohol,
+        'exercise_frequency': p.exerciseFrequency,
+        'bio': p.bio,
+      });
+      return true;
+    } catch (e) {
+      debugPrint('ApiService: syncProfile failed ($e)');
+      return false;
+    }
+  }
+
+  /// The phone's position, so the assistant can find the nearest hospital and pharmacy.
+  Future<bool> putLocation(String userId, double latitude, double longitude) async {
+    try {
+      await _dio.put('users/$userId/location', data: {'latitude': latitude, 'longitude': longitude});
+      return true;
+    } catch (e) {
+      debugPrint('ApiService: putLocation failed ($e)');
+      return false;
     }
   }
 
