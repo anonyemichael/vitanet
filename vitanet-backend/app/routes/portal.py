@@ -35,7 +35,7 @@ from app.models.portal import (
     Referral,
 )
 from app.models.staff_account import StaffAccount, StaffRole, StaffStatus
-from app.services import portal_rules
+from app.services import portal_rules, portal_tools
 from app.services.portal_events import hub
 
 router = APIRouter(tags=["portal"])
@@ -781,9 +781,10 @@ def order_prescription(case_id: UUID, payload: PrescriptionIn, staff: StaffAccou
     if c.status == "discharged":
         raise HTTPException(status_code=409, detail="Cannot order medication for a discharged patient")
     drug = payload.resolved_name
-    allergies = [a.strip().lower() for a in (c.allergies or "").split(",") if a.strip()]
-    if any(a and a in drug.lower() for a in allergies):
-        raise HTTPException(status_code=409, detail=f"{c.patient_name} is allergic to {drug}")
+    # drug FAMILIES, not just the exact word: a penicillin allergy also blocks amoxicillin, Augmentin, ...
+    guard = portal_tools.allergy_prescription_guard(drug, portal_tools.parse_allergies(c.allergies))
+    if not guard["allowed"]:
+        raise HTTPException(status_code=409, detail=f"{c.patient_name} is allergic to {guard['allergy']}: {guard['reason']}")
     rx = {"drug_name": drug, "medication": drug, "dosage": payload.dosage, "frequency": payload.frequency,
           "duration": payload.duration, "instructions": payload.instructions or "", "prescribed_by": staff.full_name}
     desc = f"Rx: {drug} {payload.dosage} ({payload.frequency} for {payload.duration})"

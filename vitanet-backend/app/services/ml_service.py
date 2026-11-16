@@ -147,33 +147,45 @@ class MLService:
     def predict_triage(
         self,
         symptoms: List[str],
-        age: int = 40,
-        gender: str = "M",
-        heart_rate: float = 80.0,
-        temperature: float = 37.0,
-        blood_oxygen: float = 98.0,
-        systolic_bp: float = 120.0,
-        diastolic_bp: float = 80.0,
+        age: Optional[int] = None,
+        gender: Optional[str] = None,
+        heart_rate: Optional[float] = None,
+        temperature: Optional[float] = None,
+        blood_oxygen: Optional[float] = None,
+        systolic_bp: Optional[float] = None,
+        diastolic_bp: Optional[float] = None,
     ) -> Dict[str, Any]:
-        """Perform combined disease inference and clinical severity triage."""
+        """Perform combined disease inference and clinical severity triage.
+
+        Vitals are optional and only MEASURED values are judged. A vital that was not measured is never replaced
+        by a "normal" default (the old defaults of HR 80, SpO2 98, BP 120/80 made unmeasured patients look healthy)."""
         norm_symptoms = [s.strip().lower().replace(" ", "_").replace("-", "_") for s in symptoms if s.strip()]
 
-        # 1. Determine Physiological Vital Severity
+        def lt(v, x):
+            return v is not None and v < x
+
+        def ge(v, x):
+            return v is not None and v >= x
+
+        def gt(v, x):
+            return v is not None and v > x
+
+        # 1. Determine Physiological Vital Severity (measured vitals only)
         is_urgent_vitals = (
-            blood_oxygen < 92.0 or
-            heart_rate > 120.0 or
-            heart_rate < 45.0 or
-            systolic_bp >= 165.0 or
-            diastolic_bp >= 105.0 or
-            temperature >= 39.5
+            lt(blood_oxygen, 92.0) or
+            gt(heart_rate, 120.0) or
+            lt(heart_rate, 45.0) or
+            ge(systolic_bp, 165.0) or
+            ge(diastolic_bp, 105.0) or
+            ge(temperature, 39.5)
         )
         is_doctor_vitals = (
-            blood_oxygen < 95.0 or
-            heart_rate > 100.0 or
-            heart_rate < 55.0 or
-            systolic_bp >= 140.0 or
-            diastolic_bp >= 90.0 or
-            temperature >= 38.0
+            lt(blood_oxygen, 95.0) or
+            gt(heart_rate, 100.0) or
+            lt(heart_rate, 55.0) or
+            ge(systolic_bp, 140.0) or
+            ge(diastolic_bp, 90.0) or
+            ge(temperature, 38.0)
         )
 
         has_critical_symptoms = any(

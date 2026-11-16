@@ -1,0 +1,236 @@
+# Safety layer rules (scripts/safety_layer.py): fixed danger-sign rules that run OUTSIDE the model.
+#
+# If the user's message clearly describes a danger sign, one short warning line is put in front of the model's
+# reply. The model's answer is never blocked, shortened or rewritten, and nothing is added when:
+#   - the sign is negated in the same clause ("no fits", "he is not floppy")
+#   - it is past history in the same sentence ("a seizure 3 years ago", "when she was a baby")
+#   - it is a general question in the same sentence ("what are the signs of stroke?", "if my child has a fit")
+#   - the model's reply already starts by sending the person to hospital / 112 / 193 (no duplicate)
+#   - a rule-specific exclusion matches ("threw a fit", "walks with a limp", "my phone is not responding")
+#
+# Patterns are Python regular expressions, matched case-insensitively against the user's message.
+#   any:      at least one must match (the matched words are what the negation/history/question checks look at)
+#   requires: every listed pattern must also appear somewhere in the message (context, e.g. fever, pregnancy)
+#   context:  child | pregnancy | any   (child/pregnancy = the message must mention a child / a pregnancy)
+#   except:   if any matches anywhere in the message, the rule does not fire
+#
+# REVIEW: written by the owner + AI; clinical reviewer to confirm the list of signs (see the review pack, Part F).
+# English only for now; Twi phrasings to be added with the Twi work.
+
+banners:
+  emergency: >-
+    ⚠️ What you describe can be a sign of an emergency. Please go to the nearest hospital now, or call 112 or the
+    National Ambulance Service on 193. Do not wait to see if it gets better.
+  crisis: >-
+    ⚠️ If you are thinking of ending your life or might hurt yourself, please talk to someone now: call 112 or go to
+    the nearest hospital. You do not have to face this alone.
+
+context:
+  child: '\b(baby|babies|infant|newborn|son|daughter|child|children|kid|toddler|boy|girl|nephew|niece|grand(son|daughter)|last ?born|twins?)\b|\b\d{1,2}\s*(months?|weeks?)\b|\bmy\s+\d{1,2}[- ]?(year|yr)[- ]?old\b|\b([1-9]|1[0-2])\s*(years?|yrs?)(\s+old)?\b'
+  pregnancy: '\bpregnan\w*|\b\d{1,2}\s*weeks?\s+(gone|pregnant)|\bexpecting\s+a\s+baby|\bantenatal\b'
+
+rules:
+  - id: convulsion
+    label: Fit / convulsion / seizure
+    kind: emergency
+    context: any
+    any:
+      - '\bconvuls\w*'
+      - '\bseizures?\b(?!\s+of\b)'
+      - '\b(had|having|has|have|get|gets|got|getting)\s+(a\s+|another\s+|some\s+)?fits?\b'
+      - '\bfitting\b'
+      - '\bshak\w*\s+(all\s+over|of\s+(his|her|the)\s+whole\s+body|(his|her)\s+whole\s+body)|\bwhole\s+body\s+(was\s+|is\s+)?shak\w*'
+      - '\beyes?\s+(rolled|rolling|went|turned)\s+(up|back)'
+      - '\bfoam\w*\s+(at|from)\s+(the|his|her)\s+mouth|\bshak\w*\b.{0,30}\b(foam\w*|not\s+respond\w*|unconscious|eyes\s+(rolled|went))'
+      - '\b(fainted|collapsed|fell\s+down)\s+and\s+(was\s+)?(shak|jerk)\w*'
+      - '\b(body|arms?|legs?|she|he)\s+(went|became|got|was|is)\s+(all\s+)?stiff\b.{0,40}\bjerk\w*|\b(she|he)\s+(was|is|kept|started)\s+jerk\w*'
+      - '\b(arms?|legs?|body)\s+(and\s+(arms?|legs?)\s+)?(were|was|are|is|kept|started)?\s*jerk\w*'
+    except:
+      - '\b(threw|throw|throws|throwing)\s+(a\s+)?fits?\b'
+
+  - id: unresponsive
+    label: Very drowsy, floppy, hard to wake, unconscious
+    kind: emergency
+    context: any
+    any:
+      - '\b(hard|difficult|impossible)\s+to\s+wake'
+      - '\b(won''?t|will\s+not|can''?t|cannot|not)\s+(wake|waking)(\s+up)?\b'
+      - '\bunconscious\b|\bunresponsive\b'
+      - '\b(not|doesn''?t|does\s+not|didn''?t|did\s+not|won''?t)\s+respond(ing)?\s+(to\s+(me|us|his\s+name|her\s+name|my\s+voice|voice|anything)|when\s+(i|we)\s+call)'
+      - '\b(is|feels|went|became|becomes|looks|so|very|all)\s+(floppy|limp)\b|\blimp\s+(in\s+my\s+arms|like)'
+      - '\btoo\s+(tired|weak)\s+to\s+open\b|\bkeeps?\s+(his|her)\s+eyes\s+closed'
+      - '\b(can''?t|cannot|won''?t|not\s+able\s+to)\s+stay\s+awake|\bdoz\w*\b.{0,20}\beven\s+when|\b(very|extremely|too|so|unusually)\s+(sleepy|drowsy)\b|\bconfused\s+and\s+(very\s+)?(sleepy|drowsy)'
+    except:
+      - '\b(i|i''m|i\s+am)\s+(can''?t|cannot|not)\s+wak'
+      - '\b(i|i''m|i\s+am|i\s+feel|i\s+get)\s+(very\s+|so\s+|always\s+)?(sleepy|drowsy)\b|\b(i|i\s+can''?t)\s+stay\s+awake\b.{0,30}\b(class|work|lecture|reading|studying|driving)'
+      - '\b(phone|app|laptop|computer|network|line|printer|website|customer\s+care)\b'
+
+  - id: cannot_drink
+    label: Young child cannot drink or breastfeed
+    kind: emergency
+    context: child
+    any:
+      - '\b(can''?t|cannot|unable\s+to|won''?t|will\s+not|not\s+able\s+to|not)\s+(drink\w*|feed\w*|suck\w*|breastfeed\w*|tak(e|ing)\s+(the\s+)?breast|tak(e|ing)\s+(any\s+)?(feeds?|milk|the\s+bottle))'
+      - '\brefus\w*\s+(the\s+)?(breast|feeds?|bottle|to\s+(drink|feed|suck))'
+      - '\bpush\w*\s+(away\s+)?(water|drinks?|the\s+cup|the\s+breast)|\b(water|drinks?)\s+(he|she)\s+push\w*\s+away'
+      - '\bturns?\s+away\s+every\s+time'
+    except:
+      - '\b(alcohol|beer|akpeteshie|coffee|soda|minerals|fizzy)\b'
+
+  - id: vomits_everything
+    label: Vomits everything / cannot keep anything down
+    kind: emergency
+    context: any
+    any:
+      - '\bvomit\w*\s+everything|\bthrow\w*\s+up\s+everything'
+      - '\b(whatever|everything)\s+(we|i|he|she)\s+(give|gives|eats?|drinks?|takes?).{0,40}\b(comes?|coming|came)\s+(straight\s+)?(back|out|up)'
+      - '\b(can''?t|cannot|unable\s+to)\s+keep\s+(anything|any\s+\w+|water|fluids?|food|ors|drinks?)\s+down'
+
+  - id: breathing
+    label: Struggling to breathe, very fast breathing, chest pulling in, blue lips
+    kind: emergency
+    context: any
+    any:
+      - '\b(struggl\w*|difficult\w*|difficulty|hard|trouble|can''?t|cannot|unable)\s+(to\s+|in\s+|with\s+)?breath\w*'
+      - '\bbreathing\s+(is\s+)?(very\s+|so\s+)?(fast|hard|quick)|\b(fast|rapid)\s+breathing|\bbreath\w*\s+(very\s+)?fast\b'
+      - '\bchest\s+(is\s+)?(pulling|sucking|drawing|going)\s+in|\b(see|seeing|showing|can\s+see)\s+(his|her|the)\s+ribs|\bribs\s+(show|showing)'
+      - '\bgasping|\blips?\s+(are\s+|is\s+|turning\s+|look\s+|looks\s+)?(blue|grey|gray)'
+      - '\b(tummy|belly|stomach|chest)\s+(goes|going|moves|moving|is\s+going)\s+in\s+and\s+out\s+(very\s+|so\s+)?(fast|quickly|hard)'
+      - '\bstruggl\w*\s+for\s+(breath|air)|\bfighting\s+for\s+(breath|air)|\b(noise|noisy|grunt\w*|whistl\w*)\b.{0,25}\bwhen\s+(he|she|the\s+baby)\s+breathes?|\bgrunting\b'
+      - '\b(can''?t|cannot|unable\s+to)\s+(lie|sleep)\s+flat|\bsit\s+up\s+to\s+breathe'
+    except:
+      - '\bthrough\s+(my|his|her|the)\s+nose\b'
+      - '\bwhen\s+(i|he|she)\s+(run|runs|exercise|exercises|climb|climbs|play|plays\s+football)'
+
+  - id: stiff_neck_fever
+    label: Stiff or painful neck with fever
+    kind: emergency
+    context: any
+    any:
+      - '\bstiff\s+neck|\bneck\s+(is\s+)?(stiff|paining|hurts?)|\b(can''?t|cannot)\s+(bend|move|turn)\s+(his|her|my|the)\s+neck|\bcries\s+when\s+(he|she)\s+bends'
+    requires:
+      - '\bfever|\bhot\s+body|\bbody\s+is\s+hot|\btemperature|\bwarm\b|\bhot\b'
+
+  - id: stroke
+    label: Sudden drooping face, one-sided weakness, slurred speech
+    kind: emergency
+    context: any
+    any:
+      - '\b(face|mouth)\s+(is\s+|has\s+|went\s+|became\s+)?(twisted|bent|drooping|droop\w*|crooked|fallen)|\b(face|mouth)\s+.{0,25}\bto\s+one\s+side'
+      - '\bone\s+side\s+(of\s+(his|her|my|the)\s+(body|face)\s+)?(is\s+)?(weak|not\s+strong|paralys\w*|numb|dead)|\b(left|right)\s+side\s+(is\s+)?(not\s+strong|weak|paralys\w*|numb)'
+      - '\b(can''?t|cannot|unable\s+to|could\s+not|couldn''?t)\s+(lift|move|raise)\s+(his|her|my)\s+(right\s+|left\s+)?(arm|leg|hand)'
+      - '\bslurr\w*|\bwords?\s+(are\s+|is\s+)?not\s+coming|\bspeech\s+(is\s+)?(slurred|strange|unclear)|\btongue\s+is\s+heavy|\btalking\s+strangely'
+      - '\b(can''?t|cannot|could\s+not|couldn''?t|not\s+able\s+to)\s+(talk|speak)\s+(properly|well|clearly|again)|\b(suddenly|now)\b.{0,30}\b(can''?t|cannot)\s+(talk|speak)'
+      - '\b(arm|leg|hand|side)\s+(is\s+|went\s+|became\s+)?(dead|numb|lifeless)\b'
+    except:
+      - '\b(broke|broken|fracture\w*|sprain\w*|dislocat\w*|gym|lifting\s+weights|slept\s+on|sleeping\s+on|pins\s+and\s+needles)\b'
+
+  - id: chest_pain
+    label: Chest pain with sweating, pain to arm or jaw, or collapse
+    kind: emergency
+    context: any
+    any:
+      - '\bchest\s+pain|\bchest\s+is\s+(very\s+)?(tight|heavy|paining|painful)|\bpain\s+in\s+(his|her|my|the)\s+chest|\bheavy\s+on\s+(his|her|my)\s+chest'
+    requires:
+      - '\bsweat\w*|\b(left\s+)?arm\b|\bjaw\b|\bshort\s+of\s+breath|\b(can''?t|cannot|struggl\w*\s+to)\s+breathe|\bvomit\w*|\bfaint\w*|\bcollaps\w*|\bsevere\b|\bstrong\b|\bcrushing\b|\bsqueez\w*'
+
+  - id: pregnancy_bleeding
+    label: Vaginal bleeding in pregnancy
+    kind: emergency
+    context: pregnancy
+    any:
+      - '\bbleed\w*\s+(from\s+below|from\s+(my|her)\s+(private|vagina)|down\s+there|from\s+down)|\bvaginal\w*\s+bleed\w*'
+      - '\bsoaked\s+(\w+\s+)?pads?|\bpassing\s+(blood|clots)|\bbleeding\s+(heavily|a\s+lot|badly)'
+      - '\bbleed\w*|\bblood\s+(is\s+)?(coming|came|passing|on\s+my\s+pad)|\bspotting\b'
+    except:
+      - '\b(gums?|nose|nosebleed|teeth|tooth|brush\w*|cut\s+my|finger)\b'
+
+  - id: pregnancy_headache_vision
+    label: Pregnancy with severe headache and blurred vision
+    kind: emergency
+    context: pregnancy
+    any:
+      - '\bheadache'
+    requires:
+      - '\bblurr\w*|\bsee(ing)?\s+spots|\bvision|\bflash\w*|\beyes\s+(are\s+)?(blurry|not\s+clear)'
+
+  - id: ectopic
+    label: Late period or pregnancy with sharp one-sided lower belly pain or fainting
+    kind: emergency
+    context: any
+    any:
+      - '\b(sharp|severe|serious|strong|bad)\s+pain\b.{0,40}\b(belly|abdomen|stomach|side|tummy)'
+    requires:
+      - '\bperiod\s+(is\s+)?late|\bmissed\s+(my\s+)?period|\blate\s+period|\bpregnan\w*'
+
+  - id: appendicitis
+    label: Belly pain that moved to the lower right side
+    kind: emergency
+    context: any
+    any:
+      - '\b(moved|moving|shifted|went)\s+(down\s+)?to\s+(my|the|his|her)?\s*(lower\s+)?right\b|\blower\s+right\s+(side|belly|abdomen|tummy)\b.{0,60}\b(worse|hurts?|pain\w*)\s+(when|on)\s+(i|he|she)?\s*(walk|cough|move|jump)'
+    requires:
+      - '\bpain\w*|\bhurt\w*'
+
+  - id: heavy_bleeding
+    label: Heavy bleeding that will not stop; vomiting or coughing blood
+    kind: emergency
+    context: any
+    any:
+      - '\bbleeding\s+(won''?t|will\s+not|does\s+not|doesn''?t)\s+stop|\blots?\s+of\s+blood|\bbleeding\s+(heavily|a\s+lot|badly)|\bblood\s+(is\s+)?(pouring|gushing|spurting)'
+      - '\bvomit\w*\s+blood|\bcough\w*\s+up\s+(a\s+lot\s+of\s+)?blood'
+      - '\bbleed\w*\b.{0,30}\b(won''?t|will\s+not|doesn''?t|does\s+not|cannot|can''?t)\s+stop'
+
+  - id: snake_bite
+    label: Snake bite
+    kind: emergency
+    context: any
+    any:
+      - '\bsnake\s*bite|\bbitten\s+by\s+(a\s+)?snake|\bsnake\s+(bit|has\s+bitten|bites)'
+      - '\b(cobra|viper|mamba|puff\s*adder|adder|python)\b.{0,20}\b(bit|bitten|bite)|\bbitten\s+by\s+(a\s+)?(cobra|viper|mamba|puff\s*adder|adder)'
+
+  - id: cholera
+    label: Rice-water diarrhoea / suspected cholera
+    kind: emergency
+    context: any
+    any:
+      - '\brice[- ]water|\bcholera\b'
+    requires:
+      - '\bstool|\bdiarrh?o?ea|\bpassing\s+water|\btoilet|\bpurg\w*'
+
+  - id: burns_child
+    label: Burn or scald in a child, or a large burn
+    kind: emergency
+    context: any
+    any:
+      - '\bburn\w*|\bscald\w*|\b(hot|boiling)\s+(water|oil|soup)\b'
+    requires:
+      - '\b(baby|infant|child|toddler|son|daughter|boy|girl)\b|\bskin\s+(is\s+)?peel\w*|\bblister\w*\b.{0,30}\b(large|big|whole)|\b(face|chest|whole\s+(arm|leg|body))\b'
+    except:
+      - '\bsun\s*burn|\bheart\s*burn|\bburn\w*\s+(when|while)\s+(i|he|she)\s+(urinat|pee)|\b(stomach|chest)\s+burns?\b|\bburns?\s+at\s+the\s+top'
+
+  - id: poisoning
+    label: Swallowed poison, kerosene, bleach, pesticide or too many tablets
+    kind: emergency
+    context: any
+    any:
+      - '\b(drank|drunk|swallowed|ate|eaten|took|taken|drinking|swallowing)\b.{0,40}\b(kerosene|petrol|paraffin|diesel|bleach|jik|poison|pesticide|insecticide|sniper|dd?vp|rat\s+poison|weedicide|herbicide|battery|caustic|acid)\b'
+      - '\b(too\s+many|a\s+lot\s+of|many|whole\s+(bottle|pack|strip)\s+of)\s+(pills|tablets|drugs|capsules)\b|\boverdose\w*'
+
+  - id: rash_not_fading
+    label: Rash that does not fade when pressed, with fever
+    kind: emergency
+    context: any
+    any:
+      - '\brash\b.{0,50}\b(not|doesn''?t|does\s+not|won''?t|didn''?t)\s+(fade|go\s+away|disappear|turn\s+white|blanch)|\bglass\s+test\b|\bpurple\s+(spots|rash|patches)|\b(spots|rash)\s+like\s+bruises'
+    requires:
+      - '\bfever|\bhot|\btemperature|\bsick|\bunwell'
+
+  - id: self_harm
+    label: Thoughts of suicide or self-harm
+    kind: crisis
+    context: any
+    any:
+      - '\b(kill\w*|hurt\w*|harm\w*)\s+(myself|himself|herself)|\bend\s+(my|his|her)\s+(own\s+)?life|\bsuicidal\b|\b(commit|attempt\w*|thinking\s+(of|about)|thoughts?\s+of|plan\w*\s+to\s+commit)\s+suicide|\bwant\s+to\s+die|\bdon''?t\s+want\s+to\s+live|\bbetter\s+off\s+dead|\btake\s+my\s+(own\s+)?life'
+      - '\b(want|going|plan\w*)\s+to\s+end\s+(it|it\s+all|everything)\b|\b(better|happier)\s+(off\s+)?without\s+me\b|\bno\s+(reason|point)\s+(to|in)\s+liv\w*|\bcan''?t\s+go\s+on\s+(living|anymore|like\s+this)'
+      - '\b(drink|take|swallow|buy)\s+(sniper|poison|rat\s+poison|pesticide|insecticide|acid)\b.{0,30}\b(die|end|myself|to\s+sleep\s+forever)'

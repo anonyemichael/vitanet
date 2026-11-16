@@ -27,11 +27,13 @@ from fastapi import APIRouter, Request
 
 # ---- CONFIG ----
 AT_USERNAME = os.environ.get("AT_USERNAME", "sandbox")  # "sandbox" for testing
-AT_API_KEY = os.environ.get("AT_API_KEY", "771da6baddf0681f705d0dc96a8c02b5b663b386af865eadbddd0f26cb270e6c6c90be48")
+AT_API_KEY = os.environ.get("AT_API_KEY", "")  # never put the key in code (this repo is public)
 
-# Initialize Africa's Talking SDK
-africastalking.initialize(AT_USERNAME, AT_API_KEY)
-sms = africastalking.SMS
+# Initialize Africa's Talking SDK only when a key is configured
+sms = None
+if AT_API_KEY:
+    africastalking.initialize(AT_USERNAME, AT_API_KEY)
+    sms = africastalking.SMS
 
 router = APIRouter(prefix="/sms", tags=["sms"])
 
@@ -76,6 +78,10 @@ async def sms_inbound(request: Request):
         return {"error": "Missing data"}
 
     reply_text = call_ai(text)
+
+    if sms is None:
+        print("[ERROR] SMS is not configured: set AT_USERNAME and AT_API_KEY")
+        return {"error": "SMS not configured"}
 
     try:
         response = sms.send(reply_text, [from_number])

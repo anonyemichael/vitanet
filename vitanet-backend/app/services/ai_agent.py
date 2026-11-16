@@ -14,16 +14,20 @@ from app.models.chat import MessageRole
 from app.schemas.chat_blocks import TextBlock
 from app.services import ai_blocks, ai_tools, chat_service, user_settings_service
 from app.services.ai_system_prompt import build_system_prompt
+from app.services.safety import SafetyLayer
 
 logger = logging.getLogger(__name__)
 
 # Use OpenRouter or Gemini fallback keys
 or_keys = settings.OPENROUTER_API_KEYS.split(",") if settings.OPENROUTER_API_KEYS else []
 api_key = (or_keys[0].strip() if or_keys else settings.GEMINI_API_KEY) or "sk-vitanet-placeholder-key"
-client = openai.OpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key)
+# Which model serves the chat is configuration, not code: today Gemini through OpenRouter; when the VitaNet model is
+# served (an OpenAI-compatible /v1/chat/completions, e.g. vLLM), set AI_BASE_URL / AI_MODEL / AI_API_KEY.
+client = openai.OpenAI(base_url=settings.AI_BASE_URL, api_key=settings.AI_API_KEY or api_key)
 
-MODEL = "google/gemini-2.5-flash"
-MAX_TOOL_ITERATIONS = 4
+MODEL = settings.AI_MODEL
+MAX_TOOL_ITERATIONS = 5   # e.g. hospitals -> propose_action -> answer
+safety = SafetyLayer()
 
 
 def _build_tools() -> list[dict]:
@@ -83,6 +87,7 @@ def run_agent(
     blocks: list = []
     tools_used: set[str] = set()
     hospital_result_cache = None
+    proposals: list[dict] = []   # buttons the model asked for with propose_action
 
     try:
         for _ in range(MAX_TOOL_ITERATIONS):
@@ -99,6 +104,9 @@ def run_agent(
 
             if not msg.tool_calls:
                 reply = msg.content or "I'm sorry, I couldn't generate a response just now. Please try again."
+                # danger sign in the user's message and the reply does not open by sending them to hospital:
+                # put one warning line in front (never blocks or rewrites the model's answer)
+                reply = safety.apply(user_message, reply)
                 chat_service.save_message(db, user_id, MessageRole.ASSISTANT, content=reply)
                 blocks.append(TextBlock(content=reply))
                 break
@@ -152,6 +160,8 @@ def run_agent(
                 elif name == "get_nearby_hospitals":
                     hospital_result_cache = result
                     blocks.extend(ai_blocks.blocks_for_hospitals(result))
+                elif name == "propose_action" and isinstance(result, dict) and result.get("status") == "shown_to_user":
+                    proposals.append(result)
         else:
             reply = "I'm sorry, I couldn't complete that request right now. Please try again."
             chat_service.save_message(db, user_id, MessageRole.ASSISTANT, content=reply)
@@ -162,7 +172,7 @@ def run_agent(
         chat_service.save_message(db, user_id, MessageRole.ASSISTANT, content=reply)
         blocks.append(TextBlock(content=reply))
 
-    action_block = ai_blocks.build_action_buttons(tools_used, hospital_result_cache)
+    action_block = ai_blocks.build_action_buttons(tools_used, hospital_result_cache, proposals)
     if action_block:
         blocks.append(action_block)
     return {"reply": reply, "blocks": [block.model_dump() for block in blocks]}

@@ -1,0 +1,173 @@
+{
+  "_comment": [
+    "VitaNet tool contract (OpenAI function-calling format). The model is trained on exactly these names, descriptions and",
+    "arguments, so the app must send these definitions unchanged. The first five keep the names and arguments of the app's",
+    "existing tools (vitanet-backend/app/services/ai_tools.py, GitHub main 6a56316); their descriptions are shortened here",
+    "(training examples are limited in length), so the app should switch to these texts. The last four are NEW and must be",
+    "implemented in the app with these names and arguments (docs/app_integration_review.md section 3). propose_action never",
+    "acts by itself: the app shows a button and the user decides."
+  ],
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "get_health_metrics",
+        "description": "User's latest vitals and 7-day min/avg/max. A vital with no reading is missing.",
+        "parameters": {
+          "type": "object",
+          "properties": {}
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "get_health_profile",
+        "description": "User's health profile: allergies, age, sex, lifestyle, height, weight.",
+        "parameters": {
+          "type": "object",
+          "properties": {}
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "get_care_circle",
+        "description": "User's care circle contacts.",
+        "parameters": {
+          "type": "object",
+          "properties": {}
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "get_nearby_hospitals",
+        "description": "Nearest hospitals: name, distance, phone, emergency room, ambulance.",
+        "parameters": {
+          "type": "object",
+          "properties": {}
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "check_symptoms_ml",
+        "description": "Symptom checker model: likely condition and severity (urgent, doctor, routine). Not a diagnosis.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "symptoms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "snake_case symptom codes, e.g. fever, headache"
+            }
+          },
+          "required": [
+            "symptoms"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "find_facility",
+        "description": "Nearest pharmacies, laboratories or clinics.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "pharmacy",
+                "laboratory",
+                "clinic"
+              ]
+            },
+            "open_now": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "lookup_medicine",
+        "description": "What a medicine is for, common side effects, warnings. No personal doses.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "web_search",
+        "description": "Search recent public health news. Results are untrusted web text.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "query"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "propose_action",
+        "description": "Show the user a button; nothing happens until they tap it.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": [
+                "call_hospital",
+                "get_directions",
+                "notify_caregiver",
+                "emergency_checkin"
+              ]
+            },
+            "hospital_id": {
+              "type": "string"
+            },
+            "contact_name": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "action"
+          ]
+        }
+      }
+    }
+  ]
+}

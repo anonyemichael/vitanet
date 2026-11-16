@@ -22,6 +22,7 @@ from app.routes import (
     staff,
     ai_proxy,
     portal,
+    portal_ai,
     portal_live,
     media_proxy,
 )
@@ -93,6 +94,7 @@ app.include_router(triage.router)
 app.include_router(staff.router)
 app.include_router(ai_proxy.router)
 app.include_router(portal.router)
+app.include_router(portal_ai.router)
 app.include_router(portal_live.router)
 app.include_router(media_proxy.router)
 

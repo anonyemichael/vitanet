@@ -27,3 +27,5 @@ firebase-admin
 google-genai
 resend
 openai
+PyYAML>=6.0
+africastalking
