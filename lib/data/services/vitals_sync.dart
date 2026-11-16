@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:vitanet/data/providers/health_alerts_provider.dart';
 import 'package:vitanet/data/providers/providers.dart';
 
 /// When readings were last pulled successfully from a real source (device /
@@ -71,11 +72,13 @@ class VitalsSync with WidgetsBindingObserver {
           _ref.read(vitalsLastSyncProvider.notifier).state = DateTime.now();
           await api.postDeviceVitals(user.uid, values,
               measuredAt: {for (final e in readings.entries) e.key: e.value.at});
+          await _ref.read(healthAlertsProvider.notifier).refresh();   // a new reading can make an alert
           return values;
         }
       }
       // No watch data on this phone: show the latest readings already on the
       // user's own backend record (e.g. from another phone or a hospital).
+      await _ref.read(healthAlertsProvider.notifier).refresh();
       final saved = await api.getLatestVitals(user.uid);
       if (saved.isNotEmpty) {
         saved.forEach(live.setVital);

@@ -1,3 +1,5 @@
+import asyncio
+import logging
 import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
@@ -45,7 +47,28 @@ async def lifespan(app: FastAPI):
         seed_hospital_data(db)
     finally:
         db.close()
+    sweeper = asyncio.create_task(_alert_sweeper())
     yield
+    sweeper.cancel()
+
+
+def _escalate_due_alerts() -> None:
+    from app.services import health_alert_service
+    db = SessionLocal()
+    try:
+        health_alert_service.escalate_due(db)
+    finally:
+        db.close()
+
+
+async def _alert_sweeper():
+    """Every minute: urgent health alerts nobody answered in time go to the care circle (SMS / email)."""
+    while True:
+        try:
+            await asyncio.to_thread(_escalate_due_alerts)
+        except Exception:
+            logging.getLogger(__name__).exception("Alert sweeper failed")
+        await asyncio.sleep(60)
 
 
 app = FastAPI(

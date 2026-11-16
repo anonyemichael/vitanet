@@ -114,24 +114,16 @@ def list_care_circle_for_user(user_id: Annotated[UUID, Depends(owned_user_id)], 
 
 @router.post("/user/{user_id}", response_model=CareCircleOut, status_code=status.HTTP_201_CREATED)
 def add_care_circle_member(user_id: Annotated[UUID, Depends(owned_user_id)], payload: CareCircleMemberInput, db: Session = Depends(get_db)):
+    """Add a contact and ask them (email link and/or SMS reply YES) to agree to get alerts. The same person added
+    again (any spelling of the number) returns the existing contact without a second invite."""
     uid = _resolve_user_id(db, user_id)
+    existing = care_circle_service.find_by_contact(db, uid, payload.contact_phone, payload.contact_email)
+    if existing:
+        return existing
     member = care_circle_service.create_care_circle_member(db, uid, payload)
     db.commit()
     db.refresh(member)
-    if member.contact_email:
-        try:
-            from app.services.verify_care_email import send_care_circle_invite
-            from app.services import user_service
-            user = user_service.get_user_by_id(db, uid)
-            user_name = user.full_name if user else "A VitaNet User"
-            send_care_circle_invite(
-                to_email=member.contact_email,
-                requester_name=user_name,
-                invite_token=member.invite_token,
-            )
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
+    care_circle_service.send_invites(db, member)
     return member
 
 

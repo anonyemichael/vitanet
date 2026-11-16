@@ -98,5 +98,8 @@ def sync_from_app(db: Session, user_id: UUID, p) -> HealthProfile:
             user.date_of_birth = dob
     db.commit()
     replace_allergies(db, user_id, p.allergies)
+    if p.contacts is not None:
+        from app.services import care_circle_service
+        care_circle_service.sync_from_app(db, user_id, p.contacts, remove_missing=p.contacts_replace)
     db.refresh(profile)
     return profile

@@ -42,6 +42,13 @@ class AllergyOut(BaseModel):
     created_at: datetime
 
 
+class AppContact(BaseModel):
+    name: str = Field(max_length=150)
+    phone: Optional[str] = Field(default=None, max_length=30)
+    email: Optional[str] = Field(default=None, max_length=255)
+    relation: Optional[str] = Field(default=None, max_length=40)
+
+
 class AppProfileSync(BaseModel):
     """The app's profile screen, as one message (lib/data/models/user_profile.dart)."""
     name: Optional[str] = Field(default=None, max_length=150)
@@ -59,3 +66,5 @@ class AppProfileSync(BaseModel):
     alcohol: Optional[bool] = None
     exercise_frequency: Optional[str] = Field(default=None, max_length=20)   # "Never" | "Sometimes" | "Mostly"
     bio: Optional[str] = Field(default=None, max_length=2000)
+    contacts: Optional[List[AppContact]] = Field(default=None, max_length=20)   # None = leave the care circle as is
+    contacts_replace: bool = False   # True: contacts missing from the list are removed (the person edited the list)

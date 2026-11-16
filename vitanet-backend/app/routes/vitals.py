@@ -1,8 +1,7 @@
 from typing import Annotated
 # app/routes/vitals.py
 from uuid import UUID
-import asyncio
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database.connection import get_db
 from app.dependencies.security import CurrentUser, get_current_user, owned_user_id
@@ -26,32 +25,22 @@ def _resolve_user_id(db: Session, identifier) -> UUID:
 @router.post("/{user_id}", response_model=VitalReadingOut)
 def ingest_reading(user_id: Annotated[UUID, Depends(owned_user_id)], payload: VitalReadingCreate, db: Session = Depends(get_db)):
     uid = _resolve_user_id(db, user_id)
-    return vitals_service.create_reading(db, uid, payload)
-
-
-async def _delayed_escalation_check(alert_id: UUID):
-    await asyncio.sleep(health_alert_service.ESCALATION_DELAY_SECONDS)
-    from app.database.connection import SessionLocal
-    db = SessionLocal()
-    try:
-        health_alert_service.escalate_if_unacknowledged(db, alert_id)
-    finally:
-        db.close()
+    reading = vitals_service.create_reading(db, uid, payload)
+    health_alert_service.check_vital_for_alert(db, uid, reading.vital_type.value, reading.value, reading_id=reading.id)
+    return reading
 
 
 @router.post("/{user_id}/batch", response_model=list[VitalReadingOut])
 def ingest_batch(user_id: Annotated[UUID, Depends(owned_user_id)],
     payload: VitalReadingBatchCreate,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
+    """Stores the new readings and makes any health alert they call for. Telling the care circle about an urgent
+    alert nobody answers is done by the alert sweeper (app/main.py), not here."""
     readings = vitals_service.create_readings_batch(db, user_id, payload)
-
     for reading in readings:
-        alert = health_alert_service.check_vital_for_alert(db, user_id, reading.vital_type.value, reading.value)
-        if alert and alert.severity.value == "urgent":
-            background_tasks.add_task(_delayed_escalation_check, alert.id)
-
+        health_alert_service.check_vital_for_alert(db, user_id, reading.vital_type.value, reading.value,
+                                                   reading_id=reading.id)
     return readings
 
 

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:vitanet/data/models/health_alert.dart';
 import 'package:vitanet/data/models/triage_result.dart';
+import 'package:vitanet/data/providers/health_alerts_provider.dart';
 import 'package:vitanet/data/providers/providers.dart';
 import 'package:vitanet/shared/widgets/vn_kit.dart';
 
@@ -17,6 +19,7 @@ final notificationsUnreadProvider = Provider<bool>((ref) {
   final history = ref.watch(triageHistoryProvider);
   final lastRead = ref.watch(notificationsLastReadProvider);
   final cutoff = DateTime.now().subtract(const Duration(hours: 24));
+  if (ref.watch(activeHealthAlertProvider) != null) return true;   // an unanswered health alert
   return history.any(
     (t) =>
         t.timestamp.isAfter(cutoff) &&
@@ -65,6 +68,12 @@ class NotificationsScreen extends ConsumerStatefulWidget {
 class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   int _tab = 0;
 
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(() => ref.read(healthAlertsProvider.notifier).refresh());
+  }
+
   static String _formatTime(DateTime t, DateTime now) {
     final today = DateTime(now.year, now.month, now.day);
     final day = DateTime(t.year, t.month, t.day);
@@ -80,12 +89,12 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   }
 
   /// Builds notification items from real, locally stored events only.
-  List<_Notif> _buildItems(List<TriageResult> history, DateTime? lastRead) {
+  List<_Notif> _buildItems(List<TriageResult> history, DateTime? lastRead, List<HealthAlertItem> alerts) {
     final now = DateTime.now();
     final cutoff = now.subtract(const Duration(hours: 24));
     final sorted = [...history]
       ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
-    return [
+    final items = [
       for (final t in sorted.take(30))
         _fromTriage(
           t,
@@ -94,7 +103,30 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
               t.timestamp.isAfter(cutoff) &&
               (lastRead == null || t.timestamp.isAfter(lastRead)),
         ),
+      for (final a in alerts.take(30)) _fromAlert(a, time: _formatTime(a.createdAt, now)),
     ];
+    return items..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+  }
+
+  _Notif _fromAlert(HealthAlertItem a, {required String time}) {
+    final status = switch (a.status) {
+      'acknowledged' => ' You answered: I\'m OK.',
+      'escalated' => ' Your care circle was told.',
+      _ => '',
+    };
+    return _Notif(
+      title: a.isUrgent ? 'Urgent health alert' : 'Health alert',
+      time: time,
+      body: '${a.message}$status',
+      icon: a.isUrgent ? Icons.warning_amber_rounded : Icons.monitor_heart_outlined,
+      bg: a.isUrgent ? const Color(0xFFFFE4E6) : const Color(0xFFFEF3C7),
+      fg: a.isUrgent ? const Color(0xFFBE123C) : const Color(0xFFB45309),
+      kind: _NotifKind.health,
+      timestamp: a.createdAt,
+      unread: a.isOpen,
+      action: a.isOpen ? "I'm OK" : null,
+      onAction: a.isOpen ? (_) => ref.read(healthAlertsProvider.notifier).acknowledge(a.id) : null,
+    );
   }
 
   _Notif _fromTriage(
@@ -168,7 +200,8 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     final unread = ref.watch(notificationsUnreadProvider);
     final history = ref.watch(triageHistoryProvider);
     final lastRead = ref.watch(notificationsLastReadProvider);
-    final all = _buildItems(history, lastRead).where(_matches).toList();
+    final alerts = ref.watch(healthAlertsProvider);
+    final all = _buildItems(history, lastRead, alerts).where(_matches).toList();
     final now = DateTime.now();
     final startOfToday = DateTime(now.year, now.month, now.day);
     final today = all

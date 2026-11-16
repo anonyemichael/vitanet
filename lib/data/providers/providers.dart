@@ -151,6 +151,7 @@ class UserProfileNotifier extends StateNotifier<UserProfile?> {
 
   UserProfileNotifier(this._storage, this._firestore, this._userId, this._api)
       : super(_storage.getProfile()) {
+    _contactsSeen = _contactsKey(state);
     _init();
   }
 
@@ -166,15 +167,24 @@ class UserProfileNotifier extends StateNotifier<UserProfile?> {
       }
     }
     final p = state;
+    _contactsSeen = _contactsKey(p);
     if (p != null && p.name.isNotEmpty) _syncToBackend(p);   // profiles saved before this existed
   }
+
+  /// The contact list as last loaded or saved, to tell when the person changed it.
+  String _contactsSeen = '';
+  static String _contactsKey(UserProfile? p) =>
+      (p?.emergencyContacts ?? const []).map((c) => '${c.name}|${c.phone}|${c.email}').join(';');
 
   /// The assistant's tools read the profile and location from the backend, not from Firestore,
   /// so every save is copied there too (in the background; the app never waits for it).
   void _syncToBackend(UserProfile profile) {
     final uid = _userId;
     if (uid == null || Firebase.apps.isEmpty) return;
-    _api.syncProfile(uid, profile);
+    final key = _contactsKey(profile);
+    final edited = key != _contactsSeen;      // only a real edit may remove care-circle contacts
+    _contactsSeen = key;
+    _api.syncProfile(uid, profile, replaceContacts: edited);
     final lat = profile.latitude, lng = profile.longitude;
     if (lat != null && lng != null) _api.putLocation(uid, lat, lng);
   }

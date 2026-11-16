@@ -31,6 +31,11 @@ class Settings(BaseSettings):
     SMS_MAX_PER_HOUR: int = 15       # replies per phone number per hour (each SMS costs money)
     SMS_MAX_SEGMENTS: int = 3        # longest reply, in SMS parts
 
+    # Health alerts: an urgent alert nobody answers in the app is sent to the care circle after this many minutes.
+    ALERT_ESCALATION_MINUTES: int = 10
+    # Public address of this server (links in care-circle invite emails).
+    PUBLIC_BASE_URL: str = "http://localhost:8000"
+
     class Config:
         env_file = ".env"
         extra = "ignore"

@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:vitanet/data/models/health_alert.dart';
 import 'package:vitanet/data/models/user_profile.dart';
 import 'package:flutter/foundation.dart';
 import 'package:vitanet/core/network/backend.dart';
@@ -159,7 +160,11 @@ class ApiService {
 
   /// Copies the profile screen to the backend (PUT /health-profile/{id}/from-app), so the
   /// assistant's get_health_profile tool sees the same age, conditions, medicines and allergies.
-  Future<bool> syncProfile(String userId, UserProfile p) async {
+  ///
+  /// [replaceContacts]: the person edited their contact list, so contacts no
+  /// longer in it are removed from the care circle. Otherwise new contacts are
+  /// only added (an old copy of the profile can never delete a contact).
+  Future<bool> syncProfile(String userId, UserProfile p, {bool replaceContacts = false}) async {
     try {
       await _dio.put('health-profile/$userId/from-app', data: {
         'name': p.name.trim().isEmpty ? null : p.name.trim(),
@@ -177,6 +182,12 @@ class ApiService {
         'alcohol': p.alcohol,
         'exercise_frequency': p.exerciseFrequency,
         'bio': p.bio,
+        // the care circle: new contacts are invited to agree to alerts, removed ones stop getting them
+        'contacts': [
+          for (final c in p.emergencyContacts)
+            {'name': c.name, 'phone': c.phone.trim().isEmpty ? null : c.phone, 'email': c.email, 'relation': c.relation},
+        ],
+        'contacts_replace': replaceContacts,
       });
       return true;
     } catch (e) {
@@ -192,6 +203,31 @@ class ApiService {
       return true;
     } catch (e) {
       debugPrint('ApiService: putLocation failed ($e)');
+      return false;
+    }
+  }
+
+  /// The person's health alerts, newest first (GET /alerts/{id}).
+  Future<List<HealthAlertItem>> getAlerts(String userId) async {
+    try {
+      final response = await _dio.get('alerts/$userId');
+      return [
+        for (final j in (response.data as List? ?? const []))
+          if (j is Map) HealthAlertItem.fromJson(Map<String, dynamic>.from(j)),
+      ];
+    } catch (e) {
+      debugPrint('ApiService: getAlerts failed ($e)');
+      return const [];
+    }
+  }
+
+  /// "I'm OK": the alert is answered and the care circle is not told.
+  Future<bool> acknowledgeAlert(String alertId) async {
+    try {
+      await _dio.post('alerts/$alertId/acknowledge');
+      return true;
+    } catch (e) {
+      debugPrint('ApiService: acknowledgeAlert failed ($e)');
       return false;
     }
   }

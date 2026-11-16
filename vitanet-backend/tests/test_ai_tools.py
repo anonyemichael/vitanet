@@ -188,11 +188,10 @@ def test_offline_chat_still_warns_on_danger_signs(monkeypatch):
     assert out["offline"] is True and out["reply"].startswith("⚠️") and "112" in out["reply"]
 
 
-def test_health_alert_falls_back_to_template(monkeypatch):
-    from app.services import ai_client, health_alert_service
-    monkeypatch.setattr(ai_client.settings, "AI_BASE_URL", "")
+def test_health_alert_uses_the_fixed_template():
+    from app.services import health_alert_service
     msg = health_alert_service.generate_alert_message("heart_rate", 128, 76.0, "urgent")
-    assert "128" in msg and "76.0" in msg
+    assert "128 bpm" in msg and "76 bpm" in msg and "112" in msg
 
 
 def test_buttons_carry_real_links():

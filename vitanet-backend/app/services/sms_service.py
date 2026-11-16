@@ -63,11 +63,49 @@ _GSM = set("@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !\"#¤%&
 _GSM_EXT = set("^{}\\[~]|€")   # count as two characters
 
 
+def normalize_phone(phone: str) -> str:
+    """One spelling per number: "024 123 4567", "0241234567", "+233241234567" and "00233..." -> "+233241234567"
+    (a leading 0 with 10 digits is a Ghana number)."""
+    digits = re.sub(r"\D", "", phone or "")
+    if digits.startswith("00"):
+        digits = digits[2:]
+    elif digits.startswith("0") and len(digits) == 10:
+        digits = "233" + digits[1:]
+    return f"+{digits}" if digits else ""
+
+
 def phone_key(phone: str) -> str:
     """Keyed hash of a normalised phone number (the number itself is never stored)."""
-    digits = re.sub(r"[^\d+]", "", phone or "")
     secret = (settings.SMS_HASH_SECRET or "vitanet-sms-dev-only").encode()
-    return hmac.new(secret, digits.encode(), hashlib.sha256).hexdigest()
+    return hmac.new(secret, normalize_phone(phone).encode(), hashlib.sha256).hexdigest()
+
+
+def is_opted_out(db: Session, phone: str) -> bool:
+    c = db.get(SmsContact, phone_key(phone))
+    return bool(c and c.opted_out)
+
+
+CARE_INVITE = ("{person} added you as a VitaNet health contact. If their readings are dangerous and they do not "
+               "answer, we will text you. Reply YES to agree or NO to refuse.")
+CARE_YES = "Thank you. You will get a text if {person} has a dangerous reading and does not answer. Text STOP to end."
+CARE_NO = "OK, you will not get VitaNet alerts for {person}."
+
+
+def _care_reply(db: Session, phone: str, word: str) -> Optional[str]:
+    """YES / NO from a number someone added to their care circle: record the answer (pending invites only)."""
+    from app.models.care_circle import CareCircle, CareCircleStatus
+    from app.services.health_alert_service import _person
+    me = normalize_phone(phone)
+    pending = [c for c in db.query(CareCircle).filter(CareCircle.status == CareCircleStatus.PENDING,
+                                                       CareCircle.contact_phone.isnot(None)).all()
+               if normalize_phone(c.contact_phone) == me]
+    if not pending:
+        return None
+    for c in pending:
+        c.status = CareCircleStatus.ACCEPTED if word == "YES" else CareCircleStatus.REJECTED
+    db.commit()
+    person = _person(db, pending[0].requester_id)
+    return (CARE_YES if word == "YES" else CARE_NO).format(person=person)
 
 
 def sms_length(text: str) -> tuple[int, bool]:
@@ -159,6 +197,10 @@ def handle_inbound(db: Session, phone: str, text: str) -> Optional[str]:
     if contact.opted_out:
         db.commit()
         return None
+    if word in ("YES", "NO", "Y", "N", "AANE", "DAABI", "DABI"):   # aane / daabi = yes / no in Twi
+        answer = _care_reply(db, phone, "YES" if word in ("YES", "Y", "AANE") else "NO")
+        if answer:
+            return answer
     if word in ("HELP", "INFO", "?") or not text:
         db.commit()
         return HELP
@@ -189,7 +231,7 @@ def send(phone: str, reply: str) -> bool:
     try:
         import africastalking
         africastalking.initialize(settings.AT_USERNAME, settings.AT_API_KEY)
-        africastalking.SMS.send(reply, [phone], sender_id=settings.AT_SHORTCODE or None)
+        africastalking.SMS.send(reply, [normalize_phone(phone)], sender_id=settings.AT_SHORTCODE or None)
         return True
     except Exception as e:
         logger.warning("SMS send failed: %s", e)

@@ -14,6 +14,7 @@ import 'package:vitanet/data/providers/providers.dart';
 import 'package:vitanet/data/services/daily_med_service.dart';
 import 'package:vitanet/data/services/vitals_sync.dart';
 import 'package:vitanet/features/settings/settings_providers.dart';
+import 'package:vitanet/shared/widgets/health_alert_banner.dart';
 import 'package:vitanet/shared/widgets/vn_kit.dart';
 
 Future<void> main() async {
@@ -107,13 +108,15 @@ class VitaNetApp extends ConsumerWidget {
       scrollBehavior: const AppScrollBehavior(),
       routerConfig: ref.watch(goRouterProvider),
       builder: (context, child) {
-        if (textScale == 1.0 || child == null) return child ?? const SizedBox.shrink();
+        // Health alerts show on top of every screen (lib/shared/widgets/health_alert_banner.dart).
+        final page = HealthAlertOverlay(child: child ?? const SizedBox.shrink());
+        if (textScale == 1.0 || child == null) return page;
         final mq = MediaQuery.of(context);
         return MediaQuery(
           data: mq.copyWith(
             textScaler: TextScaler.linear(mq.textScaler.scale(1) * textScale),
           ),
-          child: child,
+          child: page,
         );
       },
     );
