@@ -39,11 +39,13 @@ const _slides = <_Slide>[
     image: 'assets/images/photos/smartwatch_wrist.jpg',
     alt: 'Person checking a smartwatch on their wrist',
     icon: Icons.monitor_heart_outlined,
-    chip: 'Live vitals',
+    chip: 'Your vitals',
     chipSub: 'Health Connect · Apple Health',
     title: 'Your vitals, read in context.',
+    // UX-04: only what the person's own watch or phone records, and only with their permission
     body:
-        'Connect your watch or phone sensors. Heart rate, SpO2, temperature and blood pressure feed straight into every assessment.',
+        'If your watch or phone records heart rate, oxygen, temperature or blood pressure, VitaNet can read '
+        'those readings with your permission and use them in your checks. What is available depends on your device.',
   ),
   _Slide(
     image: 'assets/images/photos/holding_hands.jpg',
@@ -52,8 +54,10 @@ const _slides = <_Slide>[
     chip: 'Care circle',
     chipSub: 'Trusted contacts',
     title: 'The people who matter, in the loop.',
+    // UX-04: contacts agree first, and are texted only for an urgent alert you do not answer
     body:
-        'Add family or caregivers. If a check comes back urgent, they get notified with your location so help arrives sooner.',
+        'Add family or caregivers. Once they agree, they get a text if a reading looks dangerous and you do not '
+        'answer the alert, so someone can check on you.',
   ),
 ];
 

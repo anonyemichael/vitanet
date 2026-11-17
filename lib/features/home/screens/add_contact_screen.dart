@@ -289,7 +289,7 @@ class _AddContactScreenState extends ConsumerState<AddContactScreen> {
                     children: [
                       VnListRow(
                         title: 'Alert on urgent results',
-                        subtitle: 'SMS with your location',
+                        subtitle: 'A text if a dangerous reading goes unanswered',
                         chevron: false,
                         onTap: () => setState(() => _alertOnUrgent = !_alertOnUrgent),
                         trailing: Checkbox(

@@ -680,7 +680,7 @@ class _PatientCompletionScreenState
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _intro(p, 'Your care circle',
-            'If a check comes back urgent, these people get notified with your location.'),
+            'Once they agree, they get a text if a reading looks dangerous and you do not answer the alert.'),
         const SizedBox(height: 20),
         if (_careCircle.isNotEmpty) ...[
           VnListGroup(

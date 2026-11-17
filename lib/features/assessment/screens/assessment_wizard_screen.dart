@@ -56,6 +56,9 @@ class _AssessmentWizardScreenState extends ConsumerState<AssessmentWizardScreen>
   String? _area;
   String? _duration;
   double _pain = 5;
+  bool _painSet = false;      // pain counts only once the person has moved the slider (UX-07)
+  bool _submitting = false;
+  static const _reviewStep = 5;
   final Set<String> _symptoms = {};
   final Set<String> _riskFactors = {};
 
@@ -82,9 +85,9 @@ class _AssessmentWizardScreenState extends ConsumerState<AssessmentWizardScreen>
 
   void _next() {
     HapticFeedback.selectionClick();
-    if (_step < 4) {
+    if (_step < _reviewStep) {
       setState(() => _step += 1);
-    } else {
+    } else if (!_submitting) {
       _finish();
     }
   }
@@ -122,12 +125,15 @@ class _AssessmentWizardScreenState extends ConsumerState<AssessmentWizardScreen>
       ..write('Guided symptom assessment. ')
       ..write('Main area: $_area. ')
       ..write('Duration: $_duration. ')
-      ..write('Pain or discomfort: $pain/10 (${_painWord(pain)}). ');
+      ..write(_painSet ? 'Pain or discomfort: $pain/10 (${_painWord(pain)}). ' : 'Pain: not given. ');
     if (_symptoms.isNotEmpty) buffer.write('Other symptoms: ${_symptoms.join(", ")}. ');
     if (_riskFactors.isNotEmpty) buffer.write('Risk factors: ${_riskFactors.join(", ")}. ');
     buffer.write('Please triage me and tell me what to do next.');
+    final prompt = buffer.toString();
 
-    // Only real symptoms go to the symptom checker; the body area ("Head", "Chest") is not a symptom (audit F-04).
+    setState(() => _submitting = true);
+    // Only real symptoms go to the symptom checker; the body area ("Head", "Chest") is sent as its own field
+    // (audit F-04 / UX-06).
     var triaged = false;
     if (_symptoms.isNotEmpty) {
       try {
@@ -135,7 +141,7 @@ class _AssessmentWizardScreenState extends ConsumerState<AssessmentWizardScreen>
         final triage = await ai.generateTriageResultFromML(
           symptoms: List.of(_symptoms),
           primarySymptom: _symptoms.first,
-          pain: pain,
+          pain: _painSet ? pain : null,
           durationDays: _durationDays[_duration],
           riskFactors: List.of(_riskFactors),
           bodyArea: _area,
@@ -149,15 +155,23 @@ class _AssessmentWizardScreenState extends ConsumerState<AssessmentWizardScreen>
     }
 
     if (!mounted) return;
-    if (!triaged) {
-      // say so plainly: no made-up "self-care" result (audit F-03)
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(const SnackBar(
-        content: Text('The quick symptom check could not run, so the assistant will go through your answers. '
-            'If you feel very unwell, call 112 or 193 now.'),
-        duration: Duration(seconds: 6),
-      ));
+    setState(() => _submitting = false);
+    if (triaged) {
+      // the button said "Get my result": show the result; the assistant is one tap away there (UX-03)
+      ref.read(assessmentPromptProvider.notifier).state = prompt;
+      context.go('/triage-result');
+      return;
     }
-    _openChat(prompt: buffer.toString());
+    // say so plainly: no made-up "self-care" result (audit F-03)
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
+      content: Text(_symptoms.isEmpty
+          ? 'No symptoms were picked, so the assistant will go through your answers with you. '
+              'If you feel very unwell, call 112 or 193 now.'
+          : 'The quick symptom check could not run, so the assistant will go through your answers. '
+              'If you feel very unwell, call 112 or 193 now.'),
+      duration: const Duration(seconds: 6),
+    ));
+    _openChat(prompt: prompt);
   }
 
   Future<void> _call112() async {
@@ -206,7 +220,7 @@ class _AssessmentWizardScreenState extends ConsumerState<AssessmentWizardScreen>
                     const SizedBox(height: 22),
                     Row(
                       children: [
-                        for (var k = 0; k < 5; k++) ...[
+                        for (var k = 0; k <= _reviewStep; k++) ...[
                           if (k > 0) const SizedBox(width: 6),
                           Expanded(
                             child: AnimatedContainer(
@@ -224,7 +238,7 @@ class _AssessmentWizardScreenState extends ConsumerState<AssessmentWizardScreen>
                       ],
                     ),
                     const SizedBox(height: 8),
-                    Text('Question ${_step + 1} of 5',
+                    Text(_step == _reviewStep ? 'Check your answers' : 'Question ${_step + 1} of 5',
                         style: VnText.body(12, weight: FontWeight.w600, color: p.muted)),
                     const SizedBox(height: 22),
                     Expanded(
@@ -239,7 +253,8 @@ class _AssessmentWizardScreenState extends ConsumerState<AssessmentWizardScreen>
                               1 => _stepDuration(p),
                               2 => _stepPain(p),
                               3 => _stepSymptoms(p),
-                              _ => _stepRisks(p),
+                              4 => _stepRisks(p),
+                              _ => _stepReview(p),
                             },
                           ),
                         ),
@@ -247,8 +262,12 @@ class _AssessmentWizardScreenState extends ConsumerState<AssessmentWizardScreen>
                     ),
                     const SizedBox(height: 12),
                     VnButton(
-                      label: _step == 4 ? 'See my result' : 'Continue',
-                      onPressed: _canContinue ? _next : null,
+                      label: switch (_step) {
+                        _reviewStep => _submitting ? 'Checking your answers…' : 'Get my result',
+                        4 => 'Review my answers',
+                        _ => 'Continue',
+                      },
+                      onPressed: _canContinue && !_submitting ? _next : null,
                     ),
                     const SizedBox(height: 10),
                     Row(
@@ -277,9 +296,17 @@ class _AssessmentWizardScreenState extends ConsumerState<AssessmentWizardScreen>
     );
   }
 
-  Widget _question(VnPalette p, String title, String sub) => Column(
+  Widget _question(VnPalette p, String title, String sub, {bool optional = false}) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (optional) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+              decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: BorderRadius.circular(20)),
+              child: Text('Optional', style: VnText.body(12, weight: FontWeight.w700, color: p.muted)),
+            ),
+            const SizedBox(height: 8),
+          ],
           Semantics(header: true, child: Text(title, style: VnText.heading(24, color: p.ink))),
           const SizedBox(height: 6),
           Text(sub, style: VnText.body(15, color: p.muted)),
@@ -317,10 +344,58 @@ class _AssessmentWizardScreenState extends ConsumerState<AssessmentWizardScreen>
     );
   }
 
+  /// Last step: the answers as they will be sent, each with a way back to change it (UX-07).
+  Widget _stepReview(VnPalette p) {
+    final pain = _pain.round();
+    Widget row(String label, String value, int step) => Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
+            decoration: BoxDecoration(
+              color: p.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: p.line),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(label, style: VnText.body(12, weight: FontWeight.w600, color: p.muted)),
+                      const SizedBox(height: 2),
+                      Text(value, style: VnText.body(15, weight: FontWeight.w600, color: p.ink)),
+                    ],
+                  ),
+                ),
+                TextButton(
+                  onPressed: _submitting ? null : () => setState(() => _step = step),
+                  child: Text('Change', semanticsLabel: 'Change $label'),
+                ),
+              ],
+            ),
+          ),
+        );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _question(p, 'Check your answers', 'Change anything that is not right, then get your result.'),
+        row('Where', _area ?? 'Not given', 0),
+        row('How long', _duration ?? 'Not given', 1),
+        row('Pain', _painSet ? '$pain/10 · ${_painWord(pain)}' : 'Not given', 2),
+        row('Other symptoms', _symptoms.isEmpty ? 'None picked' : _symptoms.join(', '), 3),
+        row('Risk factors', _riskFactors.isEmpty ? 'None' : _riskFactors.join(', '), 4),
+        if (_symptoms.isEmpty)
+          Text('With no symptoms picked, the assistant goes through your answers instead of the quick check.',
+              style: VnText.body(13, color: p.muted)),
+      ],
+    );
+  }
+
   Widget _stepArea(VnPalette p) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _question(p, 'Where is the problem?', 'Pick the main area. You can add more later.'),
+          _question(p, 'Where is the problem?', 'Pick the main area of the body. You pick symptoms later.'),
           GridView.count(
             crossAxisCount: 2,
             shrinkWrap: true,
@@ -413,7 +488,9 @@ class _AssessmentWizardScreenState extends ConsumerState<AssessmentWizardScreen>
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _question(p, 'How bad is the pain or discomfort?',
-            '0 is none, 10 is the worst you can imagine.'),
+            _painSet ? '0 is none, 10 is the worst you can imagine.'
+                : 'Move the slider: 0 is none, 10 is the worst you can imagine. Not sure? Just continue.',
+            optional: true),
         const SizedBox(height: 4),
         Center(
           child: AnimatedContainer(
@@ -452,7 +529,10 @@ class _AssessmentWizardScreenState extends ConsumerState<AssessmentWizardScreen>
             divisions: 10,
             label: '$v',
             semanticFormatterCallback: (val) => '${val.round()} out of 10, ${_painWord(val.round())}',
-            onChanged: (val) => setState(() => _pain = val),
+            onChanged: (val) => setState(() {
+              _pain = val;
+              _painSet = true;
+            }),
           ),
         ),
         Row(
@@ -469,7 +549,8 @@ class _AssessmentWizardScreenState extends ConsumerState<AssessmentWizardScreen>
   Widget _stepSymptoms(VnPalette p) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _question(p, 'Any other symptoms?', 'Select all that apply.'),
+          _question(p, 'Any other symptoms?', 'Select all that apply. These are what the quick check uses.',
+              optional: true),
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -514,7 +595,7 @@ class _AssessmentWizardScreenState extends ConsumerState<AssessmentWizardScreen>
   Widget _stepRisks(VnPalette p) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _question(p, 'Any special risk factors?', 'This helps us triage you safely.'),
+          _question(p, 'Any special risk factors?', 'This helps us triage you safely.', optional: true),
           VnListGroup(
             children: [
               for (final r in _risks)
