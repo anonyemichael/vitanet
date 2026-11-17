@@ -2,13 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:http/http.dart' as http;
 
 import 'package:vitanet/core/providers/shared_state.dart';
 import 'package:vitanet/shared/widgets/vn_kit.dart';
 import '../models/health_article.dart';
-import '../services/dynamic_feed_mixer.dart';
-import '../services/europe_pmc_feed_service.dart';
+import '../services/health_library_service.dart';
 import '../widgets/resource_media.dart';
 import 'health_article_detail_screen.dart';
 
@@ -27,8 +25,8 @@ typedef GeneralHealthLibraryScreen = HealthLibraryScreen;
   return (asset: fallbackAsset, url: useDirect ? directUrl : '');
 }
 
-/// Health library: Europe PMC live literature interleaved with curated
-/// clinician-reviewed articles, with topic chips, search and bookmarks.
+/// Health library: plain-language articles from MedlinePlus and MyHealthfinder (collected by the VitaNet
+/// backend), with topic chips, search (any condition, via MedlinePlus) and bookmarks.
 class HealthLibraryScreen extends ConsumerStatefulWidget {
   const HealthLibraryScreen({super.key});
 
@@ -37,20 +35,7 @@ class HealthLibraryScreen extends ConsumerStatefulWidget {
 }
 
 class _HealthLibraryScreenState extends ConsumerState<HealthLibraryScreen> {
-  /// Chip label -> feed category / query understood by [DynamicFeedMixer].
-  static const List<(String, String)> _categories = [
-    ('For you', 'All'),
-    ('Heart', 'Cardiology'),
-    ('Breathing', 'TITLE:(asthma OR "lung function" OR respiratory OR breathing)'),
-    ('Mental health', 'TITLE:("mental health" OR anxiety OR depression OR stress)'),
-    ('Nutrition', 'Nutrition'),
-    ('Sleep', 'Sleep'),
-    ("Women's health", 'TITLE:("women\'s health" OR pregnancy OR menopause OR maternal)'),
-    ('Fitness', 'Fitness'),
-    ('Immunity', 'Immunology'),
-  ];
-
-  String _selectedCategory = 'All';
+  String _selectedCategory = 'For you';
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _searchOpen = false;
@@ -59,19 +44,18 @@ class _HealthLibraryScreenState extends ConsumerState<HealthLibraryScreen> {
   bool _isLoadingInitial = true;
   bool _isLoadingMore = false;
   bool _hasMore = true;
-  String? _nextCursorMark = '*';
+  int? _nextCursor = 0;
   String _activeSearchQuery = '';
 
   final Set<String> _bookmarkedIds = {};
 
-  late final DynamicFeedMixer _feedMixer;
-  http.Client? _activeClient;
+  final _library = HealthLibraryService();
+  int _loadToken = 0; // a newer load (topic / search change) makes older answers stale
   Timer? _debounceTimer;
 
   @override
   void initState() {
     super.initState();
-    _feedMixer = DynamicFeedMixer();
     _scrollController.addListener(_onScroll);
     _loadInitialFeed();
   }
@@ -79,7 +63,6 @@ class _HealthLibraryScreenState extends ConsumerState<HealthLibraryScreen> {
   @override
   void dispose() {
     _debounceTimer?.cancel();
-    _activeClient?.close();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     _searchController.dispose();
@@ -88,31 +71,26 @@ class _HealthLibraryScreenState extends ConsumerState<HealthLibraryScreen> {
 
   // ── Feed fetching & cursor pagination ─────────────────────────────────────
 
+  Future<LibraryPage> _fetch(int cursor) => _activeSearchQuery.isNotEmpty
+      ? _library.search(_activeSearchQuery, cursor: cursor)
+      : _library.feed(topic: _selectedCategory, cursor: cursor);
+
   Future<void> _loadInitialFeed({bool isRefresh = false}) async {
     if (!mounted) return;
     if (!isRefresh) {
       setState(() {
         _isLoadingInitial = true;
-        _nextCursorMark = '*';
+        _nextCursor = 0;
         _hasMore = true;
       });
     }
-
-    _activeClient?.close();
-    final client = http.Client();
-    _activeClient = client;
-
-    final query = _feedMixer.buildQuery(selectedCategory: _selectedCategory, searchQuery: _activeSearchQuery);
-    final service = EuropePmcFeedService(client: client);
-    final page = await service.fetchFeedPage(query: query, cursorMark: '*', pageSize: 12);
-
-    if (!mounted || client != _activeClient) return;
-
-    final mixed = _feedMixer.interleaveFeed(liveArticles: page.articles, selectedCategory: _selectedCategory);
+    final token = ++_loadToken;
+    final page = await _fetch(0);
+    if (!mounted || token != _loadToken) return;
     setState(() {
-      _articles = mixed;
-      _nextCursorMark = page.nextCursorMark;
-      _hasMore = page.hasMore && (page.nextCursorMark != null);
+      _articles = List.of(page.articles);
+      _nextCursor = page.nextCursor;
+      _hasMore = page.hasMore;
       _isLoadingInitial = false;
       _isLoadingMore = false;
     });
@@ -126,50 +104,22 @@ class _HealthLibraryScreenState extends ConsumerState<HealthLibraryScreen> {
   }
 
   Future<void> _loadNextPage() async {
-    if (_nextCursorMark == null || _isLoadingMore) return;
+    final cursor = _nextCursor;
+    if (cursor == null || _isLoadingMore) return;
     setState(() => _isLoadingMore = true);
-
-    final query = _feedMixer.buildQuery(selectedCategory: _selectedCategory, searchQuery: _activeSearchQuery);
-    final service = EuropePmcFeedService(client: _activeClient ?? http.Client());
-    final page = await service.fetchFeedPage(query: query, cursorMark: _nextCursorMark!, pageSize: 12);
-
-    if (!mounted) return;
-    if (page.articles.isEmpty) {
-      // If live feed reached the end of this query stream, seamlessly rotate to next discovery domain
-      _feedMixer.reseed();
-      final broaderQuery = _feedMixer.buildQuery(selectedCategory: _selectedCategory, searchQuery: '');
-      final backupPage = await service.fetchFeedPage(query: broaderQuery, cursorMark: '*', pageSize: 12);
-      if (!mounted) return;
-      if (backupPage.articles.isNotEmpty) {
-        final currentIds = _articles.map((a) => a.id).toSet();
-        final newUnique = backupPage.articles.where((a) => !currentIds.contains(a.id)).toList();
-        setState(() {
-          _articles.addAll(newUnique);
-          _nextCursorMark = backupPage.nextCursorMark;
-          _hasMore = true;
-          _isLoadingMore = false;
-        });
-        return;
-      }
-      setState(() {
-        _isLoadingMore = false;
-        _hasMore = false;
-      });
-      return;
-    }
-
-    final currentIds = _articles.map((a) => a.id).toSet();
-    final newUnique = page.articles.where((a) => !currentIds.contains(a.id)).toList();
+    final token = _loadToken;
+    final page = await _fetch(cursor);
+    if (!mounted || token != _loadToken) return;
+    final known = _articles.map((a) => a.id).toSet();
     setState(() {
-      _articles.addAll(newUnique);
-      _hasMore = page.hasMore && (page.nextCursorMark != null && page.nextCursorMark != _nextCursorMark);
-      _nextCursorMark = page.nextCursorMark;
+      _articles.addAll(page.articles.where((a) => known.add(a.id)));
+      _nextCursor = page.nextCursor;
+      _hasMore = page.hasMore;
       _isLoadingMore = false;
     });
   }
 
   Future<void> _onPullToRefresh() async {
-    _feedMixer.reseed();
     await _loadInitialFeed(isRefresh: true);
   }
 
@@ -179,7 +129,7 @@ class _HealthLibraryScreenState extends ConsumerState<HealthLibraryScreen> {
       if (!mounted) return;
       setState(() {
         _activeSearchQuery = value.trim();
-        _nextCursorMark = '*';
+        _nextCursor = 0;
         _hasMore = true;
       });
       _loadInitialFeed();
@@ -190,7 +140,7 @@ class _HealthLibraryScreenState extends ConsumerState<HealthLibraryScreen> {
     if (_selectedCategory == category) return;
     setState(() {
       _selectedCategory = category;
-      _nextCursorMark = '*';
+      _nextCursor = 0;
       _hasMore = true;
     });
     _loadInitialFeed();
@@ -263,11 +213,11 @@ class _HealthLibraryScreenState extends ConsumerState<HealthLibraryScreen> {
                     padding: const EdgeInsets.only(top: 18),
                     child: VnChipRow(
                       children: [
-                        for (final c in _categories)
+                        for (final c in HealthLibraryService.topics)
                           VnInkChip(
-                            label: c.$1,
-                            selected: _selectedCategory == c.$2,
-                            onTap: () => _onCategorySelected(c.$2),
+                            label: c,
+                            selected: _selectedCategory == c,
+                            onTap: () => _onCategorySelected(c),
                           ),
                       ],
                     ),
@@ -422,13 +372,18 @@ class _HealthLibraryScreenState extends ConsumerState<HealthLibraryScreen> {
 
 String _verifiedLabel(HealthArticle a) {
   final s = a.verifiedSource.toLowerCase();
+  if (s.contains('medlineplus')) return 'MedlinePlus';
+  if (s.contains('myhealthfinder')) return 'health.gov';
   if (s.contains('pubmed')) return 'PubMed';
   if (s.contains('europe pmc') || s.contains('peer')) return 'Peer reviewed';
   return 'Verified';
 }
 
 /// "The Lancet • 2026" -> "The Lancet 2026"; drops the generic "Peer Reviewed" suffix.
-String cleanArticleSource(HealthArticle a) => a.verifiedSource
+/// Library articles show the short source name ("MedlinePlus", "MyHealthfinder") in lists.
+String cleanArticleSource(HealthArticle a) => a.verifiedSource.contains(' · ')
+    ? a.verifiedSource.split(' · ').first
+    : a.verifiedSource
     .replaceAll(RegExp(r'\s*[•·â€¢]+\s*Peer Reviewed', caseSensitive: false), '')
     .replaceAll(RegExp(r'\s*[•·â€¢]+\s*'), ' ')
     .trim();

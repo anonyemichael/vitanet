@@ -28,6 +28,7 @@ from app.routes import (
     portal_live,
     media_proxy,
     videos,
+    library,
 )
 from app.dependencies.security import DEV_BYPASS_AUTH
 
@@ -52,6 +53,9 @@ async def lifespan(app: FastAPI):
     # health videos: load the saved copy and refresh it from YouTube in the background when it is old
     from app.services import video_service
     asyncio.create_task(asyncio.to_thread(video_service.refresh_if_stale))
+    # health library: same idea, rebuilt daily from MedlinePlus and MyHealthfinder
+    from app.services import library_service
+    asyncio.create_task(asyncio.to_thread(library_service.refresh_if_stale))
     yield
     sweeper.cancel()
 
@@ -125,6 +129,7 @@ app.include_router(portal_ai.router)
 app.include_router(portal_live.router)
 app.include_router(media_proxy.router)
 app.include_router(videos.router)
+app.include_router(library.router)
 
 
 @app.get("/")
