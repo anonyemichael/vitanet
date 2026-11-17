@@ -54,7 +54,10 @@ class HealthAlertCard extends ConsumerWidget {
     return Semantics(
       liveRegion: true,
       label: urgent ? 'Urgent health alert' : 'Health alert',
-      child: Material(
+      // at most 60% of the screen; the message scrolls so the buttons always stay visible (large text, UX-14)
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.6),
+        child: Material(
         elevation: 6,
         color: p.surface,
         borderRadius: BorderRadius.circular(16),
@@ -84,12 +87,21 @@ class HealthAlertCard extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 8),
-              Text(alert.message, style: VnText.body(13.5, color: p.ink)),
-              if (escalated) ...[
-                const SizedBox(height: 6),
-                Text('Your care circle has been told.',
-                    style: VnText.body(12.5, weight: FontWeight.w700, color: p.muted)),
-              ],
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(alert.message, style: VnText.body(13.5, color: p.ink)),
+                      if (escalated) ...[
+                        const SizedBox(height: 6),
+                        Text('Your care circle has been told.',
+                            style: VnText.body(12.5, weight: FontWeight.w700, color: p.muted)),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
               const SizedBox(height: 4),
               Wrap(
                 alignment: WrapAlignment.end,
@@ -116,6 +128,7 @@ class HealthAlertCard extends ConsumerWidget {
             ],
           ),
         ),
+      ),
       ),
     );
   }

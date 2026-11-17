@@ -106,3 +106,18 @@ Check after a restart: `https://your-address/videos/status` shows `"serving": "y
       (`lib/data/services/media_library_service.dart`, not used by any screen). Keys inside an app can be copied
       out of it: leave them empty; photos now come from the server.
 - [ ] Kaggle: nothing to do. Training runs from GitHub with the repository secrets you already set.
+
+## 10. Usability checks on real phones (UI/UX audit, needs people and devices)
+
+Claude tested layouts automatically (small phone, large text), but these need a real phone and real people:
+
+- [ ] **Low-end Android phone**, branch `vitanet-ai-tools`, go through: fresh install → onboarding → sign-in →
+      profile setup → symptom assessment → result → chat → find a hospital. Note anything slow, confusing or cut off.
+- [ ] **Large text:** phone Settings → Display → Font size at the largest; repeat the journey above.
+- [ ] **TalkBack** (Android: Settings → Accessibility → TalkBack): can you reach and hear every button on Home,
+      the assessment and the alert banner?
+- [ ] **No internet** (airplane mode): open Home, Library, Videos, Chat: each should say what is wrong and offer a retry.
+- [ ] **Location off / denied:** Pharmacy and Hospitals should still let you search by place name.
+- [ ] **Two or three first-time users** (family or friends): give them the phone, ask them to "check a symptom"
+      without help, and note where they get stuck. Do the same with one hospital staff member on the portal.
+- [ ] Check that pharmacy and hospital listings near you in Ghana are right (names, phone numbers, hours).

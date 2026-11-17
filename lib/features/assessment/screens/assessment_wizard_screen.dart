@@ -402,7 +402,8 @@ class _AssessmentWizardScreenState extends ConsumerState<AssessmentWizardScreen>
             physics: const NeverScrollableScrollPhysics(),
             mainAxisSpacing: 10,
             crossAxisSpacing: 10,
-            mainAxisExtent: 96,
+            // grows with the phone's text size so labels are never cut off (UX-14)
+            mainAxisExtent: 52 + 44 * (MediaQuery.textScalerOf(context).scale(14) / 14),
             children: [
               for (final (label, icon) in _areas)
                 _option(
@@ -416,6 +417,9 @@ class _AssessmentWizardScreenState extends ConsumerState<AssessmentWizardScreen>
                       Icon(icon, size: 24, color: _area == label ? p.brandDeep : p.ink),
                       const SizedBox(height: 8),
                       Text(label,
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           style: VnText.body(14,
                               weight: FontWeight.w600,
                               color: _area == label ? p.brandDeep : p.ink)),
