@@ -60,9 +60,17 @@ class ApiService {
     double? bloodOxygen,
     double? systolicBp,
     double? diastolicBp,
+    int? pain,
+    int? durationDays,
+    List<String> riskFactors = const [],
+    String? bodyArea,
   }) async {
     try {
       final response = await _dio.post('triage/predict', data: {
+        'pain': ?pain,
+        'duration_days': ?durationDays,
+        if (riskFactors.isNotEmpty) 'risk_factors': riskFactors,
+        'body_area': ?bodyArea,
         'symptoms': symptoms,
         'age': ?age,
         'gender': ?gender,

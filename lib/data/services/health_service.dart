@@ -4,6 +4,9 @@ import 'package:flutter/foundation.dart';
 class HealthService {
   late final Health _health;
 
+  /// Why the last read failed (null when it worked), so the app can say so instead of "connected".
+  String? lastError;
+
   HealthService() {
     _health = Health();
     if (!kIsWeb) _health.configure().catchError((e) => debugPrint('Health configure failed: $e'));
@@ -56,7 +59,11 @@ class HealthService {
   /// Keys: heart_rate, systolic_bp, diastolic_bp, blood_oxygen, temperature, respiratory_rate.
   Future<Map<String, ({double value, DateTime at})>> fetchLatestReadings() async {
     final out = <String, ({double value, DateTime at})>{};
-    if (!await requestPermissions()) return out;
+    lastError = null;
+    if (!await requestPermissions()) {
+      lastError = 'permission not granted';
+      return out;
+    }
     final now = DateTime.now();
     try {
       final points = await _health.getHealthDataFromTypes(
@@ -72,6 +79,7 @@ class HealthService {
       }
     } catch (e) {
       debugPrint('Error fetching biometrics: $e');
+      lastError = '$e';
     }
     return out;
   }

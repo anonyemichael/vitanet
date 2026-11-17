@@ -224,3 +224,31 @@ def test_triage_request_without_vitals_stays_empty(monkeypatch):
         app.dependency_overrides.pop(get_current_user, None)
     assert r.status_code == 200
     assert seen == {"symptoms": ["headache"], "blood_oxygen": 91}      # only what was sent
+
+
+# ---------------------------------------------------------------- audit F-02 / F-04: honest checker, all answers used
+def test_checker_says_what_it_is_and_invents_no_percentages():
+    r = ml_service.predict_triage(symptoms=["headache", "fever", "chills", "vomiting"])
+    assert "%" not in r["confidence"] and "%" not in r["severity_confidence"]
+    assert r["confidence"] in ("strong match", "partial match", "weak match", "no clear match")
+    assert "rules-based" in r["method"] and "not a diagnosis" in r["method"]
+
+
+@pytest.mark.parametrize("extra,level", [
+    ({"pain": 9}, "doctor"),
+    ({"duration_days": 30}, "doctor"),
+    ({"risk_factors": ["Pregnant"]}, "doctor"),
+])
+def test_assessment_answers_can_only_raise_urgency(extra, level):
+    base = ml_service.predict_triage(symptoms=["sneezing"])
+    assert base["severity"] == "routine"
+    r = ml_service.predict_triage(symptoms=["sneezing"], **extra)
+    assert r["severity"] == level and r["severity_confidence"] != base["severity_confidence"]
+    # never lowers: an urgent case stays urgent whatever the extras say
+    assert ml_service.predict_triage(symptoms=["chest_pain"], pain=0, duration_days=0)["severity"] == "urgent"
+
+
+def test_fever_with_stiff_neck_is_urgent():
+    for syms in (["fever", "stiff_neck"], ["fever", "confusion"], ["sneezing", "stiff_neck"], ):
+        r = ml_service.predict_triage(symptoms=syms, temperature=38.6)
+        assert r["severity"] == "urgent", syms

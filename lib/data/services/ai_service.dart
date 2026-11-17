@@ -158,6 +158,10 @@ class AiService {
   Future<TriageResult?> generateTriageResultFromML({
     required List<String> symptoms,
     String? primarySymptom,
+    int? pain,
+    int? durationDays,
+    List<String> riskFactors = const [],
+    String? bodyArea,
   }) async {
     // Only readings that really came from the watch / health platform are
     // sent. Missing ones stay missing; the server scores without them.
@@ -170,6 +174,10 @@ class AiService {
       bloodOxygen: _vitals['blood_oxygen'],
       systolicBp: _vitals['systolic_bp'],
       diastolicBp: _vitals['diastolic_bp'],
+      pain: pain,
+      durationDays: durationDays,
+      riskFactors: riskFactors,
+      bodyArea: bodyArea,
     );
 
     if (ml != null) {
@@ -182,7 +190,9 @@ class AiService {
       return TriageResult(
         id: _uuid.v4(),
         level: level,
-        summary: '${ml.disease} (${ml.confidence} confidence): ${ml.recommendation}',
+        // a rules-based checker: say so, and never present it as a diagnosis or a confidence score (audit F-02)
+        summary: 'Possible match: ${ml.disease} (${ml.confidence}). Quick symptom checker, not a diagnosis. '
+            '${ml.recommendation}',
         recommendations: [ml.recommendation, ...ml.precautions],
         monitorSymptoms: symptoms,
         primarySymptom: primarySymptom ?? (symptoms.isNotEmpty ? symptoms.first : ml.disease),

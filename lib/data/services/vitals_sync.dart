@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vitanet/data/providers/health_alerts_provider.dart';
 import 'package:vitanet/data/providers/providers.dart';
 
@@ -10,6 +11,42 @@ import 'package:vitanet/data/providers/providers.dart';
 /// health platform, or the user's backend record). `null` means no source has
 /// delivered data this session.
 final vitalsLastSyncProvider = StateProvider<DateTime?>((ref) => null);
+
+/// What the last sync really did (audit F-06): permission, readings read, readings saved, and any error.
+class SyncOutcome {
+  final bool permission;
+  final int read;
+  final int uploaded;
+  final String? error;
+  final DateTime at;
+
+  SyncOutcome({required this.permission, required this.read, required this.uploaded, this.error})
+      : at = DateTime.now();
+
+  bool get readOk => permission && error == null;
+}
+
+final lastSyncOutcomeProvider = StateProvider<SyncOutcome?>((ref) => null);
+
+/// Whether VitaNet may use the phone's watch readings. Turned off by "Disconnect" and remembered across app
+/// restarts (audit F-05); turned on again by "Connect / Sync now".
+final deviceSharingProvider = StateNotifierProvider<DeviceSharing, bool>((ref) => DeviceSharing());
+
+class DeviceSharing extends StateNotifier<bool> {
+  static const _key = 'device_sharing_on';
+  DeviceSharing() : super(true) {
+    SharedPreferences.getInstance().then((p) {
+      if (mounted) state = p.getBool(_key) ?? true;
+    }).catchError((Object _) {});
+  }
+
+  Future<void> set(bool on) async {
+    state = on;
+    try {
+      (await SharedPreferences.getInstance()).setBool(_key, on);
+    } catch (_) {}
+  }
+}
 
 /// One place that keeps the watch readings, the app and the backend in step.
 ///
@@ -61,17 +98,27 @@ class VitalsSync with WidgetsBindingObserver {
   Future<Map<String, double>> _sync() async {
     final user = _ref.read(authProvider).user;
     if (user == null) return const {};          // not signed in yet (not even as a guest)
+    if (!_ref.read(deviceSharingProvider)) return const {}; // the person disconnected their device
     final api = _ref.read(apiServiceProvider);
     final live = _ref.read(liveVitalsProvider.notifier);
     try {
       if (!kIsWeb) {
-        final readings = await _ref.read(healthServiceProvider).fetchLatestReadings();
+        final health = _ref.read(healthServiceProvider);
+        final readings = await health.fetchLatestReadings();
+        final error = health.lastError;
+        if (readings.isEmpty) {
+          _ref.read(lastSyncOutcomeProvider.notifier).state = SyncOutcome(
+              permission: error != 'permission not granted', read: 0, uploaded: 0, error: error);
+        }
         if (readings.isNotEmpty) {
           final values = {for (final e in readings.entries) e.key: e.value.value};
           values.forEach(live.setVital);
           _ref.read(vitalsLastSyncProvider.notifier).state = DateTime.now();
-          await api.postDeviceVitals(user.uid, values,
+          final sent = await api.postDeviceVitals(user.uid, values,
               measuredAt: {for (final e in readings.entries) e.key: e.value.at});
+          _ref.read(lastSyncOutcomeProvider.notifier).state = SyncOutcome(
+              permission: true, read: values.length, uploaded: sent,
+              error: sent == 0 ? 'could not save to your VitaNet account' : null);
           await _ref.read(healthAlertsProvider.notifier).refresh();   // a new reading can make an alert
           return values;
         }

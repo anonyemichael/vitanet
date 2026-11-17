@@ -32,6 +32,14 @@ class _AssessmentWizardScreenState extends ConsumerState<AssessmentWizardScreen>
     '1–4 weeks',
     'More than a month',
   ];
+  /// Duration answer -> days for the symptom checker.
+  static const _durationDays = <String, int>{
+    'Less than 24 hours': 0,
+    '1–3 days': 2,
+    '4–7 days': 5,
+    '1–4 weeks': 14,
+    'More than a month': 30,
+  };
   static const _extras = [
     'Fever', 'Stiff neck', 'Light sensitivity', 'Nausea', 'Vomiting',
     'Rash', 'Confusion', 'Cough', 'Fatigue', 'Dizziness',
@@ -127,6 +135,10 @@ class _AssessmentWizardScreenState extends ConsumerState<AssessmentWizardScreen>
         final triage = await ai.generateTriageResultFromML(
           symptoms: List.of(_symptoms),
           primarySymptom: _symptoms.first,
+          pain: pain,
+          durationDays: _durationDays[_duration],
+          riskFactors: List.of(_riskFactors),
+          bodyArea: _area,
         );
         if (triage != null && mounted) {
           ref.read(triageResultProvider.notifier).state = triage;

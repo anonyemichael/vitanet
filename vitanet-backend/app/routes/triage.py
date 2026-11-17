@@ -22,6 +22,8 @@ def predict_triage(payload: TriagePredictRequest):
                 "heart_rate": payload.heart_rate, "temperature": payload.temperature,
                 "blood_oxygen": payload.blood_oxygen,
                 "systolic_bp": payload.systolic_bp, "diastolic_bp": payload.diastolic_bp,
+                "pain": payload.pain, "duration_days": payload.duration_days,
+                "risk_factors": payload.risk_factors or None,
             }.items() if v is not None
         }
         result = ml_service.predict_triage(symptoms=payload.symptoms, **measured)

@@ -32,48 +32,62 @@ class _DeviceConnectionScreenState extends ConsumerState<DeviceConnectionScreen>
   @override
   void initState() {
     super.initState();
-    // Reflect vitals already pulled in this session.
+    // Connected = sharing is on AND readings were really read this session (not just "a permission exists").
     final vitals = ref.read(liveVitalsProvider);
-    if (vitals.isNotEmpty) {
+    final outcome = ref.read(lastSyncOutcomeProvider);
+    if (ref.read(deviceSharingProvider) && vitals.isNotEmpty && (outcome == null || outcome.read > 0)) {
       _connected = true;
+      _lastSync = ref.read(vitalsLastSyncProvider);
       _syncedKeys.addAll(vitals.keys);
     }
   }
 
+  /// Connect / Sync now. Each step is reported as it really went (audit F-06): permission, reading the
+  /// watch data, saving it to the VitaNet account. Only a real read counts as "connected".
   Future<void> _syncDevice() async {
     setState(() => _isSyncing = true);
-    final service = ref.read(healthServiceProvider);
-    final hasPermissions = await service.requestPermissions();
-    var count = 0;
+    await ref.read(deviceSharingProvider.notifier).set(true);
+    final hasPermissions = await ref.read(healthServiceProvider).requestPermissions();
+    SyncOutcome? outcome;
     if (hasPermissions) {
+      ref.read(lastSyncOutcomeProvider.notifier).state = null;
       try {
-        final fromDevice = await ref.read(vitalsSyncProvider).syncNow();
-        if (mounted) {
-          _syncedKeys.addAll(fromDevice.keys);
-          count = fromDevice.length;
-        }
+        await ref.read(vitalsSyncProvider).syncNow();
       } catch (e) {
-        debugPrint('Error fetching immediate biometrics: $e');
+        debugPrint('Device sync failed: $e');
       }
+      outcome = ref.read(lastSyncOutcomeProvider);
     }
     if (!mounted) return;
+    final read = outcome?.read ?? 0;
+    final uploaded = outcome?.uploaded ?? 0;
+    final readWorked = hasPermissions && outcome != null && (read > 0 || outcome.error == null);
+    final String message;
+    if (!hasPermissions) {
+      message = 'Could not get $_platformName permission. Install it or check its settings.';
+    } else if (outcome == null) {
+      message = 'Sign in first, then sync again.';
+    } else if (read > 0 && uploaded > 0) {
+      message = 'Synced $read readings from $_platformName and saved them to your VitaNet account.';
+    } else if (read > 0) {
+      message = 'Read $read readings on this phone, but could not save them to your account. '
+          'They will be sent at the next sync.';
+    } else if (outcome.error == null) {
+      message = 'Connected. No readings from the last 2 days yet.';
+    } else {
+      message = 'Permission is granted, but the readings could not be read ($_platformName said: ${outcome.error}).';
+    }
     setState(() {
       _isSyncing = false;
-      if (hasPermissions) {
-        _connected = true;
-        _lastSync = DateTime.now();
+      _connected = readWorked;
+      if (readWorked) {
+        _lastSync = outcome!.at;
+        _syncedKeys.addAll(ref.read(liveVitalsProvider).keys);
       }
     });
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        behavior: SnackBarBehavior.floating,
-        content: Text(
-          hasPermissions
-              ? (count > 0 ? 'Synced $count readings from $_platformName' : 'Connected. No new readings in the last 2 days.')
-              : 'Could not get $_platformName permission. Install it or check its settings.',
-        ),
-      ));
+      ..showSnackBar(SnackBar(behavior: SnackBarBehavior.floating, content: Text(message)));
   }
 
   Future<void> _disconnect() async {
@@ -117,6 +131,13 @@ class _DeviceConnectionScreenState extends ConsumerState<DeviceConnectionScreen>
       },
     );
     if (ok != true || !mounted) return;
+    // Stop using the device's readings everywhere (audit F-05): no more syncing (remembered after restart),
+    // and the readings already shown on the dashboard and given to triage are cleared.
+    await ref.read(deviceSharingProvider.notifier).set(false);
+    ref.read(liveVitalsProvider.notifier).clear();
+    ref.read(vitalsLastSyncProvider.notifier).state = null;
+    ref.read(lastSyncOutcomeProvider.notifier).state = null;
+    if (!mounted) return;
     setState(() {
       _connected = false;
       _lastSync = null;

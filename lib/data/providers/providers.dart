@@ -85,6 +85,9 @@ class LiveVitalsNotifier extends StateNotifier<Map<String, double>> {
     state = {...state, metricId: value};
   }
 
+  /// Forget every reading (device disconnected, signed out).
+  void clear() => state = const {};
+
   void connectDevice(String metricId) {
     // Real data will be fetched/streamed instead of simulating.
   }
