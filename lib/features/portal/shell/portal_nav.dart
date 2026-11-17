@@ -1,10 +1,11 @@
+import 'package:vitanet/core/layout/breakpoints.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vitanet/features/portal/board/referral_view.dart';
 import 'package:vitanet/features/portal/record/case_record_view.dart';
 
 /// Desk layouts start at this width (navy rail + two panes).
-const kDeskBreakpoint = 1000.0;
+const kDeskBreakpoint = VnBreakpoints.expanded; // same step as the patient app (UX-05)
 
 bool isDesk(BuildContext context) => MediaQuery.sizeOf(context).width >= kDeskBreakpoint;
 

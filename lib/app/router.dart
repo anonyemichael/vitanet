@@ -1,3 +1,4 @@
+import 'package:vitanet/core/layout/breakpoints.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -301,7 +302,7 @@ class _ScaffoldWithNavBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // Staff use the hospital portal (/admin); this shell is the patient app.
-    final isDesktop = MediaQuery.of(context).size.width >= 800;
+    final isDesktop = VnBreakpoints.isExpanded(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     const topLevelPaths = {'/home', '/chat', '/resources', '/profile'};

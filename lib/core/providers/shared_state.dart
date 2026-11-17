@@ -47,3 +47,8 @@ bool handleScrollNotification(ScrollNotification notification, WidgetRef ref) {
   }
   return false;
 }
+
+
+/// The answers of the last guided symptom assessment, written as a message for the assistant. The triage result
+/// page offers "Talk it through with the assistant", which sends it (UI/UX audit UX-03).
+final assessmentPromptProvider = StateProvider<String?>((ref) => null);

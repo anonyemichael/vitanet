@@ -61,6 +61,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   late HealthVideo _video;
   ClinicalVideo? _source;
   YoutubePlayerController? _controller;
+  // false until the current clip is actually playing: the poster stays on top so there is never a black box
+  bool _started = false;
   StreamSubscription<YoutubeVideoState>? _stateSub;
   final ValueNotifier<Duration> _positionNotifier = ValueNotifier(Duration.zero);
   List<ClinicalVideo>? _cachedUpNext;
@@ -124,7 +126,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     try {
       _stateSub?.cancel();
       _controller?.close();
-      setState(() => _hasPlaybackError = false);
+      setState(() {
+        _hasPlaybackError = false;
+        _started = false;
+      });
       final ctrl = YoutubePlayerController.fromVideoId(
         videoId: _video.videoId,
         autoPlay: true,
@@ -140,10 +145,16 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         ),
       );
       _stateSub = ctrl.videoStateStream.listen(_onState);
+      _posterTimeout();
       ctrl.listen((value) {
         if (!mounted) return;
         if (value.hasError && !_hasPlaybackError) {
           setState(() => _hasPlaybackError = true);
+        }
+        // ready (playing, or waiting for a tap where the browser blocks autoplay): show the real player
+        const ready = {PlayerState.playing, PlayerState.paused, PlayerState.cued};
+        if (ready.contains(value.playerState) && !_started) {
+          setState(() => _started = true);
         }
       });
       setState(() => _controller = ctrl);
@@ -165,18 +176,33 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     LaunchHelpers.openWeb(context, 'https://www.youtube.com/watch?v=${_video.videoId}');
   }
 
+  /// Up next: load the new clip into the player that is already running (no new WebView, like YouTube), and
+  /// only build a new player if that fails.
+  /// Never leave the poster up for long, whatever the player reports.
+  void _posterTimeout() {
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted && !_started) setState(() => _started = true);
+    });
+  }
+
   void _changeVideo(ClinicalVideo next) {
-    _stateSub?.cancel();
-    _controller?.close();
+    final ctrl = _hasPlaybackError ? null : _controller;
     setState(() {
-      _controller = null;
       _hasPlaybackError = false;
+      _started = false;
       _source = next;
       _video = next.toHealthVideo();
       _cachedUpNext = null;
       _expanded = false;
     });
     _positionNotifier.value = Duration.zero;
+    if (ctrl != null) {
+      _posterTimeout();
+      ctrl.loadVideoById(videoId: _video.videoId).catchError((Object _) {
+        if (mounted) _startPlayback();
+      });
+      return;
+    }
     _startPlayback();
   }
 
@@ -318,6 +344,30 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           children: [
             if (_controller != null)
               YoutubePlayer(controller: _controller!, aspectRatio: 16 / 9),
+            if (_controller != null && !_started && !_hasPlaybackError)
+              // Poster + spinner until the first frame plays (fades away, never blocks the player's buttons).
+              IgnorePointer(
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    isCprVideo(clip)
+                        ? const CprDesignedThumbnail()
+                        : VnNetworkPhoto(
+                            url: _video.thumbnailUrl.isNotEmpty ? _video.thumbnailUrl : clip.thumbnailUrl,
+                            fallbackAsset: videoFallbackPhoto(clip),
+                            cacheWidth: 900,
+                          ),
+                    const ColoredBox(color: Color(0x33000000)),
+                    const Center(
+                      child: SizedBox(
+                        width: 36,
+                        height: 36,
+                        child: CircularProgressIndicator(strokeWidth: 3, color: Color(0xFF2DD4BF)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             if (_hasPlaybackError)
               ColoredBox(
                 color: const Color(0xEE090E17),

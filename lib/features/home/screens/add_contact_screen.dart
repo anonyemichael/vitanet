@@ -49,12 +49,7 @@ class _AddContactScreenState extends ConsumerState<AddContactScreen> {
       relation: _selectedRole,
     );
 
-    final updated = List<EmergencyContact>.from(currentProfile.emergencyContacts)
-      ..add(newContact);
-    await ref
-        .read(userProfileProvider.notifier)
-        .updateProfile(currentProfile.copyWith(emergencyContacts: updated));
-
+    // Backend first (it sends the invite once), then the profile, whose sync then finds the contact already there.
     try {
       final auth = ref.read(authProvider);
       final userId = auth.user?.uid ?? '';
@@ -67,6 +62,13 @@ class _AddContactScreenState extends ConsumerState<AddContactScreen> {
         isPrimary: _alertOnUrgent,
       );
     } catch (_) {}
+
+    final updated = List<EmergencyContact>.from(currentProfile.emergencyContacts)
+      ..add(newContact);
+    await ref
+        .read(userProfileProvider.notifier)
+        .updateProfile(currentProfile.copyWith(emergencyContacts: updated));
+
 
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -287,7 +289,7 @@ class _AddContactScreenState extends ConsumerState<AddContactScreen> {
                     children: [
                       VnListRow(
                         title: 'Alert on urgent results',
-                        subtitle: 'SMS with your location',
+                        subtitle: 'A text if a dangerous reading goes unanswered',
                         chevron: false,
                         onTap: () => setState(() => _alertOnUrgent = !_alertOnUrgent),
                         trailing: Checkbox(

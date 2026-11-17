@@ -6,24 +6,24 @@ import logging
 import json
 from uuid import UUID
 
-import openai
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models.chat import MessageRole
 from app.schemas.chat_blocks import TextBlock
-from app.services import ai_blocks, ai_tools, chat_service, user_settings_service
+from app.services import ai_blocks, ai_client, ai_tools, chat_service
 from app.services.ai_system_prompt import build_system_prompt
+from app.services.safety import SafetyLayer
 
 logger = logging.getLogger(__name__)
 
-# Use OpenRouter or Gemini fallback keys
-or_keys = settings.OPENROUTER_API_KEYS.split(",") if settings.OPENROUTER_API_KEYS else []
-api_key = (or_keys[0].strip() if or_keys else settings.GEMINI_API_KEY) or "sk-vitanet-placeholder-key"
-client = openai.OpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key)
-
-MODEL = "google/gemini-2.5-flash"
-MAX_TOOL_ITERATIONS = 4
+# The chat is answered by the VitaNet model only (app/services/ai_client.py: AI_BASE_URL / AI_MODEL / AI_API_KEY).
+MODEL = settings.AI_MODEL
+OFFLINE_REPLY = ("The VitaNet assistant is offline right now, so I can't answer in detail. If you feel very unwell, "
+                 "have a fit, trouble breathing, chest pain, heavy bleeding or a child who cannot drink, go to the "
+                 "nearest hospital now or call 112 / 193. You can still use Assess Symptoms and Find Hospital.")
+MAX_TOOL_ITERATIONS = 5   # e.g. hospitals -> propose_action -> answer
+safety = SafetyLayer()
 
 
 def _build_tools() -> list[dict]:
@@ -54,10 +54,14 @@ def run_agent(
     db: Session, user_id: UUID, user_message: str, image_base64: str | None = None
 ) -> dict:
     chat_service.save_message(db, user_id, MessageRole.USER, content=user_message)
-    user_settings = user_settings_service.get_or_create_settings(db, user_id)
+
+    client = ai_client.get_client()
+    if client is None:   # no model server configured: say so, but still warn about danger signs
+        reply = safety.apply(user_message, OFFLINE_REPLY)
+        chat_service.save_message(db, user_id, MessageRole.ASSISTANT, content=reply)
+        return {"reply": reply, "blocks": [TextBlock(content=reply).model_dump()], "offline": True}
     contents = _history_contents(db, user_id)
-    
-    sys_prompt = build_system_prompt(db, user_id, user_settings)
+    sys_prompt = build_system_prompt()
     messages = [{"role": "system", "content": sys_prompt}] + contents
 
     if image_base64:
@@ -83,6 +87,7 @@ def run_agent(
     blocks: list = []
     tools_used: set[str] = set()
     hospital_result_cache = None
+    proposals: list[dict] = []   # buttons the model asked for with propose_action
 
     try:
         for _ in range(MAX_TOOL_ITERATIONS):
@@ -99,6 +104,9 @@ def run_agent(
 
             if not msg.tool_calls:
                 reply = msg.content or "I'm sorry, I couldn't generate a response just now. Please try again."
+                # danger sign in the user's message and the reply does not open by sending them to hospital:
+                # put one warning line in front (never blocks or rewrites the model's answer)
+                reply = safety.apply(user_message, reply)
                 chat_service.save_message(db, user_id, MessageRole.ASSISTANT, content=reply)
                 blocks.append(TextBlock(content=reply))
                 break
@@ -152,17 +160,19 @@ def run_agent(
                 elif name == "get_nearby_hospitals":
                     hospital_result_cache = result
                     blocks.extend(ai_blocks.blocks_for_hospitals(result))
+                elif name == "propose_action" and isinstance(result, dict) and result.get("status") == "shown_to_user":
+                    proposals.append(result)
         else:
             reply = "I'm sorry, I couldn't complete that request right now. Please try again."
             chat_service.save_message(db, user_id, MessageRole.ASSISTANT, content=reply)
             blocks.append(TextBlock(content=reply))
     except Exception:
         logger.exception("AI chat request failed for user %s", user_id)
-        reply = "I'm having trouble connecting right now. Please try again shortly."
+        reply = safety.apply(user_message, OFFLINE_REPLY)
         chat_service.save_message(db, user_id, MessageRole.ASSISTANT, content=reply)
         blocks.append(TextBlock(content=reply))
 
-    action_block = ai_blocks.build_action_buttons(tools_used, hospital_result_cache)
+    action_block = ai_blocks.build_action_buttons(tools_used, hospital_result_cache, proposals)
     if action_block:
         blocks.append(action_block)
     return {"reply": reply, "blocks": [block.model_dump() for block in blocks]}

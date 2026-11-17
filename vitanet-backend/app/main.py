@@ -1,3 +1,5 @@
+import asyncio
+import logging
 import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
@@ -22,8 +24,11 @@ from app.routes import (
     staff,
     ai_proxy,
     portal,
+    portal_ai,
     portal_live,
     media_proxy,
+    videos,
+    library,
 )
 from app.dependencies.security import DEV_BYPASS_AUTH
 
@@ -44,7 +49,34 @@ async def lifespan(app: FastAPI):
         seed_hospital_data(db)
     finally:
         db.close()
+    sweeper = asyncio.create_task(_alert_sweeper())
+    # health videos: load the saved copy and refresh it from YouTube in the background when it is old
+    from app.services import video_service
+    asyncio.create_task(asyncio.to_thread(video_service.refresh_if_stale))
+    # health library: same idea, rebuilt daily from MedlinePlus and MyHealthfinder
+    from app.services import library_service
+    asyncio.create_task(asyncio.to_thread(library_service.refresh_if_stale))
     yield
+    sweeper.cancel()
+
+
+def _escalate_due_alerts() -> None:
+    from app.services import health_alert_service
+    db = SessionLocal()
+    try:
+        health_alert_service.escalate_due(db)
+    finally:
+        db.close()
+
+
+async def _alert_sweeper():
+    """Every minute: urgent health alerts nobody answered in time go to the care circle (SMS / email)."""
+    while True:
+        try:
+            await asyncio.to_thread(_escalate_due_alerts)
+        except Exception:
+            logging.getLogger(__name__).exception("Alert sweeper failed")
+        await asyncio.sleep(60)
 
 
 app = FastAPI(
@@ -93,8 +125,11 @@ app.include_router(triage.router)
 app.include_router(staff.router)
 app.include_router(ai_proxy.router)
 app.include_router(portal.router)
+app.include_router(portal_ai.router)
 app.include_router(portal_live.router)
 app.include_router(media_proxy.router)
+app.include_router(videos.router)
+app.include_router(library.router)
 
 
 @app.get("/")

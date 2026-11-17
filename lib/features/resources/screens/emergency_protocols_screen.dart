@@ -1,3 +1,4 @@
+import 'package:vitanet/core/layout/breakpoints.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -302,7 +303,7 @@ class _EmergencyProtocolsScreenState extends ConsumerState<EmergencyProtocolsScr
                         const SizedBox(height: 10),
                         LayoutBuilder(
                           builder: (context, constraints) {
-                            final columns = constraints.maxWidth >= 600 ? 3 : 2;
+                            final columns = constraints.maxWidth >= VnBreakpoints.medium ? 3 : 2;
                             final width = (constraints.maxWidth - 10 * (columns - 1)) / columns;
                             return Wrap(
                               spacing: 10,

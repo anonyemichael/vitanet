@@ -1,3 +1,4 @@
+import 'package:vitanet/core/layout/breakpoints.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -44,8 +45,8 @@ class _RoleSelectionScreenState extends ConsumerState<RoleSelectionScreen> {
   Widget build(BuildContext context) {
     final p = VnPalette.of(context);
     final width = MediaQuery.sizeOf(context).width;
-    final isDesktop = width >= 960;
-    final isWideDesktop = width >= 1260;
+    final isDesktop = width >= VnBreakpoints.expanded;
+    final isWideDesktop = width >= VnBreakpoints.large;
 
     if (isDesktop) {
       return Scaffold(

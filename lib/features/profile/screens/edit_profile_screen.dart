@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -66,6 +68,42 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   String? _exercise;
   late List<EmergencyContact> _contacts;
   bool _saving = false;
+  // what the form held when opened / last saved, to show "unsaved changes" (UI/UX audit UX-11)
+  String _saved = '';
+
+  String _fingerprint() => jsonEncode(_build(ref.read(userProfileProvider)).toMap());
+  bool get _dirty => _fingerprint() != _saved;
+  void _onEdit() {
+    if (mounted) setState(() {});
+  }
+
+  void _jumpTo(GlobalKey key) {
+    final ctx = key.currentContext;
+    if (ctx != null) {
+      Scrollable.ensureVisible(ctx, duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic);
+    }
+  }
+
+  Future<bool> _confirmDiscard() async {
+    if (!_dirty) return true;
+    final leave = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Leave without saving?'),
+        content: const Text('Your changes to the medical profile will be lost.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep editing')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Discard')),
+        ],
+      ),
+    );
+    return leave == true;
+  }
+
+  Future<void> _leave() async {
+    if (!await _confirmDiscard() || !mounted) return;
+    context.canPop() ? context.pop() : context.go('/profile');
+  }
 
   @override
   void initState() {
@@ -98,6 +136,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     _alcohol = pr?.alcohol ?? false;
     _exercise = pr?.exerciseFrequency;
     _contacts = List.of(pr?.emergencyContacts ?? const []);
+    _saved = _fingerprint();
+    for (final c in [_name, _phone, _height, _weight]) {
+      c.addListener(_onEdit);
+    }
 
     final target = switch (widget.initialTab) {
       'medical' => _medicalKey,
@@ -161,7 +203,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     setState(() => _saving = true);
     await ref.read(userProfileProvider.notifier).updateProfile(_build(ref.read(userProfileProvider)));
     if (!mounted) return;
-    setState(() => _saving = false);
+    setState(() {
+      _saving = false;
+      _saved = _fingerprint();
+    });
     context.showSnack('Medical profile saved');
     if (context.canPop()) context.pop();
   }
@@ -433,7 +478,12 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
     final conditionOptions = {..._commonConditions, ..._conditions}.toList();
 
-    return Scaffold(
+    return PopScope(
+      canPop: !_dirty,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _leave();
+      },
+      child: Scaffold(
       backgroundColor: p.page,
       body: Column(
         children: [
@@ -452,7 +502,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     icon: Icons.chevron_left_rounded,
                     tooltip: 'Back',
                     iconSize: 26,
-                    onPressed: () => context.canPop() ? context.pop() : context.go('/profile'),
+                    onPressed: _leave,
                   ),
                   const SizedBox(width: 8),
                   Expanded(child: Text('Medical profile', style: VnText.heading(19, color: p.ink))),
@@ -472,6 +522,27 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                                 : const Color(0xFF92400E)))),
                   ),
                 ]),
+              ),
+            ),
+          ),
+          // jump between the four sections of this long form (UX-11)
+          Material(
+            color: p.surface,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: Row(
+                children: [
+                  for (final (label, key) in [
+                    ('Personal', _personalKey),
+                    ('Medical', _medicalKey),
+                    ('Lifestyle', _lifestyleKey),
+                    ('Emergency contacts', _emergencyKey),
+                  ]) ...[
+                    ActionChip(label: Text(label), onPressed: () => _jumpTo(key)),
+                    const SizedBox(width: 8),
+                  ],
+                ],
               ),
             ),
           ),
@@ -820,7 +891,19 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 child: Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 680),
-                    child: VnButton(label: 'Save changes', loading: _saving, onPressed: _save),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          _dirty ? 'You have unsaved changes' : 'All changes saved',
+                          textAlign: TextAlign.center,
+                          style: VnText.body(12.5, weight: FontWeight.w600, color: _dirty ? p.danger : p.muted),
+                        ),
+                        const SizedBox(height: 8),
+                        VnButton(label: 'Save changes', loading: _saving, onPressed: _dirty ? _save : null),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -828,6 +911,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           ),
         ],
       ),
+    ),
     );
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:vitanet/core/constants/app_strings.dart';
+import 'package:vitanet/core/providers/shared_state.dart';
 import 'package:vitanet/core/utils/launch_helpers.dart';
 import 'package:vitanet/data/models/triage_result.dart';
 import 'package:vitanet/data/providers/providers.dart';
@@ -368,6 +369,22 @@ class TriageResultScreen extends ConsumerWidget {
                         'This is guidance, not a diagnosis. Only a clinician can confirm the cause.',
                         style: VnText.body(12, color: p.muted, height: 1.5),
                       ),
+                      if (ref.watch(assessmentPromptProvider) != null) ...[
+                        const SizedBox(height: 16),
+                        // the assessment answers go to the assistant for next steps (UX-03)
+                        VnButton(
+                          label: 'Talk it through with the assistant',
+                          onPressed: () {
+                            final prompt = ref.read(assessmentPromptProvider);
+                            ref.read(assessmentPromptProvider.notifier).state = null;
+                            final container = ProviderScope.containerOf(context, listen: false);
+                            context.go('/chat');
+                            Future.delayed(const Duration(milliseconds: 450), () {
+                              container.read(searchActionProvider.notifier).state = prompt;
+                            });
+                          },
+                        ),
+                      ],
                       const SizedBox(height: 16),
                       Row(
                         children: [

@@ -1,92 +1,64 @@
 """
-app/routes/sms.py
+app/routes/sms_router.py
 
-SMS-to-AI webhook router for Africa's Talking.
+VitaNet by SMS, through Africa's Talking (https://africastalking.com).
 
 Flow:
-1. Contestant texts your short code.
-2. Africa's Talking POSTs the message to this router's /sms/inbound route.
-3. This router sends the text to an AI and gets a reply.
-4. This router sends the AI's reply back via Africa's Talking's SMS API.
+1. Someone texts your short code (no internet needed).
+2. Africa's Talking POSTs the message to /sms/inbound.
+3. We answer "OK" at once, then app/services/sms_service.py works out the reply with the VitaNet model and the
+   safety layer, and texts it back through Africa's Talking.
 
-SETUP:
-1. pip install africastalking python-multipart --break-system-packages
-2. Set AT_USERNAME and AT_API_KEY as environment variables.
-3. Already wired into app/main.py via app.include_router(sms.router).
-4. Run: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-5. In another terminal: ngrok http 8000
-6. Paste https://xxxx.ngrok-free.app/sms/inbound into the Africa's Talking
-   sandbox inbox callback field:
-   https://account.africastalking.com/apps/sandbox/sms/inbox/callback
-7. Test it from the simulator: https://simulator.africastalking.com:1517/
+SETUP (server settings / .env, never in the code):
+  AT_USERNAME        your Africa's Talking app username ("sandbox" for testing)
+  AT_API_KEY         its API key
+  AT_SHORTCODE       your short code or sender id
+  SMS_WEBHOOK_TOKEN  a long random string; the callback URL is then https://<server>/sms/inbound?token=<it>
+  SMS_HASH_SECRET    another long random string (phone numbers are stored only as a hash made with it)
+Paste the callback URL into Africa's Talking: SMS -> Inbox callback URL (sandbox: account.africastalking.com/apps/
+sandbox/sms/inbox/callback) and test with their simulator.
 """
+import hmac
+import logging
 
-import os
-import africastalking
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 
-# ---- CONFIG ----
-AT_USERNAME = os.environ.get("AT_USERNAME", "sandbox")  # "sandbox" for testing
-AT_API_KEY = os.environ.get("AT_API_KEY", "771da6baddf0681f705d0dc96a8c02b5b663b386af865eadbddd0f26cb270e6c6c90be48")
+from app.core.config import settings
+from app.database.connection import SessionLocal
+from app.services import ai_client, sms_service
 
-# Initialize Africa's Talking SDK
-africastalking.initialize(AT_USERNAME, AT_API_KEY)
-sms = africastalking.SMS
-
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/sms", tags=["sms"])
 
 
-def call_ai(message_text: str) -> str:
-    """
-    Replace this with your actual AI call (Anthropic API, OpenAI, etc).
-    Keep replies short -- SMS is limited to 160 characters per segment.
-    """
-    # --- Example using the Anthropic API ---
-    # import requests
-    # response = requests.post(
-    #     "https://api.anthropic.com/v1/messages",
-    #     headers={
-    #         "x-api-key": os.environ["ANTHROPIC_API_KEY"],
-    #         "anthropic-version": "2023-06-01",
-    #         "content-type": "application/json",
-    #     },
-    #     json={
-    #         "model": "claude-sonnet-4-6",
-    #         "max_tokens": 100,
-    #         "messages": [{"role": "user", "content": message_text}],
-    #     },
-    # )
-    # return response.json()["content"][0]["text"]
-
-    # Placeholder response for now, so you can test the plumbing first:
-    return f"Got it! You said: {message_text}"
+def _reply_in_background(phone: str, text: str) -> None:
+    db = SessionLocal()
+    try:
+        reply = sms_service.handle_inbound(db, phone, text)
+    except Exception:
+        logger.exception("SMS reply failed")
+        db.rollback()
+        reply = sms_service.fit_sms(sms_service.safety.apply(text, sms_service.OFFLINE, banners=sms_service.SMS_BANNERS))
+    finally:
+        db.close()
+    if reply:
+        sms_service.send(phone, reply)
 
 
 @router.post("/inbound")
-async def sms_inbound(request: Request):
-    """URL to paste into the Africa's Talking inbox callback field
-    (full path once mounted: /sms/inbound)."""
+async def sms_inbound(request: Request, background_tasks: BackgroundTasks, token: str = ""):
+    """Africa's Talking inbox callback (form fields: from, to, text, date, id, linkId)."""
+    if settings.SMS_WEBHOOK_TOKEN and not hmac.compare_digest(token, settings.SMS_WEBHOOK_TOKEN):
+        raise HTTPException(status_code=403, detail="Bad token")
     form = await request.form()
-    from_number = form.get("from")
-    text = form.get("text")
-
-    print(f"[INBOUND] From {from_number}: {text}")
-
-    if not from_number or not text:
-        return {"error": "Missing data"}
-
-    reply_text = call_ai(text)
-
-    try:
-        response = sms.send(reply_text, [from_number])
-        print(f"[OUTBOUND] To {from_number}: {reply_text}")
-        print(response)
-    except Exception as e:
-        print(f"[ERROR sending SMS] {e}")
-
+    phone, text = (form.get("from") or "").strip(), (form.get("text") or "")
+    if not phone:
+        return {"error": "Missing sender"}
+    background_tasks.add_task(_reply_in_background, phone, text)   # Africa's Talking wants a quick answer
     return "OK"
 
 
 @router.get("/health")
 async def health_check():
-    return {"status": "SMS-to-AI webhook is running."}
+    return {"status": "ok", "model_configured": ai_client.enabled(), "sms_configured": bool(settings.AT_API_KEY),
+            "token_required": bool(settings.SMS_WEBHOOK_TOKEN)}

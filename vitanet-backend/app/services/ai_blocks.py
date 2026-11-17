@@ -1,4 +1,6 @@
 # app/services/ai_blocks.py
+from urllib.parse import quote_plus
+
 from app.schemas.chat_blocks import (
     TextBlock, HospitalRecommendationBlock, VitalCheckLoadingBlock,
     VitalResultBlock, ActionButtonsBlock, ActionButton,
@@ -64,8 +66,36 @@ def blocks_for_hospitals(result) -> list:
         address=top.get("address"),
     )]
 
-def build_action_buttons(tools_used: set[str], hospital_result=None) -> ActionButtonsBlock | None:
+def _url_for(action, hospital):
+    """tel: link for calls, a Google Maps search link for directions (name + address); None otherwise."""
+    if not hospital:
+        return None
+    if action == "call_hospital" and hospital.get("phone_number"):
+        return "tel:" + "".join(c for c in hospital["phone_number"] if c.isdigit() or c == "+")
+    if action == "get_directions":
+        place = " ".join(x for x in (hospital.get("name"), hospital.get("address")) if x)
+        return "https://www.google.com/maps/search/?api=1&query=" + quote_plus(place)
+    return None
+
+
+ACTION_LABELS = {"call_hospital": "Call {name}", "get_directions": "Directions to {name}",
+                 "notify_caregiver": "Send message to {contact}", "emergency_checkin": "Emergency check-in"}
+
+
+def build_action_buttons(tools_used: set[str], hospital_result=None, proposals=None) -> ActionButtonsBlock | None:
+    """Buttons only: nothing happens until the user taps one. Buttons the model proposed (propose_action) come
+    first; the older automatic buttons are added after them without duplicates."""
     buttons = []
+    hospitals = {str(h["id"]): h for h in hospital_result} if isinstance(hospital_result, list) else {}
+    names = {k: h["name"] for k, h in hospitals.items()}
+    for p in proposals or []:
+        target = p.get("hospital_id") or p.get("contact_name")
+        label = ACTION_LABELS[p["action"]].format(name=names.get(str(p.get("hospital_id")), "the hospital"),
+                                                  contact=p.get("contact_name") or "your caregiver")
+        if not any(b.action == p["action"] and b.target_id == target for b in buttons):
+            buttons.append(ActionButton(label=label, action=p["action"], target_id=target,
+                                        url=_url_for(p["action"], hospitals.get(str(p.get("hospital_id"))))))
+    proposed = {b.action for b in buttons}
 
     hospital_available = (
         hospital_result
@@ -75,8 +105,13 @@ def build_action_buttons(tools_used: set[str], hospital_result=None) -> ActionBu
 
     if "get_nearby_hospitals" in tools_used and hospital_available:
         top = hospital_result[0]
-        buttons.append(ActionButton(label=f"Call {top['name']}", action="call_hospital", target_id=str(top["id"])))
-        buttons.append(ActionButton(label="Get Directions", action="get_directions", target_id=str(top["id"])))
+        if "call_hospital" not in proposed:
+            buttons.append(ActionButton(label=f"Call {top['name']}", action="call_hospital", target_id=str(top["id"]),
+                                        url=_url_for("call_hospital", top)))
+        if "get_directions" not in proposed:
+            buttons.append(ActionButton(label="Get Directions", action="get_directions", target_id=str(top["id"]),
+                                        url=_url_for("get_directions", top)))
 
-    buttons.append(ActionButton(label="Notify Caregiver", action="notify_caregiver"))
+    if "notify_caregiver" not in proposed:
+        buttons.append(ActionButton(label="Notify Caregiver", action="notify_caregiver"))
     return ActionButtonsBlock(buttons=buttons) if buttons else None

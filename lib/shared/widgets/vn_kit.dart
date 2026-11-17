@@ -114,8 +114,9 @@ class VnTopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = VnPalette.of(context);
-    return SizedBox(
-      height: 48,
+    // at least 48 px, taller when the phone's text is large (UX-14)
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 48),
       child: Row(
         children: [
           if (showBack) ...[
@@ -468,7 +469,14 @@ class VnListRow extends StatelessWidget {
               ),
               if (value != null) ...[
                 const SizedBox(width: 8),
-                Text(value!, style: VnText.body(14, color: p.muted)),
+                // may shrink and wrap so a long value never pushes the row off the screen (UX-14)
+                Flexible(
+                  child: Text(value!,
+                      textAlign: TextAlign.end,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: VnText.body(14, color: p.muted)),
+                ),
               ],
               if (trailing != null) ...[const SizedBox(width: 8), trailing!],
               if (chevron && onTap != null) ...[

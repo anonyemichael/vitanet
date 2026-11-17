@@ -77,6 +77,13 @@ class HealthArticle {
   final String? publishedDate;
   final List<String> meshHeadings;
 
+  /// Where the article was published (MedlinePlus / MyHealthfinder page), shown as "Read the original".
+  final String? sourceUrl;
+
+  /// Photo credit and its page (Pexels asks for both), e.g. "Photo: Ama Mensah / Pexels".
+  final String? imageCredit;
+  final String? imageCreditUrl;
+
   // Convenient property getters requested for Clean Clinical Repository
   String get source => verifiedSource;
   String get snippet => excerpt;
@@ -103,6 +110,9 @@ class HealthArticle {
     this.doi,
     this.publishedDate,
     this.meshHeadings = const [],
+    this.sourceUrl,
+    this.imageCredit,
+    this.imageCreditUrl,
   })  : verifiedSource = verifiedSource ?? source ?? 'Europe PMC • Peer Reviewed',
         excerpt = excerpt ?? snippet ?? '';
 
@@ -125,6 +135,9 @@ class HealthArticle {
     String? doi,
     String? publishedDate,
     List<String>? meshHeadings,
+    String? sourceUrl,
+    String? imageCredit,
+    String? imageCreditUrl,
   }) {
     return HealthArticle(
       id: id ?? this.id,
@@ -145,6 +158,9 @@ class HealthArticle {
       doi: doi ?? this.doi,
       publishedDate: publishedDate ?? this.publishedDate,
       meshHeadings: meshHeadings ?? this.meshHeadings,
+      sourceUrl: sourceUrl ?? this.sourceUrl,
+      imageCredit: imageCredit ?? this.imageCredit,
+      imageCreditUrl: imageCreditUrl ?? this.imageCreditUrl,
     );
   }
 
@@ -198,6 +214,9 @@ class HealthArticle {
       meshHeadings: json['mesh_headings'] != null
           ? List<String>.from(json['mesh_headings'])
           : (json['meshHeadings'] != null ? List<String>.from(json['meshHeadings']) : const []),
+      sourceUrl: json['source_url'] as String?,
+      imageCredit: json['image_credit'] as String?,
+      imageCreditUrl: json['image_credit_url'] as String?,
     );
   }
 }

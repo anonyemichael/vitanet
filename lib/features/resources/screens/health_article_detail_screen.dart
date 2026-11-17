@@ -236,11 +236,22 @@ class _HealthArticleDetailScreenState extends State<HealthArticleDetailScreen> {
                           ),
                         ),
                       ),
+                      if (a.imageCredit != null && photo.url.isNotEmpty)
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: a.imageCreditUrl == null
+                                ? null
+                                : () => LaunchHelpers.openWeb(context, a.imageCreditUrl!),
+                            child: Text(a.imageCredit!, style: VnText.body(11.5 * s, color: p.muted)),
+                          ),
+                        ),
                       if (a.keyTakeaways.isNotEmpty) ...[
                         const SizedBox(height: 16),
                         _KeyPoints(points: a.keyTakeaways, scale: s),
                       ],
-                      if (a.excerpt.isNotEmpty) ...[
+                      // library articles start with their first section, which already holds the preview text
+                      if (a.excerpt.isNotEmpty && a.sourceUrl == null) ...[
                         const SizedBox(height: 16),
                         Text(a.excerpt, style: VnText.body(16 * s, color: bodyColor, height: 1.75)),
                       ],
@@ -256,6 +267,20 @@ class _HealthArticleDetailScreenState extends State<HealthArticleDetailScreen> {
                       if (a.mythVsFact != null) ...[
                         const SizedBox(height: 16),
                         _PullQuote(myth: a.mythVsFact!.myth, fact: a.mythVsFact!.fact, scale: s),
+                      ],
+                      if (a.sourceUrl != null && a.sourceUrl!.isNotEmpty) ...[
+                        const SizedBox(height: 20),
+                        Text('Source: ${a.verifiedSource}. Reused with credit; not medical advice for you '
+                            'personally. If you are worried, ask a health worker.',
+                            style: VnText.body(13 * s, color: p.muted, height: 1.5)),
+                        const SizedBox(height: 12),
+                        VnOutlineButton(
+                          label: 'Read the original',
+                          icon: Icons.open_in_new_rounded,
+                          foreground: p.brand,
+                          borderColor: p.brand,
+                          onPressed: () => LaunchHelpers.openWeb(context, a.sourceUrl!),
+                        ),
                       ],
                       if (a.doi != null && a.doi!.isNotEmpty) ...[
                         const SizedBox(height: 16),

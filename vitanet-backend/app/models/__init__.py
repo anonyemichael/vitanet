@@ -20,3 +20,4 @@ from app.models.portal import (
     PortalWard,
     Referral,
 )
+from app.models.sms import SmsContact, SmsMessage

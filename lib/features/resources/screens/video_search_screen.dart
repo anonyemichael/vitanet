@@ -87,21 +87,16 @@ class _VideoSearchScreenState extends ConsumerState<VideoSearchScreen> {
       return;
     }
     setState(() => _loading = true);
-    List<ClinicalVideo> videos = [];
+    List<ClinicalVideo> videos = [], shorts = [];
     try {
-      final res = await ClinicalVideoRepository.fetchMasterclasses(
-        pageIndex: 0,
-        pageSize: 20,
-        searchQuery: q,
-      );
-      videos = List.of(res.videos);
+      // videos and shorts from the trusted catalogue on the backend, fetched together
+      final both = await Future.wait([
+        ClinicalVideoRepository.fetchMasterclasses(pageIndex: 0, pageSize: 20, searchQuery: q),
+        ClinicalVideoRepository.fetchShorts(searchQuery: q),
+      ]);
+      videos = List.of(both[0].videos);
+      shorts = List.of(both[1].videos);
     } catch (_) {}
-    final lower = q.toLowerCase();
-    final shorts = ClinicalVideoRepository.verifiedShorts.where((v) =>
-        v.title.toLowerCase().contains(lower) ||
-        v.channelName.toLowerCase().contains(lower) ||
-        v.category.toLowerCase().contains(lower) ||
-        v.keyTakeaways.any((k) => k.toLowerCase().contains(lower)));
     final seen = <String>{};
     final merged = [...videos, ...shorts].where((v) => seen.add('${v.youtubeId}_${v.isShort}')).toList();
     if (!mounted || q != _query) return;

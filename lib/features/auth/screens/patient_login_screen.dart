@@ -1,3 +1,4 @@
+import 'package:vitanet/core/layout/breakpoints.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
@@ -139,7 +140,7 @@ class _PatientLoginScreenState extends ConsumerState<PatientLoginScreen> {
     final authState = ref.watch(authProvider);
     final isLoading = authState.status == AuthStatus.loading || _isFetchingProfile;
     final width = MediaQuery.sizeOf(context).width;
-    final isDesktop = width >= 960;
+    final isDesktop = width >= VnBreakpoints.expanded;
 
     if (isDesktop) {
       return Scaffold(

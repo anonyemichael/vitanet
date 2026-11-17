@@ -85,6 +85,9 @@ class LiveVitalsNotifier extends StateNotifier<Map<String, double>> {
     state = {...state, metricId: value};
   }
 
+  /// Forget every reading (device disconnected, signed out).
+  void clear() => state = const {};
+
   void connectDevice(String metricId) {
     // Real data will be fetched/streamed instead of simulating.
   }
@@ -140,16 +143,18 @@ final userProfileProvider =
       final storage = ref.watch(localStorageProvider);
       final firestore = ref.watch(firestoreServiceProvider);
       final authState = ref.watch(authProvider);
-      return UserProfileNotifier(storage, firestore, authState.user?.uid);
+      return UserProfileNotifier(storage, firestore, authState.user?.uid, ref.read(apiServiceProvider));
     });
 
 class UserProfileNotifier extends StateNotifier<UserProfile?> {
   final LocalStorageService _storage;
   final FirestoreService _firestore;
   final String? _userId;
+  final ApiService _api;
 
-  UserProfileNotifier(this._storage, this._firestore, this._userId) 
+  UserProfileNotifier(this._storage, this._firestore, this._userId, this._api)
       : super(_storage.getProfile()) {
+    _contactsSeen = _contactsKey(state);
     _init();
   }
 
@@ -164,6 +169,27 @@ class UserProfileNotifier extends StateNotifier<UserProfile?> {
         }
       }
     }
+    final p = state;
+    _contactsSeen = _contactsKey(p);
+    if (p != null && p.name.isNotEmpty) _syncToBackend(p);   // profiles saved before this existed
+  }
+
+  /// The contact list as last loaded or saved, to tell when the person changed it.
+  String _contactsSeen = '';
+  static String _contactsKey(UserProfile? p) =>
+      (p?.emergencyContacts ?? const []).map((c) => '${c.name}|${c.phone}|${c.email}').join(';');
+
+  /// The assistant's tools read the profile and location from the backend, not from Firestore,
+  /// so every save is copied there too (in the background; the app never waits for it).
+  void _syncToBackend(UserProfile profile) {
+    final uid = _userId;
+    if (uid == null || Firebase.apps.isEmpty) return;
+    final key = _contactsKey(profile);
+    final edited = key != _contactsSeen;      // only a real edit may remove care-circle contacts
+    _contactsSeen = key;
+    _api.syncProfile(uid, profile, replaceContacts: edited);
+    final lat = profile.latitude, lng = profile.longitude;
+    if (lat != null && lng != null) _api.putLocation(uid, lat, lng);
   }
 
   Future<void> updateProfile(UserProfile profile) async {
@@ -179,6 +205,7 @@ class UserProfileNotifier extends StateNotifier<UserProfile?> {
       _firestore.saveUserProfile(uid, profile).catchError((e) {
         debugPrint('Failed to sync profile to firestore: $e');
       });
+      _syncToBackend(profile);
     }
   }
 
@@ -230,6 +257,27 @@ class ChatMessagesNotifier extends StateNotifier<List<ChatMessage>> {
             actions: msg.actions,
             widgetType: msg.widgetType,
             widgetPayload: msg.widgetPayload,
+            quickReplies: msg.quickReplies,
+          )
+        else
+          msg
+    ];
+  }
+
+  /// Adds the buttons / card that came with an assistant reply (call a hospital, directions, ...).
+  void attachExtras(String id, {List<ChatAction>? actions, String? widgetType, Map<String, dynamic>? widgetPayload}) {
+    state = [
+      for (final msg in state)
+        if (msg.id == id)
+          ChatMessage(
+            id: msg.id,
+            role: msg.role,
+            text: msg.text,
+            timestamp: msg.timestamp,
+            imagePath: msg.imagePath,
+            actions: (actions == null || actions.isEmpty) ? msg.actions : actions,
+            widgetType: widgetType ?? msg.widgetType,
+            widgetPayload: widgetPayload ?? msg.widgetPayload,
             quickReplies: msg.quickReplies,
           )
         else

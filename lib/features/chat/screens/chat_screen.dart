@@ -1,3 +1,4 @@
+import 'package:vitanet/core/layout/breakpoints.dart';
 import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -13,6 +14,7 @@ import 'package:vitanet/core/providers/shared_state.dart';
 import 'package:vitanet/core/utils/launch_helpers.dart';
 import 'package:vitanet/data/models/chat_message.dart';
 import 'package:vitanet/data/providers/providers.dart';
+import 'package:vitanet/data/services/vitals_sync.dart';
 import 'package:vitanet/data/services/voice_service.dart';
 
 import 'package:vitanet/features/chat/widgets/ai_message_card.dart';
@@ -281,6 +283,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       }
     }
 
+    // Send the newest watch reading first, so the assistant answers with it (at most 4 s wait).
+    try {
+      await ref.read(vitalsSyncProvider).syncNow().timeout(const Duration(seconds: 4));
+    } catch (_) {}
+
     final aiService = ref.read(aiServiceProvider);
     final stream = aiService.getResponseStream(
       query.isEmpty ? 'Please analyze this clinical report or image in detail.' : query,
@@ -310,6 +317,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     if (isFirst) {
       ref.read(isAiTypingProvider.notifier).state = false;
+    } else if (aiService.lastActions.isNotEmpty || aiService.lastWidgetType != null) {
+      ref.read(chatMessagesProvider.notifier).attachExtras(
+            responseId,
+            actions: aiService.lastActions,
+            widgetType: aiService.lastWidgetType,
+            widgetPayload: aiService.lastWidgetPayload,
+          );
     }
 
     if (isVoice && fullResponse.isNotEmpty) {
@@ -1038,7 +1052,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final p = VnPalette.of(context);
     final isDark = p.isDark;
     final keyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
-    final isDesktop = MediaQuery.sizeOf(context).width >= 800;
+    final isDesktop = VnBreakpoints.isExpanded(context);
     // Leave room for the shell's floating bottom navigation bar without layout thrashing.
     final navInset =
         (!isDesktop && !keyboardOpen && !Navigator.of(context).canPop()) ? 74.0 : 0.0;

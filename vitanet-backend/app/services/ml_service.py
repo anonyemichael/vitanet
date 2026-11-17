@@ -142,38 +142,54 @@ class MLService:
                 logger.warning("Could not read disease_diagnosis.csv: %s", e)
 
     def is_ready(self) -> bool:
+        """Rules and the knowledge base are code, so always available (there is no model file to load)."""
         return True
 
     def predict_triage(
         self,
         symptoms: List[str],
-        age: int = 40,
-        gender: str = "M",
-        heart_rate: float = 80.0,
-        temperature: float = 37.0,
-        blood_oxygen: float = 98.0,
-        systolic_bp: float = 120.0,
-        diastolic_bp: float = 80.0,
+        age: Optional[int] = None,
+        gender: Optional[str] = None,
+        heart_rate: Optional[float] = None,
+        temperature: Optional[float] = None,
+        blood_oxygen: Optional[float] = None,
+        systolic_bp: Optional[float] = None,
+        diastolic_bp: Optional[float] = None,
+        pain: Optional[int] = None,
+        duration_days: Optional[int] = None,
+        risk_factors: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
-        """Perform combined disease inference and clinical severity triage."""
+        """Perform combined disease inference and clinical severity triage.
+
+        Vitals are optional and only MEASURED values are judged. A vital that was not measured is never replaced
+        by a "normal" default (the old defaults of HR 80, SpO2 98, BP 120/80 made unmeasured patients look healthy)."""
         norm_symptoms = [s.strip().lower().replace(" ", "_").replace("-", "_") for s in symptoms if s.strip()]
 
-        # 1. Determine Physiological Vital Severity
+        def lt(v, x):
+            return v is not None and v < x
+
+        def ge(v, x):
+            return v is not None and v >= x
+
+        def gt(v, x):
+            return v is not None and v > x
+
+        # 1. Determine Physiological Vital Severity (measured vitals only)
         is_urgent_vitals = (
-            blood_oxygen < 92.0 or
-            heart_rate > 120.0 or
-            heart_rate < 45.0 or
-            systolic_bp >= 165.0 or
-            diastolic_bp >= 105.0 or
-            temperature >= 39.5
+            lt(blood_oxygen, 92.0) or
+            gt(heart_rate, 120.0) or
+            lt(heart_rate, 45.0) or
+            ge(systolic_bp, 165.0) or
+            ge(diastolic_bp, 105.0) or
+            ge(temperature, 39.5)
         )
         is_doctor_vitals = (
-            blood_oxygen < 95.0 or
-            heart_rate > 100.0 or
-            heart_rate < 55.0 or
-            systolic_bp >= 140.0 or
-            diastolic_bp >= 90.0 or
-            temperature >= 38.0
+            lt(blood_oxygen, 95.0) or
+            gt(heart_rate, 100.0) or
+            lt(heart_rate, 55.0) or
+            ge(systolic_bp, 140.0) or
+            ge(diastolic_bp, 90.0) or
+            ge(temperature, 38.0)
         )
 
         has_critical_symptoms = any(
@@ -207,26 +223,57 @@ class MLService:
                 "precautions": ["Rest quietly in a comfortable setting", "Maintain adequate hydration", "Observe for developing symptoms"],
                 "recommendation": "Consult a healthcare provider if symptoms persist or worsen."
             }
-            confidence_val = 88.5
+        # Honest strength of the match (audit F-02): how many of the condition's listed symptoms were reported.
+        # These are rules, not a trained model, so no made-up percentages.
+        if best_score <= 0 or best_meta is None or best_disease == "Clinical observation presentation":
+            match = "no clear match"
+        elif best_score >= 60:
+            match = "strong match"
+        elif best_score >= 30:
+            match = "partial match"
         else:
-            confidence_val = min(96.5, max(82.0, 75.0 + best_score * 0.25))
+            match = "weak match"
 
-        # 3. Final Severity Resolution
+        # 3. Final Severity Resolution, with the rule that decided it
         if is_urgent_vitals or has_critical_symptoms or best_meta["severity"] == "urgent":
             resolved_severity = "urgent"
-            severity_conf = "95.5%"
+            severity_reason = ("a measured reading is in the danger range" if is_urgent_vitals else
+                               "a danger-sign symptom was reported" if has_critical_symptoms else
+                               "the matched condition is urgent")
         elif is_doctor_vitals or best_meta["severity"] == "doctor":
             resolved_severity = "doctor"
-            severity_conf = "89.0%"
+            severity_reason = ("a measured reading is outside the normal range" if is_doctor_vitals else
+                               "the matched condition needs a clinician")
         else:
             resolved_severity = "routine"
-            severity_conf = "91.2%"
+            severity_reason = "no danger sign or abnormal reading was reported"
+
+        # 4. The rest of the guided assessment (audit F-04). These only RAISE the urgency, never lower it.
+        # REVIEW (clinical reviewer): thresholds below.
+        rank = {"routine": 0, "doctor": 1, "urgent": 2}
+
+        def raise_to(level, reason):
+            nonlocal resolved_severity, severity_reason
+            if rank[level] > rank[resolved_severity]:
+                resolved_severity, severity_reason = level, reason
+
+        fever = "fever" in norm_symptoms or "high_fever" in norm_symptoms or ge(temperature, 38.0)
+        if fever and any(s in norm_symptoms for s in ("stiff_neck", "confusion", "altered_sensorium")):
+            raise_to("urgent", "fever with a stiff neck or confusion can be meningitis or severe malaria")
+        if pain is not None and pain >= 8:
+            raise_to("doctor", f"severe pain ({pain}/10)")
+        if duration_days is not None and duration_days >= 14:
+            raise_to("doctor", "symptoms for two weeks or more need a clinician's check")
+        risks = [r.lower() for r in (risk_factors or [])]
+        if risks and (norm_symptoms or pain):
+            raise_to("doctor", f"risk factor: {(risk_factors or [''])[0]}")
 
         return {
             "disease": best_disease,
-            "confidence": f"{confidence_val:.1f}%",
+            "confidence": match,                    # kept field name for the app; now a plain description
             "severity": resolved_severity,
-            "severity_confidence": severity_conf,
+            "severity_confidence": severity_reason,
+            "method": "rules-based symptom checker (not a trained model, not a diagnosis)",
             "description": best_meta["description"],
             "precautions": best_meta["precautions"],
             "recommendation": best_meta["recommendation"]
