@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vitanet/core/providers/shared_state.dart';
 import 'package:vitanet/shared/widgets/vitanet_logo.dart';
 import 'package:vitanet/shared/widgets/vn_kit.dart';
+import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
 import '../models/clinical_video.dart';
 import '../widgets/resource_media.dart';
@@ -61,6 +62,11 @@ class _VideoTutorialsScreenState extends ConsumerState<VideoTutorialsScreen> {
   int _tab = 0; // 0 Home, 2 Channels, 3 Saved (Shorts opens full screen)
 
   List<ClinicalVideo> _videos = [];
+  List<ClinicalVideo> _shortsFeed = []; // real shorts from the backend for the current topic
+  // A hidden player that downloads YouTube's player code once while the list is read, so the first video
+  // tapped starts faster (the phone's web view keeps that code). Closed after 30 s.
+  YoutubePlayerController? _warmUp;
+  String? _shortsNext;
   bool _isLoadingInitial = true;
   bool _isLoadingMore = false;
   bool _hasMore = true;
@@ -74,12 +80,39 @@ class _VideoTutorialsScreenState extends ConsumerState<VideoTutorialsScreen> {
     _topic = _topics.contains(widget.initialTopic) ? widget.initialTopic : 'All';
     _loadInitialVideos();
     _scrollController.addListener(_onScroll);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _startWarmUp());
+  }
+
+  void _startWarmUp() {
+    if (!mounted || _warmUp != null) return;
+    setState(() {
+      _warmUp = YoutubePlayerController.fromVideoId(
+        videoId: ClinicalVideoRepository.verifiedMasterclasses.first.youtubeId,
+        autoPlay: false,
+        params: const YoutubePlayerParams(
+          mute: true,
+          showControls: false,
+          privacyEnhancedMode: true,
+          origin: 'https://www.youtube-nocookie.com',
+        ),
+      );
+    });
+    Future.delayed(const Duration(seconds: 30), _stopWarmUp);
+  }
+
+  void _stopWarmUp() {
+    final c = _warmUp;
+    if (c == null) return;
+    if (mounted) setState(() => _warmUp = null);
+    c.close().catchError((Object _) {});
   }
 
   @override
   void dispose() {
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
+    _warmUp?.close().catchError((Object _) {});
+    _warmUp = null;
     super.dispose();
   }
 
@@ -96,6 +129,7 @@ class _VideoTutorialsScreenState extends ConsumerState<VideoTutorialsScreen> {
       _currentPage = 0;
       _hasMore = true;
     });
+    _loadShorts();
     try {
       final res = await ClinicalVideoRepository.fetchMasterclasses(
         pageIndex: 0,
@@ -118,6 +152,18 @@ class _VideoTutorialsScreenState extends ConsumerState<VideoTutorialsScreen> {
         _isLoadingInitial = false;
       });
     }
+  }
+
+  Future<void> _loadShorts() async {
+    final topic = _topic;
+    try {
+      final res = await ClinicalVideoRepository.fetchShorts(category: _category);
+      if (!mounted || topic != _topic) return;
+      setState(() {
+        _shortsFeed = res.videos;
+        _shortsNext = res.hasMore ? res.nextPageToken : null;
+      });
+    } catch (_) {}
   }
 
   Future<void> _fetchMoreVideos() async {
@@ -186,6 +232,9 @@ class _VideoTutorialsScreenState extends ConsumerState<VideoTutorialsScreen> {
   }
 
   List<ClinicalVideo> get _shorts {
+    if (_shortsFeed.isNotEmpty) {
+      return _shortsFeed.where((v) => !_store.isHidden(v.youtubeId) && _matchesTopicKeywords(v)).toList();
+    }
     var list = ClinicalVideoRepository.verifiedShorts.where((v) => !_store.isHidden(v.youtubeId));
     final cat = _topicCategory[_topic];
     if (cat != null) {
@@ -203,8 +252,16 @@ class _VideoTutorialsScreenState extends ConsumerState<VideoTutorialsScreen> {
   void _openShorts({int initialIndex = 0, List<ClinicalVideo>? list}) {
     final shorts = list ?? _shorts;
     final source = shorts.isEmpty ? ClinicalVideoRepository.verifiedShorts : shorts;
+    final paging = list == null && shorts.isNotEmpty; // the topic feed can keep loading more
     Navigator.of(context, rootNavigator: true).push(
-      MaterialPageRoute(builder: (_) => VideoShortsScreen(shorts: source, initialIndex: initialIndex)),
+      MaterialPageRoute(
+        builder: (_) => VideoShortsScreen(
+          shorts: source,
+          initialIndex: initialIndex,
+          category: paging ? _category : null,
+          nextPageToken: paging ? _shortsNext : null,
+        ),
+      ),
     );
   }
 
@@ -281,6 +338,23 @@ class _VideoTutorialsScreenState extends ConsumerState<VideoTutorialsScreen> {
   @override
   Widget build(BuildContext context) {
     final p = VnPalette.of(context);
+    final warm = _warmUp;
+    return Stack(
+      children: [
+        _buildScaffold(p),
+        if (warm != null)
+          Positioned(
+            left: 0,
+            top: 0,
+            width: 2,
+            height: 2,
+            child: IgnorePointer(child: Opacity(opacity: 0, child: YoutubePlayer(controller: warm))),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildScaffold(VnPalette p) {
     return Scaffold(
       backgroundColor: p.surface,
       body: SafeArea(

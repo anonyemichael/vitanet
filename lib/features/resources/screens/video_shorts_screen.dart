@@ -25,7 +25,13 @@ class VideoShortsScreen extends StatefulWidget {
   final List<ClinicalVideo> shorts;
   final int initialIndex;
 
-  const VideoShortsScreen({super.key, required this.shorts, this.initialIndex = 0});
+  /// Topic the feed came from and the backend cursor of the next page: when given, more shorts are loaded as
+  /// you reach the end instead of starting again from the first one.
+  final String? category;
+  final String? nextPageToken;
+
+  const VideoShortsScreen({super.key, required this.shorts, this.initialIndex = 0, this.category,
+      this.nextPageToken});
 
   @override
   State<VideoShortsScreen> createState() => _VideoShortsScreenState();
@@ -34,7 +40,10 @@ class VideoShortsScreen extends StatefulWidget {
 class _VideoShortsScreenState extends State<VideoShortsScreen> {
   late final PageController _pageController;
   ShortsPlayback? _playback;
-  StreamSubscription<YoutubePlayerValue>? _stateSub;
+  final List<StreamSubscription<YoutubePlayerValue>> _stateSubs = [];
+  late final List<ClinicalVideo> _feed = List.of(widget.shorts);
+  late String? _nextToken = widget.nextPageToken;
+  bool _loadingMore = false;
   final _store = VideoEngagementStore.instance;
   int _current = 0;
   bool _isMuted = true;
@@ -50,24 +59,35 @@ class _VideoShortsScreenState extends State<VideoShortsScreen> {
     super.initState();
     _current = widget.initialIndex.clamp(0, widget.shorts.isEmpty ? 0 : widget.shorts.length - 1);
     _pageController = PageController(initialPage: _current);
-    if (widget.shorts.isNotEmpty) {
-      final playback = ShortsPlayback(shorts: widget.shorts, initialIndex: _current);
+    if (_feed.isNotEmpty) {
+      final playback = ShortsPlayback(shorts: _feed, initialIndex: _current);
       _playback = playback;
-      _stateSub = playback.controller.stream.listen(_onPlayerValue);
+      for (var i = 0; i < playback.players.length; i++) {
+        _stateSubs.add(playback.players[i].stream.listen((v) => _onPlayerValue(i, v)));
+      }
+      _maybeLoadMore(_current);
     }
   }
 
   @override
   void dispose() {
-    _stateSub?.cancel();
+    for (final sub in _stateSubs) {
+      sub.cancel();
+    }
     _playback?.dispose();
     _pageController.dispose();
     super.dispose();
   }
 
-  void _onPlayerValue(YoutubePlayerValue value) {
+  void _onPlayerValue(int player, YoutubePlayerValue value) {
     if (!mounted) return;
     final state = value.playerState;
+    final playback = _playback;
+    if (playback == null) return;
+    if (player != playback.activePlayer) {
+      playback.onPlayerState(player, state); // the hidden player loading the next clip
+      return;
+    }
     if (state == PlayerState.ended) {
       _playback?.replay();
       return;
@@ -86,6 +106,26 @@ class _VideoShortsScreenState extends State<VideoShortsScreen> {
     _playback
       ?..show(index)
       ..setMuted(_isMuted);
+    _maybeLoadMore(index);
+  }
+
+  /// Near the end of the list: fetch the next page of shorts from the same topic.
+  Future<void> _maybeLoadMore(int index) async {
+    final token = _nextToken;
+    if (_loadingMore || token == null || index < _feed.length - 3) return;
+    _loadingMore = true;
+    try {
+      final res = await ClinicalVideoRepository.fetchShorts(category: widget.category, pageToken: token);
+      if (!mounted) return;
+      final known = _feed.map((v) => v.youtubeId).toSet();
+      setState(() {
+        _feed.addAll(res.videos.where((v) => known.add(v.youtubeId)));
+        _nextToken = res.hasMore ? res.nextPageToken : null;
+      });
+    } catch (_) {
+    } finally {
+      _loadingMore = false;
+    }
   }
 
   bool _onScroll(ScrollNotification n) {
@@ -218,13 +258,25 @@ class _VideoShortsScreenState extends State<VideoShortsScreen> {
             : Stack(
                 fit: StackFit.expand,
                 children: [
-                  // The one player, fixed in place under the feed.
-                  Center(
-                    child: AspectRatio(
-                      aspectRatio: 9 / 16,
-                      child: YoutubePlayer(controller: playback.controller, aspectRatio: 9 / 16),
+                  // Two players fixed in place under the feed: the visible one plays, the hidden one has the
+                  // next clip loaded and paused, so a swipe starts it at once.
+                  for (var i = 0; i < playback.players.length; i++)
+                    IgnorePointer(
+                      ignoring: i != playback.activePlayer,
+                      child: Opacity(
+                        opacity: i == playback.activePlayer ? 1 : 0,
+                        child: Center(
+                          child: AspectRatio(
+                            aspectRatio: 9 / 16,
+                            child: YoutubePlayer(
+                              key: ValueKey('shorts-player-$i'),
+                              controller: playback.players[i],
+                              aspectRatio: 9 / 16,
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
                   // On the web the player is an iframe that would swallow
                   // every swipe and tap; the interceptor keeps them in Flutter.
                   PointerInterceptor(
@@ -237,7 +289,9 @@ class _VideoShortsScreenState extends State<VideoShortsScreen> {
                           scrollDirection: Axis.vertical,
                           controller: _pageController,
                           onPageChanged: _onPageChanged,
-                          itemBuilder: (context, index) => _buildShort(playback.videoAt(index), index),
+                          // no wrap-around: the feed ends (or grows) instead of repeating the same clips
+                          itemCount: _feed.length,
+                          itemBuilder: (context, index) => _buildShort(_feed[index], index),
                         ),
                       ),
                     ),
@@ -386,7 +440,7 @@ class _VideoShortsScreenState extends State<VideoShortsScreen> {
                         ),
                       ),
                       Text(
-                        '${index + 1}/${widget.shorts.length}',
+                        '${index + 1}/${_feed.length}${_nextToken != null ? '+' : ''}',
                         style: VnText.body(11, weight: FontWeight.w600, color: Colors.white70),
                       ),
                     ],

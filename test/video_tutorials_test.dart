@@ -1,8 +1,13 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vitanet/features/resources/models/clinical_video.dart';
 import 'package:vitanet/features/resources/screens/video_library_screen.dart';
+import 'package:vitanet/features/resources/widgets/shorts_controller_pool.dart';
 import 'package:vitanet/shared/widgets/liquid_glass.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
@@ -36,6 +41,12 @@ class FakeYoutubePlayerController extends Fake implements YoutubePlayerControlle
   Future<void> close() async {
     closed = true;
   }
+
+  @override
+  Future<void> mute() async {}
+
+  @override
+  Future<void> unMute() async {}
 }
 
 void main() {
@@ -97,83 +108,129 @@ void main() {
     });
   });
 
-  group('ClinicalVideoRepository Hybrid & Caching Tests', () {
-    test('Initial page loads 10 masterclasses immediately from verified dataset', () async {
-      final res = await ClinicalVideoRepository.fetchMasterclasses(
-        pageIndex: 0,
-        pageSize: 10,
-      );
+  group('ClinicalVideoRepository (backend feed + fallback)', () {
+    Map<String, dynamic> vid(String id, {bool short = false, int views = 12345}) => {
+          'id': id,
+          'title': 'How to treat a burn &amp; scald',
+          'channel': 'NHS',
+          'category': 'Trauma',
+          'duration_s': short ? 45 : 130,
+          'is_short': short,
+          'views': views,
+          'published_at': DateTime.now().subtract(const Duration(days: 3)).toIso8601String(),
+          'takeaways': ['Cool the burn under running water for 20 minutes'],
+          'verified': true,
+        };
 
-      expect(res.videos.length, equals(10));
-      expect(res.hasMore, isTrue);
-      expect(res.nextPageToken, isNotNull);
+    test('Reads real videos from the backend, maps them and caches the page', () async {
+      final asked = <Uri>[];
+      final client = MockClient((req) async {
+        asked.add(req.url);
+        return http.Response(jsonEncode({'videos': [vid('a1'), vid('a2')], 'next_cursor': 2}), 200);
+      });
+      await http.runWithClient(() async {
+        final r1 = await ClinicalVideoRepository.fetchMasterclasses(pageIndex: 0, pageSize: 2, category: 'Trauma');
+        final r2 = await ClinicalVideoRepository.fetchMasterclasses(pageIndex: 0, pageSize: 2, category: 'Trauma');
+        expect(identical(r1.videos, r2.videos), isTrue); // second call from memory
+        expect(asked, hasLength(1));
+        expect(asked.single.path, endsWith('videos/feed'));
+        expect(asked.single.queryParameters, containsPair('topic', 'Trauma'));
+        expect(asked.single.queryParameters, containsPair('kind', 'long'));
+        final v = r1.videos.first;
+        expect(v.title, 'How to treat a burn & scald');
+        expect(v.formattedDuration, '2:10');
+        expect(v.viewsCount, '12K views');
+        expect(v.publishedAgo, '3d ago');
+        expect(v.isVerifiedChannel, isTrue);
+        expect(r1.nextPageToken, '2');
+        expect(r1.hasMore, isTrue);
+      }, () => client);
     });
 
-    test('In-memory caching prevents duplicate fetches for same search query', () async {
-      final res1 = await ClinicalVideoRepository.fetchMasterclasses(
-        pageIndex: 0,
-        pageSize: 5,
-        searchQuery: 'cpr',
-      );
-
-      final res2 = await ClinicalVideoRepository.fetchMasterclasses(
-        pageIndex: 0,
-        pageSize: 5,
-        searchQuery: 'cpr',
-      );
-
-      // Verify identical list instances returned from in-memory cache (0 API quota cost)
-      expect(identical(res1.videos, res2.videos), isTrue);
-      expect(res1.videos.isNotEmpty, isTrue);
+    test('Search and shorts go to the right backend routes', () async {
+      final asked = <Uri>[];
+      final client = MockClient((req) async {
+        asked.add(req.url);
+        return http.Response(jsonEncode({'videos': [vid('s1', short: true)], 'next_cursor': null}), 200);
+      });
+      await http.runWithClient(() async {
+        final r = await ClinicalVideoRepository.fetchShorts(searchQuery: 'burns');
+        expect(r.videos.single.isShort, isTrue);
+        expect(r.hasMore, isFalse);
+      }, () => client);
+      expect(asked.single.path, endsWith('videos/search'));
+      expect(asked.single.queryParameters, containsPair('q', 'burns'));
+      expect(asked.single.queryParameters, containsPair('kind', 'short'));
     });
 
-    test('Filters videos by category correctly', () async {
-      final res = await ClinicalVideoRepository.fetchMasterclasses(
-        pageIndex: 0,
-        pageSize: 10,
-        category: 'First Aid & CPR',
-      );
-
-      expect(res.videos.isNotEmpty, isTrue);
-      for (final v in res.videos) {
-        expect(v.category, equals('First Aid & CPR'));
-      }
+    test('Backend down: the hand-checked videos, listed once (no endless repeats)', () async {
+      final client = MockClient((req) async => http.Response('down', 503));
+      await http.runWithClient(() async {
+        final seen = <String>[];
+        String? token;
+        var page = 0;
+        do {
+          final r = await ClinicalVideoRepository.fetchMasterclasses(
+              pageIndex: page++, pageSize: 5, pageToken: token, category: 'Offline test');
+          seen.addAll(r.videos.map((v) => v.youtubeId));
+          token = r.nextPageToken;
+        } while (token != null && page < 20);
+        expect(seen, isEmpty); // unknown topic: nothing, rather than unrelated videos
+        final all = await ClinicalVideoRepository.fetchMasterclasses(pageIndex: 0, pageSize: 50, searchQuery: 'zzz-none');
+        expect(all.videos, isEmpty);
+        final firstAid = await ClinicalVideoRepository.fetchMasterclasses(pageIndex: 0, pageSize: 50, category: 'First Aid & CPR');
+        expect(firstAid.videos, isNotEmpty);
+        expect(firstAid.videos.map((v) => v.youtubeId).toSet().length, firstAid.videos.length);
+        expect(firstAid.hasMore, isFalse);
+      }, () => client);
     });
   });
 
   group('Shorts playback', () {
-    test('Uses one player for the whole feed and loads each clip into it', () {
+    test('Two players: the hidden one preloads the next clip and a swipe swaps them', () {
       final shorts = ClinicalVideoRepository.verifiedShorts;
-      var created = 0;
-      late FakeYoutubePlayerController fake;
+      final created = <String>[];
+      final fakes = <FakeYoutubePlayerController>[];
       final playback = ShortsPlayback(
         shorts: shorts,
         initialIndex: 0,
         controllerFactory: (videoId) {
-          created++;
-          expect(videoId, shorts[0].youtubeId);
-          return fake = FakeYoutubePlayerController();
+          created.add(videoId);
+          final f = FakeYoutubePlayerController();
+          fakes.add(f);
+          return f;
         },
       );
 
-      expect(created, 1);
-      expect(playback.loadedIndex, 0);
+      // player 0 shows clip 0, player 1 starts loading clip 1 straight away
+      expect(created, [shorts[0].youtubeId, shorts[1].youtubeId]);
+      expect(playback.activePlayer, 0);
 
-      playback.show(0); // already loaded: nothing to do
-      expect(fake.loaded, isEmpty);
+      // the hidden player started playing its clip: it is paused at the start (buffered, silent)
+      playback.onPlayerState(1, PlayerState.playing);
+      expect(fakes[1].isPlaying, isFalse);
+      expect(fakes[1].seekSeconds, 0);
+      // the visible player is left alone
+      fakes[0].isPlaying = true;
+      playback.onPlayerState(0, PlayerState.playing);
+      expect(fakes[0].isPlaying, isTrue);
 
+      // swipe to clip 1: no new load, just a swap; the freed player preloads clip 2
       playback.show(1);
-      playback.show(2);
-      playback.show(2);
-      expect(fake.loaded, [shorts[1].youtubeId, shorts[2].youtubeId]);
+      expect(playback.activePlayer, 1);
+      expect(fakes[1].isPlaying, isTrue);
+      expect(fakes[1].loaded, isEmpty);
+      expect(fakes[0].loaded, [shorts[2].youtubeId]);
+      expect(playback.controller, same(fakes[1]));
 
-      // The feed wraps around, so a large page index maps back into the list.
-      playback.show(shorts.length + 1);
-      expect(fake.loaded.last, shorts[1].youtubeId);
-      expect(created, 1);
+      // jump back to clip 0 (not preloaded): loaded into the visible player, clip 1 preloaded again
+      playback.show(0);
+      expect(fakes[1].loaded, [shorts[0].youtubeId]);
+      expect(fakes[0].loaded.last, shorts[1].youtubeId);
+      expect(created, hasLength(2)); // never more than two players
 
       playback.dispose();
-      expect(fake.closed, isTrue);
+      expect(fakes.every((f) => f.closed), isTrue);
     });
   });
 

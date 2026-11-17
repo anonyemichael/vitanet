@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:vitanet/core/network/backend.dart';
 import 'package:http/http.dart' as http;
 import 'health_video.dart';
 
@@ -522,200 +522,115 @@ class ClinicalVideoRepository {
     ),
   ];
 
-  /// Hybrid fetch: Serves instant initial page (10 Masterclasses),
-  /// executes live YouTube Data API v3 queries with 400ms debounce when searching,
-  /// and gracefully falls back to the curated pool with in-memory caching.
+  /// Health videos from the VitaNet backend (`GET /videos/feed`, `GET /videos/search`): the newest uploads of
+  /// trusted health channels, read from YouTube on the server and kept there, so a page answers fast and no
+  /// YouTube key is ever inside the app. [pageToken] is the backend's cursor. When the backend cannot be
+  /// reached, the hand-checked videos above are shown instead (no repeats: they are listed once).
   static Future<PaginatedVideosResponse> fetchMasterclasses({
     required int pageIndex,
     required int pageSize,
     String? category,
     String? searchQuery,
     String? pageToken,
+    bool shorts = false,
   }) async {
-    final cleanQuery = searchQuery?.trim() ?? '';
-    final cleanCategory = (category != null && category != 'All')
-        ? category
-        : null;
-    final cacheKey =
-        '${cleanQuery.toLowerCase()}_${cleanCategory ?? "all"}_$pageIndex';
-
-    // 1. Check in-memory result cache so duplicate searches cost 0 API quota
-    if (_searchCache.containsKey(cacheKey)) {
-      return PaginatedVideosResponse(
-        videos: _searchCache[cacheKey]!,
-        nextPageToken: _searchNextPageTokens[cacheKey],
-        hasMore: _searchCache[cacheKey]!.isNotEmpty,
-      );
+    final query = searchQuery?.trim() ?? '';
+    final topic = (category != null && category != 'All') ? category : null;
+    final cursor = int.tryParse(pageToken ?? '') ?? (pageIndex * pageSize);
+    final cacheKey = '${shorts ? 's' : 'l'}|${query.toLowerCase()}|${topic ?? 'all'}|$cursor|$pageSize';
+    final cached = _searchCache[cacheKey];
+    if (cached != null) {
+      final next = _searchNextPageTokens[cacheKey];
+      return PaginatedVideosResponse(videos: cached, nextPageToken: next, hasMore: next != null);
     }
-
-    // 2. If live search query is provided, attempt live YouTube Data API v3 search
-    if (cleanQuery.isNotEmpty) {
-      String apiKey = '';
-      try {
-        if (dotenv.isInitialized) {
-          apiKey =
-              dotenv.env['GOOGLE_API_KEY'] ??
-              dotenv.env['YOUTUBE_API_KEY'] ??
-              '';
-        }
-      } catch (_) {}
-
-      if (apiKey.isNotEmpty) {
-        try {
-          final liveResults = await _queryYouTubeDataApi(
-            query: cleanQuery,
-            apiKey: apiKey,
-            pageToken: pageToken,
-            maxResults: pageSize,
-            category: cleanCategory,
-          );
-          if (liveResults.videos.isNotEmpty) {
-            _searchCache[cacheKey] = liveResults.videos;
-            _searchNextPageTokens[cacheKey] = liveResults.nextPageToken;
-            return liveResults;
-          }
-        } catch (e) {
-          debugPrint('YouTube Data API search fallback to curated pool: $e');
-        }
-      }
+    try {
+      final params = {
+        if (query.isNotEmpty) 'q': query,
+        if (query.isEmpty && topic != null) 'topic': topic,
+        'kind': shorts ? 'short' : 'long',
+        'cursor': '$cursor',
+        'limit': '$pageSize',
+      };
+      final uri = BackendConfig.uri(query.isNotEmpty ? 'videos/search' : 'videos/feed').replace(queryParameters: params);
+      final res = await http.get(uri).timeout(const Duration(seconds: 8));
+      if (res.statusCode != 200) throw Exception('videos ${res.statusCode}');
+      final data = json.decode(res.body) as Map<String, dynamic>;
+      final videos = [
+        for (final j in (data['videos'] as List? ?? const []))
+          if (j is Map) fromBackend(Map<String, dynamic>.from(j)),
+      ];
+      final next = data['next_cursor'] == null ? null : '${data['next_cursor']}';
+      _searchCache[cacheKey] = videos;
+      _searchNextPageTokens[cacheKey] = next;
+      return PaginatedVideosResponse(videos: videos, nextPageToken: next, hasMore: next != null);
+    } catch (e) {
+      debugPrint('Videos: backend unavailable, showing the hand-checked list ($e)');
+      return _curatedPage(shorts ? verifiedShorts : verifiedMasterclasses, topic, query, cursor, pageSize);
     }
+  }
 
-    // 3. Curated verified dataset fallback & pagination
-    await Future.delayed(const Duration(milliseconds: 150));
+  /// Shorts (60 s or less) for the Shorts shelf and the swipe feed.
+  static Future<PaginatedVideosResponse> fetchShorts({String? category, String? searchQuery, String? pageToken,
+          int pageSize = 20}) =>
+      fetchMasterclasses(pageIndex: 0, pageSize: pageSize, category: category, searchQuery: searchQuery,
+          pageToken: pageToken, shorts: true);
 
-    var pool = List<ClinicalVideo>.from(verifiedMasterclasses);
-
-    if (cleanCategory != null) {
+  static PaginatedVideosResponse _curatedPage(
+      List<ClinicalVideo> source, String? topic, String query, int cursor, int pageSize) {
+    var pool = source.toList();
+    if (topic != null) {
+      final t = topic.toLowerCase();
       pool = pool.where((v) {
-        final vCat = v.category.toLowerCase();
-        final cCat = cleanCategory.toLowerCase();
-        if (cCat == 'trauma') {
-          return vCat.contains('trauma') || vCat.contains('first aid');
-        }
-        return vCat.contains(cCat) || cCat.contains(vCat);
+        final c = v.category.toLowerCase();
+        if (t == 'trauma') return c.contains('trauma') || c.contains('first aid');
+        return c.contains(t) || t.contains(c);
       }).toList();
     }
-
-    if (cleanQuery.isNotEmpty) {
-      final q = cleanQuery.toLowerCase();
+    if (query.isNotEmpty) {
+      final words = query.toLowerCase().split(RegExp(r'\s+')).where((w) => w.length > 1);
       pool = pool.where((v) {
-        return v.title.toLowerCase().contains(q) ||
-            v.channelName.toLowerCase().contains(q) ||
-            v.category.toLowerCase().contains(q) ||
-            v.keyTakeaways.any((k) => k.toLowerCase().contains(q));
+        final text = '${v.title} ${v.channelName} ${v.category} ${v.keyTakeaways.join(' ')}'.toLowerCase();
+        return words.every(text.contains);
       }).toList();
     }
+    final page = pool.skip(cursor).take(pageSize).toList();
+    final more = cursor + pageSize < pool.length;
+    return PaginatedVideosResponse(videos: page, nextPageToken: more ? '${cursor + pageSize}' : null, hasMore: more);
+  }
 
-    if (pool.isEmpty) {
-      return const PaginatedVideosResponse(videos: [], hasMore: false);
-    }
-
-    final startIndex = pageIndex * pageSize;
-    if (startIndex >= pool.length && cleanQuery.isNotEmpty) {
-      // Loop or stop
-      return const PaginatedVideosResponse(videos: [], hasMore: false);
-    }
-
-    final int start = startIndex % pool.length;
-    final results = <ClinicalVideo>[];
-    for (int i = 0; i < pageSize; i++) {
-      final item = pool[(start + i) % pool.length];
-      results.add(item);
-    }
-
-    _searchCache[cacheKey] = results;
-    _searchNextPageTokens[cacheKey] = 'cursor_${pageIndex + 1}';
-
-    return PaginatedVideosResponse(
-      videos: results,
-      nextPageToken: 'cursor_${pageIndex + 1}',
-      hasMore: true,
+  /// One video from the backend's JSON.
+  static ClinicalVideo fromBackend(Map<String, dynamic> j) {
+    final seconds = (j['duration_s'] as num?)?.toInt() ?? 0;
+    final channel = '${j['channel'] ?? ''}';
+    final views = (j['views'] as num?)?.toInt();
+    final takeaways = [for (final t in (j['takeaways'] as List? ?? const [])) '$t'];
+    return ClinicalVideo(
+      youtubeId: '${j['id']}',
+      title: _unescapeHtml('${j['title'] ?? ''}'),
+      channelName: channel,
+      channelAvatarUrl: _extractInitials(channel),
+      isVerifiedChannel: j['verified'] == true,
+      category: '${j['category'] ?? 'General health'}',
+      durationSeconds: seconds,
+      formattedDuration: formatDuration(seconds),
+      viewsCount: views == null ? '' : '${formatCount(views)} views',
+      publishedAgo: j['published_at'] == null ? '' : _formatRelativeTime('${j['published_at']}'),
+      isShort: j['is_short'] == true,
+      keyTakeaways: takeaways,
     );
   }
 
-  /// YouTube Data API v3 live request with medical context query appending
-  static Future<PaginatedVideosResponse> _queryYouTubeDataApi({
-    required String query,
-    required String apiKey,
-    String? pageToken,
-    required int maxResults,
-    String? category,
-  }) async {
-    // Medical context query appending to ensure authentic clinical results
-    final enrichedQuery = '$query clinical first aid medical';
-    final queryParams = {
-      'part': 'snippet',
-      'type': 'video',
-      'videoEmbeddable': 'true',
-      'safeSearch': 'strict',
-      'maxResults': '$maxResults',
-      'q': enrichedQuery,
-      'key': apiKey,
-    };
-    if (pageToken != null && !pageToken.startsWith('cursor_')) {
-      queryParams['pageToken'] = pageToken;
-    }
+  static String formatDuration(int s) {
+    if (s <= 0) return '';
+    final h = s ~/ 3600, m = (s % 3600) ~/ 60, sec = s % 60;
+    final mm = h > 0 ? m.toString().padLeft(2, '0') : '$m';
+    return '${h > 0 ? '$h:' : ''}$mm:${sec.toString().padLeft(2, '0')}';
+  }
 
-    final uri = Uri.https(
-      'www.googleapis.com',
-      '/youtube/v3/search',
-      queryParams,
-    );
-    final response = await http.get(uri).timeout(const Duration(seconds: 6));
-
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      final List items = data['items'] ?? [];
-      final nextPageToken = data['nextPageToken'] as String?;
-
-      final videos = <ClinicalVideo>[];
-      for (final item in items) {
-        final idObj = item['id'];
-        final videoId = idObj is Map ? idObj['videoId'] as String? : null;
-        if (videoId == null || videoId.isEmpty) continue;
-
-        final snippet = item['snippet'] as Map<String, dynamic>? ?? {};
-        final rawTitle =
-            snippet['title'] as String? ?? 'Clinical Medical Guide';
-        final cleanTitle = _unescapeHtml(rawTitle);
-        final channelTitle =
-            snippet['channelTitle'] as String? ?? 'Verified Health Education';
-        final publishedAt = snippet['publishedAt'] as String? ?? '';
-        final description = snippet['description'] as String? ?? '';
-
-        final isVerified = _isLikelyVerifiedMedicalChannel(channelTitle);
-        final derivedCategory =
-            category ?? _deriveCategoryFromText('$cleanTitle $description');
-
-        videos.add(
-          ClinicalVideo(
-            youtubeId: videoId,
-            title: cleanTitle,
-            channelName: channelTitle,
-            channelAvatarUrl: _extractInitials(channelTitle),
-            isVerifiedChannel: isVerified,
-            category: derivedCategory,
-            durationSeconds: 0,
-            formattedDuration: '',
-            viewsCount: '',
-            publishedAgo: _formatRelativeTime(publishedAt),
-            isShort: false,
-            keyTakeaways: _extractKeyTakeawaysFromDescription(
-              description,
-              cleanTitle,
-            ),
-          ),
-        );
-      }
-
-      return PaginatedVideosResponse(
-        videos: videos,
-        nextPageToken: nextPageToken,
-        hasMore: nextPageToken != null && videos.isNotEmpty,
-      );
-    } else {
-      throw Exception('YouTube API error: ${response.statusCode}');
-    }
+  static String formatCount(int n) {
+    if (n >= 1000000) return '${(n / 1000000).toStringAsFixed(n >= 10000000 ? 0 : 1)}M';
+    if (n >= 1000) return '${(n / 1000).toStringAsFixed(n >= 10000 ? 0 : 1)}K';
+    return '$n';
   }
 
   static String _unescapeHtml(String text) {
@@ -726,96 +641,6 @@ class ClinicalVideoRepository {
         .replaceAll('&quot;', '"')
         .replaceAll('&#39;', "'")
         .replaceAll('&apos;', "'");
-  }
-
-  static bool _isLikelyVerifiedMedicalChannel(String channel) {
-    final lower = channel.toLowerCase();
-    const keywords = [
-      'ambulance',
-      'clinic',
-      'hospital',
-      'red cross',
-      'foundation',
-      'osmosis',
-      'nhs',
-      'medicine',
-      'health',
-      'doctor',
-      'dr.',
-      'md',
-      'stanford',
-      'mayo',
-      'hopkins',
-      'cleveland',
-      'harvard',
-    ];
-    return keywords.any((k) => lower.contains(k));
-  }
-
-  static String _deriveCategoryFromText(String text) {
-    final lower = text.toLowerCase();
-    if (lower.contains('cpr') ||
-        lower.contains('chok') ||
-        lower.contains('first aid')) {
-      return 'First Aid & CPR';
-    }
-    if (lower.contains('bleed') ||
-        lower.contains('burn') ||
-        lower.contains('fracture') ||
-        lower.contains('wound')) {
-      return 'Trauma';
-    }
-    if (lower.contains('heart') ||
-        lower.contains('cardio') ||
-        lower.contains('pressure') ||
-        lower.contains('vital')) {
-      return 'Cardio & Vitals';
-    }
-    if (lower.contains('spine') ||
-        lower.contains('back') ||
-        lower.contains('stretch') ||
-        lower.contains('posture')) {
-      return 'Physical Therapy';
-    }
-    if (lower.contains('breath') ||
-        lower.contains('panic') ||
-        lower.contains('anxiety')) {
-      return 'Guided Breathing';
-    }
-    if (lower.contains('sleep') ||
-        lower.contains('diet') ||
-        lower.contains('nutrition')) {
-      return 'Nutrition & Sleep';
-    }
-    return 'First Aid & CPR';
-  }
-
-  static List<String> _extractKeyTakeawaysFromDescription(
-    String desc,
-    String fallbackTitle,
-  ) {
-    if (desc.trim().isEmpty) {
-      return [
-        'Physician-reviewed clinical protocol and technique demonstration',
-        'Follow verified hospital and paramedic first aid guidelines',
-        'Seek immediate professional emergency care in life-threatening conditions',
-      ];
-    }
-    final lines = desc
-        .split('\n')
-        .map((l) => l.trim())
-        .where((l) => l.isNotEmpty && l.length > 20 && !l.startsWith('http'))
-        .take(3)
-        .toList();
-
-    if (lines.isEmpty) {
-      return [
-        'Detailed instructional walkthrough for $fallbackTitle',
-        'Step-by-step guidance vetted by clinical health educators',
-        'Consult emergency services if vital signs become unstable',
-      ];
-    }
-    return lines;
   }
 
   static String _extractInitials(String name) {

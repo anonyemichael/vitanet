@@ -33,6 +33,9 @@ class Settings(BaseSettings):
 
     # Health alerts: an urgent alert nobody answers in the app is sent to the care circle after this many minutes.
     ALERT_ESCALATION_MINUTES: int = 10
+    # Health videos (Learn / Clips pages): free YouTube Data API v3 key, used only on the server.
+    YOUTUBE_API_KEY: str = ""
+
     # Public address of this server (links in care-circle invite emails).
     PUBLIC_BASE_URL: str = "http://localhost:8000"
 
