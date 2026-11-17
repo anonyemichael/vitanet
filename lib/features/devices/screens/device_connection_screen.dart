@@ -137,6 +137,7 @@ class _DeviceConnectionScreenState extends ConsumerState<DeviceConnectionScreen>
     ref.read(liveVitalsProvider.notifier).clear();
     ref.read(vitalsLastSyncProvider.notifier).state = null;
     ref.read(lastSyncOutcomeProvider.notifier).state = null;
+    ref.read(vitalsProvenanceProvider.notifier).state = null;
     if (!mounted) return;
     setState(() {
       _connected = false;

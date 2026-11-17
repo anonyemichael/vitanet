@@ -1,3 +1,4 @@
+import 'package:vitanet/core/layout/breakpoints.dart';
 import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -1051,7 +1052,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final p = VnPalette.of(context);
     final isDark = p.isDark;
     final keyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
-    final isDesktop = MediaQuery.sizeOf(context).width >= 800;
+    final isDesktop = VnBreakpoints.isExpanded(context);
     // Leave room for the shell's floating bottom navigation bar without layout thrashing.
     final navInset =
         (!isDesktop && !keyboardOpen && !Navigator.of(context).canPop()) ? 74.0 : 0.0;

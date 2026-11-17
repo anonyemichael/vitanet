@@ -10,6 +10,9 @@ import 'package:vitanet/shared/widgets/vn_kit.dart';
 /// Readings older than this are not presented as "live".
 const _freshWindow = Duration(minutes: 2);
 
+/// Reading keys used by the sync for each tile id (they are the same today; kept in one place).
+String _measuredKey(String tileId) => tileId;
+
 /// "Today's vitals" 2x2 grid driven by [liveVitalsProvider].
 class HealthOverviewSection extends ConsumerStatefulWidget {
   const HealthOverviewSection({super.key});
@@ -55,7 +58,18 @@ class _HealthOverviewSectionState extends ConsumerState<HealthOverviewSection> {
         lastSync != null &&
         DateTime.now().difference(lastSync) < _freshWindow;
 
+    final provenance = ref.watch(vitalsProvenanceProvider);
+    String ago(DateTime t) {
+      final d = DateTime.now().difference(t);
+      if (d.inMinutes < 60) return '${d.inMinutes.clamp(1, 59)} min ago';
+      if (d.inHours < 24) return '${d.inHours} h ago';
+      return '${d.inDays} d ago';
+    }
+
     String status(String id, double v) {
+      // a reading measured long ago is not presented as current (UX-17)
+      final at = provenance?.measuredAt[_measuredKey(id)];
+      if (at != null && DateTime.now().difference(at) > const Duration(hours: 12)) return 'Old · ${ago(at)}';
       switch (id) {
         case 'heart_rate':
           return v < 50 ? 'Low' : (v > 100 ? 'High' : 'Normal');
@@ -148,9 +162,13 @@ class _HealthOverviewSectionState extends ConsumerState<HealthOverviewSection> {
         ),
         const SizedBox(height: 4),
         Text(
-          hasReadings
-              ? (isFresh ? 'Live readings from connected device' : 'Last recorded vitals · Tap to sync')
-              : 'Connect a watch or tracker to see live vitals',
+          !hasReadings
+              ? 'Connect a watch or tracker to see your readings'
+              : provenance == null
+                  ? (isFresh ? 'Readings from your device' : 'Last recorded readings · Tap to sync')
+                  : provenance.newest != null
+                      ? 'From ${provenance.source} · newest reading ${ago(provenance.newest!)}'
+                      : 'Saved on ${provenance.source} · tap Sync for new readings',
           style: VnText.body(13, color: p.muted),
         ),
         const SizedBox(height: 12),

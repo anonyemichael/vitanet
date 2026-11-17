@@ -25,14 +25,18 @@ class _PharmacyScreenState extends State<PharmacyScreen> {
   final _controller = TextEditingController();
 
   static const _filters = <(String, String)>[
+    // UX-16: labels say what the map data can support ("Hospitals", not "Emergency room")
     ('Open now', 'pharmacy open now'),
     ('Pharmacies', 'pharmacy near me'),
     ('24 hours', '24 hour pharmacy near me'),
-    ('Emergency room', 'emergency room hospital near me'),
-    ('Urgent care', 'urgent care near me'),
+    ('Hospitals', 'hospital near me'),
+    ('Clinics', 'clinic near me'),
     ('Drive-thru', 'drive thru pharmacy near me'),
   ];
   String _filter = 'Pharmacies';
+  DateTime? _loadedAt;
+
+  static String _hhmm(DateTime t) => '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
 
   _LoadState _state = _LoadState.locating;
   String _statusMessage = '';
@@ -146,6 +150,7 @@ class _PharmacyScreenState extends State<PharmacyScreen> {
       final data = jsonDecode(res.body) as Map<String, dynamic>;
       final elements = (data['elements'] as List?) ?? const [];
       final now = DateTime.now();
+      _loadedAt = now;
       final places = <_Place>[];
       for (final e in elements) {
         final place = _Place.fromOverpass(e as Map<String, dynamic>, pos, now);
@@ -172,9 +177,9 @@ class _PharmacyScreenState extends State<PharmacyScreen> {
         list = list.where((p) => p.kind == _PlaceKind.pharmacy);
       case '24 hours':
         list = list.where((p) => p.is24h);
-      case 'Emergency room':
+      case 'Hospitals':
         list = list.where((p) => p.kind == _PlaceKind.hospital);
-      case 'Urgent care':
+      case 'Clinics':
         list = list.where((p) => p.kind == _PlaceKind.clinic);
       case 'Drive-thru':
         list = list.where((p) => p.driveThrough);
@@ -393,7 +398,8 @@ class _PharmacyScreenState extends State<PharmacyScreen> {
         if (visible.isEmpty) {
           return _FallbackCard(
             message: _filter == 'Open now'
-                ? 'No nearby listings show opening hours that match right now.'
+                ? 'No nearby listing has opening hours that say it is open now. Many places do not list their '
+                    'hours, so try "Pharmacies" and call ahead.'
                 : 'No "${_filter.toLowerCase()}" listed within 5 km.',
             filter: _filter,
             onSearch: () => _searchMaps(_filterQuery),
@@ -412,7 +418,8 @@ class _PharmacyScreenState extends State<PharmacyScreen> {
               const SizedBox(height: 14),
             ],
             Text(
-              'Places from OpenStreetMap. Opening hours may be out of date, so call ahead.',
+              'Map listings from OpenStreetMap${_loadedAt == null ? '' : ', loaded at ${_hhmm(_loadedAt!)}'}. '
+              '"Hours not listed" means unknown, not closed. Hours may be out of date, so call ahead.',
               style: VnText.body(12, color: p.muted, height: 1.5),
             ),
           ],

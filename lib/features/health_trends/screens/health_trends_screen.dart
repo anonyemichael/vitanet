@@ -69,6 +69,27 @@ const _metrics = <_Metric>[
     high: 37.2,
     decimals: 1,
   ),
+  // UX-10: blood pressure, which the device screen syncs, has its trends too (top and bottom number)
+  _Metric(
+    id: 'systolic_bp',
+    label: 'BP (top)',
+    title: 'Blood Pressure (top number)',
+    unit: 'mmHg',
+    icon: Icons.speed_rounded,
+    color: Color(0xFFB91C1C),
+    low: 90,
+    high: 120,
+  ),
+  _Metric(
+    id: 'diastolic_bp',
+    label: 'BP (bottom)',
+    title: 'Blood Pressure (bottom number)',
+    unit: 'mmHg',
+    icon: Icons.speed_rounded,
+    color: Color(0xFF9F1239),
+    low: 60,
+    high: 80,
+  ),
   _Metric(
     id: 'respiratory_rate',
     label: 'Breathing rate',

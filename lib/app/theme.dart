@@ -14,8 +14,9 @@ class AppTheme {
     final colorScheme = ColorScheme.light(
       primary: AppColors.brand,
       primaryContainer: AppColors.brandTint,
-      secondary: AppColors.secondaryLight,
-      secondaryContainer: AppColors.secondaryContainerLight,
+      // one patient colour system (UI/UX audit UX-01): teal family, no cyan / violet
+      secondary: AppColors.brandDark,
+      secondaryContainer: AppColors.brandTint,
       surface: AppColors.surfaceLight,
       surfaceContainerHighest: AppColors.surfaceVariantLight,
       error: AppColors.errorLight,
@@ -116,8 +117,8 @@ class AppTheme {
     final colorScheme = ColorScheme.dark(
       primary: AppColors.mint,
       primaryContainer: Color(0xFF134E4A),
-      secondary: AppColors.secondaryDark,
-      secondaryContainer: AppColors.secondaryContainerDark,
+      secondary: AppColors.mintLight,
+      secondaryContainer: Color(0xFF134E4A),
       surface: AppColors.surfaceDark,
       surfaceContainerHighest: AppColors.surfaceVariantDark,
       error: AppColors.errorDark,
@@ -165,7 +166,7 @@ class AppTheme {
       navigationBarTheme: NavigationBarThemeData(
         height: 72,
         backgroundColor: AppColors.surfaceDark,
-        indicatorColor: AppColors.primaryContainerDark,
+        indicatorColor: const Color(0xFF134E4A),
         labelTextStyle: WidgetStatePropertyAll(
           TextStyle(fontFamily: _inter, fontSize: 11, fontWeight: FontWeight.w600),
         ),

@@ -5,9 +5,13 @@ class AppColors {
   AppColors._();
 
   // ── Light Mode ──
+  @Deprecated('Old cyan/violet palette: use brand / VnPalette (UI/UX audit UX-01)')
   static const Color primaryLight = Color(0xFF06B6D4); // Electric Cyan
+  @Deprecated('Old cyan/violet palette: use brand / VnPalette (UI/UX audit UX-01)')
   static const Color primaryContainerLight = Color(0xFFCFFAFE);
+  @Deprecated('Old cyan/violet palette: use brand / VnPalette (UI/UX audit UX-01)')
   static const Color secondaryLight = Color(0xFF8B5CF6); // Deep Violet
+  @Deprecated('Old cyan/violet palette: use brand / VnPalette (UI/UX audit UX-01)')
   static const Color secondaryContainerLight = Color(0xFFEDE9FE);
   static const Color surfaceLight = Color(0xFFFFFFFF);
   static const Color surfaceVariantLight = Color(0xFFF1F5F9);
@@ -26,9 +30,13 @@ class AppColors {
   static const Color navInactiveDark = Color(0xFF94A3B8); // Slate Gray 400
 
   // ── Dark Mode ──
+  @Deprecated('Old cyan/violet palette: use brand / VnPalette (UI/UX audit UX-01)')
   static const Color primaryDark = Color(0xFF22D3EE); // Cyan 400
+  @Deprecated('Old cyan/violet palette: use brand / VnPalette (UI/UX audit UX-01)')
   static const Color primaryContainerDark = Color(0xFF164E63); // Cyan 900
+  @Deprecated('Old cyan/violet palette: use brand / VnPalette (UI/UX audit UX-01)')
   static const Color secondaryDark = Color(0xFFA78BFA); // Violet 400
+  @Deprecated('Old cyan/violet palette: use brand / VnPalette (UI/UX audit UX-01)')
   static const Color secondaryContainerDark = Color(0xFF4C1D95); // Violet 900
   static const Color surfaceDark = Color(0xFF1E1E1E); // Neutral Dark Gray (Cards)
   static const Color surfaceVariantDark = Color(0xFF2A2A2A); // Lighter Gray
@@ -94,6 +102,8 @@ class AppColors {
   static const Color aiTint = Color(0xFFF5F3FF);
 
   // Primary with alpha (for selected states)
+  @Deprecated('Old cyan/violet palette: use brand / VnPalette (UI/UX audit UX-01)')
   static const Color primaryLight12 = Color(0x1F06B6D4);      // primary 12%
+  @Deprecated('Old cyan/violet palette: use brand / VnPalette (UI/UX audit UX-01)')
   static const Color primaryDark12 = Color(0x1F22D3EE);       // primary 12%
 }

@@ -108,6 +108,12 @@ class HealthService {
       case 'respiratory_rate':
         type = HealthDataType.RESPIRATORY_RATE;
         break;
+      case 'systolic_bp':
+        type = HealthDataType.BLOOD_PRESSURE_SYSTOLIC;
+        break;
+      case 'diastolic_bp':
+        type = HealthDataType.BLOOD_PRESSURE_DIASTOLIC;
+        break;
       default:
         type = HealthDataType.HEART_RATE;
     }

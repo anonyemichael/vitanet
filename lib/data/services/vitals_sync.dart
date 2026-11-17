@@ -28,6 +28,19 @@ class SyncOutcome {
 
 final lastSyncOutcomeProvider = StateProvider<SyncOutcome?>((ref) => null);
 
+/// Where the readings on screen came from and when each was measured (UI/UX audit UX-17), so a tile can say
+/// "From Health Connect · 10:42" or "Old reading" instead of looking current.
+class VitalsProvenance {
+  final String source;
+  final Map<String, DateTime> measuredAt;
+  const VitalsProvenance(this.source, this.measuredAt);
+
+  DateTime? get newest =>
+      measuredAt.values.fold<DateTime?>(null, (a, b) => a == null || b.isAfter(a) ? b : a);
+}
+
+final vitalsProvenanceProvider = StateProvider<VitalsProvenance?>((ref) => null);
+
 /// Whether VitaNet may use the phone's watch readings. Turned off by "Disconnect" and remembered across app
 /// restarts (audit F-05); turned on again by "Connect / Sync now".
 final deviceSharingProvider = StateNotifierProvider<DeviceSharing, bool>((ref) => DeviceSharing());
@@ -114,6 +127,9 @@ class VitalsSync with WidgetsBindingObserver {
           final values = {for (final e in readings.entries) e.key: e.value.value};
           values.forEach(live.setVital);
           _ref.read(vitalsLastSyncProvider.notifier).state = DateTime.now();
+          _ref.read(vitalsProvenanceProvider.notifier).state = VitalsProvenance(
+              defaultTargetPlatform == TargetPlatform.iOS ? 'Apple Health' : 'Health Connect',
+              {for (final e in readings.entries) e.key: e.value.at});
           final sent = await api.postDeviceVitals(user.uid, values,
               measuredAt: {for (final e in readings.entries) e.key: e.value.at});
           _ref.read(lastSyncOutcomeProvider.notifier).state = SyncOutcome(
@@ -130,6 +146,7 @@ class VitalsSync with WidgetsBindingObserver {
       if (saved.isNotEmpty) {
         saved.forEach(live.setVital);
         _ref.read(vitalsLastSyncProvider.notifier).state = DateTime.now();
+        _ref.read(vitalsProvenanceProvider.notifier).state = const VitalsProvenance('your VitaNet account', {});
       }
     } catch (e) {
       debugPrint('VitalsSync: $e');
