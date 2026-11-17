@@ -199,3 +199,28 @@ def test_buttons_carry_real_links():
     block = ai_blocks.build_action_buttons({"get_nearby_hospitals"}, hospitals)
     urls = {b.action: b.url for b in block.buttons}
     assert urls["call_hospital"] == "tel:0302228382" and urls["get_directions"].startswith("https://www.google.com/maps/")
+
+
+# ---------------------------------------------------------------- audit F-01 (TRI-01): no invented readings
+def test_triage_request_without_vitals_stays_empty(monkeypatch):
+    from fastapi.testclient import TestClient
+    from app.main import app
+    from app.routes import triage as triage_route
+    from app.schemas.triage import TriagePredictRequest
+    req = TriagePredictRequest(symptoms=["headache"])
+    assert all(getattr(req, f) is None for f in ("age", "gender", "heart_rate", "temperature", "blood_oxygen",
+                                                 "systolic_bp", "diastolic_bp"))
+    seen = {}
+    def fake_predict(symptoms, **measured):
+        seen.update(measured, symptoms=symptoms)
+        return {"disease": "x", "confidence": "low", "severity": "doctor", "severity_confidence": "low",
+                "description": "", "precautions": [], "recommendation": ""}
+    monkeypatch.setattr(triage_route.ml_service, "predict_triage", fake_predict)
+    from app.dependencies.security import CurrentUser, get_current_user
+    app.dependency_overrides[get_current_user] = lambda: CurrentUser(uid="test-user")
+    try:
+        r = TestClient(app).post("/triage/predict", json={"symptoms": ["headache"], "blood_oxygen": 91})
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+    assert r.status_code == 200
+    assert seen == {"symptoms": ["headache"], "blood_oxygen": 91}      # only what was sent

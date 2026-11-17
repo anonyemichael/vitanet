@@ -152,17 +152,10 @@ class AiService {
   int get questionCount => _questionCount;
   double get progress => (_questionCount / 5).clamp(0.0, 1.0);
 
-  TriageResult generateTriageResult() => TriageResult(
-        id: _uuid.v4(),
-        level: TriageLevel.selfCare,
-        summary: 'Triage is provided by the VitaNet assistant.',
-        recommendations: const [],
-        monitorSymptoms: const [],
-        primarySymptom: '',
-        timestamp: DateTime.now(),
-      );
-
-  Future<TriageResult> generateTriageResultFromML({
+  /// Triage from the backend's symptom checker, or null when it could not be done (no symptoms, network,
+  /// sign-in or server error). A failure is never turned into a result: it must not look like "self-care"
+  /// (audit F-03).
+  Future<TriageResult?> generateTriageResultFromML({
     required List<String> symptoms,
     String? primarySymptom,
   }) async {
@@ -197,7 +190,7 @@ class AiService {
       );
     }
 
-    return generateTriageResult();
+    return null;
   }
 
   void reset() {

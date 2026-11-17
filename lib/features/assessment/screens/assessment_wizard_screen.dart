@@ -119,25 +119,32 @@ class _AssessmentWizardScreenState extends ConsumerState<AssessmentWizardScreen>
     if (_riskFactors.isNotEmpty) buffer.write('Risk factors: ${_riskFactors.join(", ")}. ');
     buffer.write('Please triage me and tell me what to do next.');
 
-    final allSymptoms = [
-      ?_area,
-      ..._symptoms,
-    ];
-    try {
-      final ai = ref.read(aiServiceProvider);
-      final triage = await ai.generateTriageResultFromML(
-        symptoms: allSymptoms,
-        primarySymptom: _symptoms.isNotEmpty ? _symptoms.first : (_area ?? 'General symptom'),
-      );
-      if (mounted) {
-        ref.read(triageResultProvider.notifier).state = triage;
-        ref.read(triageHistoryProvider.notifier).add(triage);
-      }
-    } catch (_) {
-      // Graceful fallback
+    // Only real symptoms go to the symptom checker; the body area ("Head", "Chest") is not a symptom (audit F-04).
+    var triaged = false;
+    if (_symptoms.isNotEmpty) {
+      try {
+        final ai = ref.read(aiServiceProvider);
+        final triage = await ai.generateTriageResultFromML(
+          symptoms: List.of(_symptoms),
+          primarySymptom: _symptoms.first,
+        );
+        if (triage != null && mounted) {
+          ref.read(triageResultProvider.notifier).state = triage;
+          ref.read(triageHistoryProvider.notifier).add(triage);
+          triaged = true;
+        }
+      } catch (_) {}
     }
 
     if (!mounted) return;
+    if (!triaged) {
+      // say so plainly: no made-up "self-care" result (audit F-03)
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(const SnackBar(
+        content: Text('The quick symptom check could not run, so the assistant will go through your answers. '
+            'If you feel very unwell, call 112 or 193 now.'),
+        duration: Duration(seconds: 6),
+      ));
+    }
     _openChat(prompt: buffer.toString());
   }
 
