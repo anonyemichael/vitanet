@@ -13,16 +13,50 @@ import 'health_article_detail_screen.dart';
 /// Clean alias for backward compatibility across navigation routes
 typedef GeneralHealthLibraryScreen = HealthLibraryScreen;
 
-/// Topic photo for an article. Uses curated/live image URL if available,
-/// with the exact matching local clinical topic photo as instant 0ms fallback.
+/// Photo for an article: its own picture (from the source, or a Pexels photo the backend chose for it) when it
+/// has one. Otherwise a bundled photo: a specific one when the title matches (e.g. ECG), else one picked from
+/// a small set for the article's topic by its title, so articles in the same topic do not all look the same.
 ({String asset, String url}) articlePhoto(HealthArticle a) {
-  final fallbackAsset = VnTopics.photoForArticle(a.title, a.category);
   final directUrl = a.imageUrls.isNotEmpty ? a.imageUrls.first : '';
-  // Bucketed Unsplash IDs from MedicalImageResolver are guesses (a beach for
-  // a Tai Chi study; some 404 and render blank), so the curated local topic
-  // photo wins. Real article images from other hosts are still used.
+  // Bucketed Unsplash IDs from MedicalImageResolver are guesses (a beach for a Tai Chi study; some 404 and
+  // render blank), so they are not used. Real article images from other hosts are.
   final useDirect = directUrl.isNotEmpty && !directUrl.contains('images.unsplash.com');
-  return (asset: fallbackAsset, url: useDirect ? directUrl : '');
+  return (asset: fallbackPhotoFor(a.title, a.category), url: useDirect ? directUrl : '');
+}
+
+/// Bundled photos per library topic (the backend's topic names).
+const Map<String, List<String>> _topicPhotos = {
+  'Infections': [VnPhotos.vaccination, VnPhotos.doctorWithPatient, VnPhotos.clinicalExamination,
+      VnPhotos.stethoscopeDiagnostics, VnPhotos.pillsColorful, VnPhotos.doctorOnPhone],
+  'Heart': [VnPhotos.bloodPressureCheck, VnPhotos.bpCuff, VnPhotos.cardiologyEcg, VnPhotos.smartwatchWrist,
+      VnPhotos.stethoscopeDiagnostics],
+  'Breathing': [VnPhotos.respiratoryHealth, VnPhotos.stethoscopeDiagnostics, VnPhotos.xray, VnPhotos.doctorWithPatient],
+  'Mental health': [VnPhotos.meditation, VnPhotos.holdingHands, VnPhotos.mindfulnessWellness, VnPhotos.sleep,
+      VnPhotos.doctorOnPhone],
+  'Nutrition': [VnPhotos.healthyPlate, VnPhotos.saladBowl, VnPhotos.metabolicNutrition, VnPhotos.glucoseMonitoring],
+  'Women & children': [VnPhotos.doctorsWithChild, VnPhotos.clinicianFemale, VnPhotos.vaccination, VnPhotos.holdingHands],
+  'Fitness': [VnPhotos.workout, VnPhotos.fitnessVitality, VnPhotos.smartwatchWrist],
+  'Chronic conditions': [VnPhotos.glucoseMonitoring, VnPhotos.bloodPressureCheck, VnPhotos.pillsOrange,
+      VnPhotos.blisterPacks, VnPhotos.doctorWithPatient, VnPhotos.clinicalExamination],
+  'First aid & safety': [VnPhotos.firstAidKit, VnPhotos.bandageTherapy, VnPhotos.cprResuscitation, VnPhotos.medicalTeam],
+  'General health': [VnPhotos.laptopStethoscope, VnPhotos.doctorPortrait, VnPhotos.medicalTeam, VnPhotos.digitalHealth,
+      VnPhotos.physicianMale, VnPhotos.clinicianFemale],
+};
+
+/// A stable pick from the topic's set (same article -> same photo every time).
+String fallbackPhotoFor(String title, String category) {
+  final pool = _topicPhotos[category];
+  if (pool == null) return VnTopics.photoForArticle(title, category); // older built-in articles
+  final specific = VnTopics.classify(title);
+  if (specific != null && specific.refinements.isNotEmpty) {
+    final refined = specific.photoFor(title);
+    if (refined != specific.photo) return refined; // a title-specific photo (ECG, smartwatch, salad, ...)
+  }
+  var h = 0;
+  for (final c in title.toLowerCase().codeUnits) {
+    h = (h * 31 + c) & 0x7fffffff;
+  }
+  return pool[h % pool.length];
 }
 
 /// Health library: plain-language articles from MedlinePlus and MyHealthfinder (collected by the VitaNet

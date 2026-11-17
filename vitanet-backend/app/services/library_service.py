@@ -268,6 +268,11 @@ def refresh(client=None, pause: float = MP_PAUSE_S) -> bool:
         client = client or httpx.Client(headers={"User-Agent": "VitaNet-HealthLibrary/1.0"}, follow_redirects=True)
         try:
             articles = build_catalog(client, pause)
+            # every article without its own picture gets one of its own (Pexels; kept from the last refresh)
+            from app.services import photo_service
+            with _lock:
+                previous = {a["id"]: a.get("photo") for a in _state["articles"]}
+            photo_service.add_photos(client, articles, previous)
         finally:
             if own:
                 client.close()
@@ -355,6 +360,10 @@ def _live(q: str, client=None) -> list:
         client = client or httpx.Client(headers={"User-Agent": "VitaNet-HealthLibrary/1.0"}, follow_redirects=True)
         try:
             res = medlineplus_search(client, q, 5)
+            from app.services import photo_service
+            known = {a["id"]: a.get("photo") for a in catalog()}
+            photo_service.add_photos(client, res, {a["id"]: known.get(a["id"]) for a in res} |
+                                     {k: v for k, v in known.items() if v})
         finally:
             if own:
                 client.close()

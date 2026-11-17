@@ -236,6 +236,16 @@ class _HealthArticleDetailScreenState extends State<HealthArticleDetailScreen> {
                           ),
                         ),
                       ),
+                      if (a.imageCredit != null && photo.url.isNotEmpty)
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: a.imageCreditUrl == null
+                                ? null
+                                : () => LaunchHelpers.openWeb(context, a.imageCreditUrl!),
+                            child: Text(a.imageCredit!, style: VnText.body(11.5 * s, color: p.muted)),
+                          ),
+                        ),
                       if (a.keyTakeaways.isNotEmpty) ...[
                         const SizedBox(height: 16),
                         _KeyPoints(points: a.keyTakeaways, scale: s),
