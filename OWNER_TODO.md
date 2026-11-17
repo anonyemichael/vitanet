@@ -83,11 +83,21 @@ Check after a restart: `https://your-address/videos/status` shows `"serving": "y
 
 ## 7. Twi (you are the native speaker)
 
-- [ ] **Mark the Twi check PDF** (`vitanet-model/docs/review/VitaNet_Twi_Check_v1.pdf`, also sent in chat):
-      Good / Small mistakes / Wrong meaning for each A and B, and which is better. A short reply is enough.
-- [ ] Then **translate about 150 short template sentences** into Twi (Claude prepares an easy fill-in list once
-      your marks are in). These become VitaNet's Twi danger-sign training data.
-- [ ] **Write the 12 benchmark openings in Twi** (the test conversations, never trained on), so Twi can be tested.
+- [x] **Mark the Twi check PDF** (done 17 Nov: 0 of 40 machine translations were Good, you chose "Neither",
+      so VitaNet's Twi will be written by you, not by a computer).
+- [ ] **Translate 147 short sentences + the 12 test openings** in one sheet:
+      `vitanet-model/docs/review/twi_fill_in_v1.csv` (also sent in chat). About 2–3 hours; you can stop and go on later.
+  1. Google Drive → New → File upload → pick the file → open it with Google Sheets (or open it in Excel).
+  2. Write the Twi in the **twi** column only. Do not change the id or english columns.
+  3. Write it the way a Ghanaian would really say or type it, not word for word.
+  4. "he/she", "him/her": Twi uses one word for both, so write it once.
+  5. Keep numbers exactly (112, 193, ages, days). A question stays a question (ends with ?).
+     Keep **[SIGN]** where it is: a danger sign is put in there.
+  6. Rows marked "TEST ONLY" are the 12 test conversations. They are only for checking VitaNet, never for training.
+  7. Typing ɛ and ɔ: on a phone, Gboard → Settings → Languages → add "Twi". If that is hard, write 3 for ɛ and
+     c for ɔ (texting style) and say so: the program converts them and shows every change.
+  8. File → Download → Comma-separated values (.csv), and send the file to Claude in chat.
+  Cost: free. These become VitaNet's Twi danger-sign training data and the Twi test.
 
 ## 8. Clinical reviewer (your cousin)
 
