@@ -8,6 +8,9 @@ class Settings(BaseSettings):
     DEV_BYPASS_AUTH: bool = True
     FIREBASE_CREDENTIALS_PATH: str = ""
     RESEND_API_KEY: str = ""
+    # Sender for care-circle invites and alert emails. Resend's test sender only delivers to your own address;
+    # verify your domain in Resend and set e.g. "VitaNet <alerts@yourdomain.com>".
+    EMAIL_FROM: str = "VitaNet <onboarding@resend.dev>"
     
     # The VitaNet model (OpenAI-compatible server, e.g. vLLM). Gemini / OpenRouter are no longer used.
     # Empty AI_BASE_URL = the assistant is offline: the app is told so, danger-sign warnings and triage still work.

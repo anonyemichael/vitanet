@@ -178,7 +178,7 @@ def _send_email(to: str, subject: str, text: str) -> bool:
     try:
         import resend
         resend.api_key = app_settings.RESEND_API_KEY
-        resend.Emails.send({"from": "VitaNet <onboarding@resend.dev>", "to": [to], "subject": subject, "text": text})
+        resend.Emails.send({"from": app_settings.EMAIL_FROM, "to": [to], "subject": subject, "text": text})
         return True
     except Exception as e:
         logger.warning("Alert email failed: %s", e)
