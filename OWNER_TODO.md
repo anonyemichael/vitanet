@@ -77,8 +77,8 @@ Check after a restart: `https://your-address/videos/status` shows `"serving": "y
 - [ ] **Profile:** edit and save; add a care-circle contact by phone (they get an SMS invite once SMS is set up).
 - [ ] Note anything odd and tell Claude. When happy, merge the pull requests on GitHub (open the link →
       "Files changed" to look through it → "Merge pull request" → "Confirm merge"):
-  - [ ] App: https://github.com/anonyemichael/vitanet/pull/1 (merge after testing on your phone)
-  - [ ] Model: https://github.com/anonyemichael/vitanet-model/pull/2 (safe to merge any time)
+  - [x] App: https://github.com/anonyemichael/vitanet/pull/1 (merged 17 Nov; still test on your phone)
+  - [x] Model: https://github.com/anonyemichael/vitanet-model/pull/2 (merged 17 Nov)
       After merging, on your laptop: `git checkout main && git pull`.
 
 ## 7. Twi (you are the native speaker)
