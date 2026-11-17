@@ -124,3 +124,29 @@ Claude tested layouts automatically (small phone, large text), but these need a 
 - [ ] **Two or three first-time users** (family or friends): give them the phone, ask them to "check a symptom"
       without help, and note where they get stuck. Do the same with one hospital staff member on the portal.
 - [ ] Check that pharmacy and hospital listings near you in Ghana are right (names, phone numbers, hours).
+
+## 11. Host the backend on Google Cloud Run (your Firebase project) — needs your decision and 4 clicks
+
+Claude prepared everything that is free: a deploy workflow (`.github/workflows/deploy-backend.yml`) that builds
+the backend, puts it on Cloud Run in the Firebase project `vitanet-62e40` (region europe-west1), and sets a free
+every-minute job for health alerts. It does nothing until the steps below are done.
+
+- [ ] **Approve Claude's workflows once.** GitHub → vitanet repo → Actions → "check-secrets" → "Approve and run".
+      (GitHub asks the owner the first time a workflow comes from the Claude app. It lists secret NAMES only.)
+- [ ] **Decide on the Blaze plan (money).** Cloud Run needs the Firebase project on the pay-as-you-go "Blaze"
+      plan with a card. A small app like this stays inside the free tier (2 million requests a month), so expect
+      about $0–2 a month; the workflow caps it at 2 server copies. Firebase console → ⚙ → Usage and billing →
+      Modify plan → Blaze, then set a **budget alert of $5** (Google Cloud console → Billing → Budgets & alerts).
+- [ ] **Free database:** neon.tech → sign up (no card) → create project "vitanet" (region Frankfurt) → copy the
+      connection string (starts with `postgresql://`).
+- [ ] **Service account key:** console.cloud.google.com → project vitanet-62e40 → IAM & Admin → Service Accounts →
+      Create "github-deploy" → roles: Cloud Run Admin, Cloud Build Editor, Artifact Registry Administrator,
+      Service Account User, Storage Admin, Cloud Scheduler Admin → Keys → Add key → JSON (a file downloads).
+- [ ] **Put them in GitHub** (vitanet repo → Settings → Secrets and variables → Actions → New repository secret):
+      `GCP_SA_KEY` = the whole JSON file's text, `DATABASE_URL` = the Neon string, `TICK_TOKEN` = a long random
+      string. The other server keys from sections 3–5 can go here too (same names); the workflow passes them on.
+      Then delete the downloaded JSON file from your laptop.
+- [ ] **Run it:** Actions → deploy-backend → Run workflow. The log ends with "Backend address: https://…".
+      Tell Claude that address: it becomes the app's permanent server address (audit F-09).
+- [ ] **Firebase project names differ:** `.firebaserc` says `vitanet-prod-gh`, the app signs in with
+      `vitanet-62e40`. Tell Claude which one is right (the deploy uses `vitanet-62e40`).

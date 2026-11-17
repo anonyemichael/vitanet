@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     # Health library photos: free Pexels API key (pexels.com/api), server only. Empty = app topic photos.
     PEXELS_API_KEY: str = ""
 
+    # Secret for POST /internal/tick (a scheduler calls it every minute when the server sleeps between requests,
+    # e.g. on Cloud Run). Empty = the endpoint is off.
+    TICK_TOKEN: str = ""
+
     # Public address of this server (links in care-circle invite emails).
     PUBLIC_BASE_URL: str = "http://localhost:8000"
 

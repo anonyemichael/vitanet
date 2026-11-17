@@ -29,6 +29,7 @@ from app.routes import (
     media_proxy,
     videos,
     library,
+    internal,
 )
 from app.dependencies.security import DEV_BYPASS_AUTH
 
@@ -130,6 +131,7 @@ app.include_router(portal_live.router)
 app.include_router(media_proxy.router)
 app.include_router(videos.router)
 app.include_router(library.router)
+app.include_router(internal.router)
 
 
 @app.get("/")

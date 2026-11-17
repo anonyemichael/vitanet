@@ -1,0 +1,116 @@
+# Deploys vitanet-backend to Google Cloud Run in the Firebase project (vitanet-62e40), and keeps a free Cloud
+# Scheduler job calling /internal/tick every minute (alert check + content refresh while the server sleeps).
+#
+# Does NOTHING until the owner has set it up (see OWNER_TODO.md, "Host the backend"):
+#   GCP_SA_KEY    service-account JSON key (Cloud Run Admin, Cloud Build Editor, Artifact Registry Admin,
+#                 Service Account User, Storage Admin, Cloud Scheduler Admin)  [required]
+#   DATABASE_URL  PostgreSQL address, e.g. a free Neon database                    [required]
+#   TICK_TOKEN    long random string                                              [required]
+#   optional, passed to the server when set: YOUTUBE_API_KEY PEXELS_API_KEY RESEND_API_KEY EMAIL_FROM
+#   AT_USERNAME AT_API_KEY AT_SHORTCODE SMS_WEBHOOK_TOKEN SMS_HASH_SECRET TAVILY_API_KEY GOOGLE_API_KEY
+#   GOOGLE_CSE_ID AI_BASE_URL AI_MODEL AI_API_KEY PORTAL_AI_URL PORTAL_AI_MODEL PORTAL_AI_KEY
+#   BOOTSTRAP_ADMIN_EMAILS PUBLIC_BASE_URL ALLOWED_ORIGINS
+# Runs by hand (Actions -> deploy-backend -> Run workflow) and after backend changes reach main.
+# Cost guard: at most 2 server copies, scales to zero when idle (Cloud Run free tier covers a small app, but the
+# Google project must be on the pay-as-you-go "Blaze" plan: the owner decides that).
+name: deploy-backend
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["vitanet-backend/**", ".github/workflows/deploy-backend.yml"]
+permissions:
+  contents: read
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: false
+env:
+  PROJECT_ID: vitanet-62e40
+  REGION: europe-west1
+  SERVICE: vitanet-api
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Is hosting set up?
+        id: ready
+        env:
+          KEY: ${{ secrets.GCP_SA_KEY }}
+          DB: ${{ secrets.DATABASE_URL }}
+          TICK: ${{ secrets.TICK_TOKEN }}
+        run: |
+          missing=""
+          [ -n "$KEY" ] || missing="$missing GCP_SA_KEY"
+          [ -n "$DB" ] || missing="$missing DATABASE_URL"
+          [ -n "$TICK" ] || missing="$missing TICK_TOKEN"
+          if [ -n "$missing" ]; then
+            echo "Not set up yet (missing:$missing). Nothing deployed. See OWNER_TODO.md, 'Host the backend'."
+            echo "go=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "go=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.ready.outputs.go == 'true'
+
+      - uses: google-github-actions/auth@v2
+        if: steps.ready.outputs.go == 'true'
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+        if: steps.ready.outputs.go == 'true'
+
+      - name: Server settings from the repository secrets (written to a file, never printed)
+        if: steps.ready.outputs.go == 'true'
+        env:
+          ALL: ${{ toJSON(secrets) }}
+        run: |
+          python3 - <<'EOF'
+          import json, os
+          s = json.loads(os.environ["ALL"])
+          names = ["DATABASE_URL", "TICK_TOKEN", "YOUTUBE_API_KEY", "PEXELS_API_KEY", "RESEND_API_KEY", "EMAIL_FROM",
+                   "AT_USERNAME", "AT_API_KEY", "AT_SHORTCODE", "SMS_WEBHOOK_TOKEN", "SMS_HASH_SECRET",
+                   "TAVILY_API_KEY", "GOOGLE_API_KEY", "GOOGLE_CSE_ID", "AI_BASE_URL", "AI_MODEL", "AI_API_KEY",
+                   "PORTAL_AI_URL", "PORTAL_AI_MODEL", "PORTAL_AI_KEY", "BOOTSTRAP_ADMIN_EMAILS",
+                   "PUBLIC_BASE_URL", "ALLOWED_ORIGINS"]
+          env = {"ENVIRONMENT": "production", "FIREBASE_PROJECT_ID": os.environ["PROJECT_ID"]}
+          env.update({n: s[n] for n in names if s.get(n)})
+          with open(os.path.join(os.environ["RUNNER_TEMP"], "env.yaml"), "w") as f:
+              for k, v in env.items():
+                  f.write(f"{k}: {json.dumps(v)}\n")
+          print("settings passed:", ", ".join(sorted(env)))   # names only
+          EOF
+
+      - name: Build and deploy to Cloud Run
+        if: steps.ready.outputs.go == 'true'
+        run: |
+          gcloud run deploy "$SERVICE" --project "$PROJECT_ID" --region "$REGION" --source vitanet-backend \
+            --allow-unauthenticated --env-vars-file "$RUNNER_TEMP/env.yaml" \
+            --memory 1Gi --cpu 1 --timeout 120 --min-instances 0 --max-instances 2 --quiet
+          rm -f "$RUNNER_TEMP/env.yaml"
+          URL=$(gcloud run services describe "$SERVICE" --project "$PROJECT_ID" --region "$REGION" --format 'value(status.url)')
+          echo "Backend address: $URL"
+          echo "URL=$URL" >> "$GITHUB_ENV"
+
+      - name: Every-minute tick (Cloud Scheduler, free tier)
+        if: steps.ready.outputs.go == 'true'
+        env:
+          TICK: ${{ secrets.TICK_TOKEN }}
+        run: |
+          JOB=vitanet-tick
+          ARGS=(--project "$PROJECT_ID" --location "$REGION" --schedule "* * * * *" --http-method POST
+                --uri "$URL/internal/tick?token=$TICK" --attempt-deadline 60s)
+          if gcloud scheduler jobs describe "$JOB" --project "$PROJECT_ID" --location "$REGION" >/dev/null 2>&1; then
+            gcloud scheduler jobs update http "$JOB" "${ARGS[@]}" --quiet >/dev/null
+          else
+            gcloud scheduler jobs create http "$JOB" "${ARGS[@]}" --quiet >/dev/null
+          fi
+          echo "Tick job ready."
+
+      - name: Check the live server
+        if: steps.ready.outputs.go == 'true'
+        run: |
+          for path in /sms/health /videos/status /library/status; do
+            echo "$path: $(curl -s --max-time 30 "$URL$path" | head -c 200)"
+          done
