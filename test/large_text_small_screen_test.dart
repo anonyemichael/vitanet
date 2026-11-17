@@ -3,7 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vitanet/data/models/health_alert.dart';
+import 'package:vitanet/data/providers/referral_providers.dart';
+import 'package:vitanet/features/portal/data/portal_models.dart';
 import 'package:vitanet/features/assessment/screens/assessment_wizard_screen.dart';
+import 'package:vitanet/features/history/screens/patient_visits_screen.dart';
+import 'package:vitanet/features/home/screens/hospital_directory_screen.dart';
 import 'package:vitanet/features/settings/screens/disclaimer_screen.dart';
 import 'package:vitanet/features/settings/screens/privacy_screen.dart';
 import 'package:vitanet/features/settings/screens/settings_screen.dart';
@@ -17,6 +21,17 @@ void main() {
   final screens = <String, Widget>{
     'Symptom assessment': const AssessmentWizardScreen(),
     'Settings': const SettingsScreen(),
+    'Hospital directory': ProviderScope(
+      overrides: [
+        nearbyFacilitiesProvider.overrideWith((ref) async => const [
+              Facility(name: 'Korle Bu Teaching Hospital', address: 'Guggisberg Ave, Accra', latitude: 5.536,
+                  longitude: -0.226, phoneNumber: '0302 674 000', hasAmbulance: true, distanceKm: 2.4,
+                  bedsTotal: 40, bedsFree: 6, etaMinutes: 9),
+            ]),
+      ],
+      child: const HospitalDirectoryScreen(),
+    ),
+    'Hospital visits': const PatientVisitsScreen(),
     'Privacy': const PrivacyScreen(),
     'Disclaimer': const DisclaimerScreen(),
     'Health alert card': Scaffold(

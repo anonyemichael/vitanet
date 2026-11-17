@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -88,6 +89,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   static const _uuid = Uuid();
 
   bool _isFocused = false;
+  bool _showFirstUseHint = false; // one-time "type and send / tap +" hint (UX-08)
   bool _isComposing = false;
   bool _showSlashMenu = false;
   String _slashQuery = '';
@@ -102,6 +104,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     super.initState();
     _textController.addListener(_handleTextChange);
     _focusNode.addListener(_handleFocusChange);
+
+    SharedPreferences.getInstance().then((prefs) {
+      if (mounted && !(prefs.getBool('chat_hint_seen') ?? false)) setState(() => _showFirstUseHint = true);
+    }).catchError((Object _) {});
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(navBarVisibleProvider.notifier).state = true;
@@ -252,6 +258,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Future<void> _sendMessage(String text, {String? imagePath, bool isVoice = false}) async {
     final query = text.trim();
     if (query.isEmpty && imagePath == null) return;
+    _dismissFirstUseHint(); // they found the basic path
 
     _textController.clear();
     setState(() {
@@ -543,6 +550,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     'Full blood count, lipid panel, kidney function', _pickDocumentFile),
                 row(Icons.edit_note_rounded, 'Type values directly',
                     'WBC, haemoglobin, creatinine, cholesterol', _openLabValues),
+              ],
+            ),
+            // the shortcuts live here too, so the composer can stay simple mid-conversation (UX-08)
+            const VnSectionLabel('Get help with', padding: EdgeInsets.only(top: 4)),
+            VnListGroup(
+              children: [
+                row(Icons.monitor_heart_outlined, 'Check my symptoms', 'Step-by-step questions, like a triage nurse',
+                    () => _checkProfileCompletionAndProceed(
+                        'I want to check my symptoms. Please ask structured triage questions to evaluate what I am experiencing.')),
+                row(Icons.medication_outlined, 'Medication help', 'Doses, side effects, mixing medicines',
+                    () => _showMedicationInteractionModal(context)),
+                row(Icons.emergency_outlined, 'First aid', 'What to do right now in an emergency',
+                    () => _showEmergencyFirstAidModal(context)),
               ],
             ),
             Row(
@@ -988,6 +1008,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   // SHORTCUT CHIPS (ABOVE THE COMPOSER)
   // ==========================================
 
+  void _dismissFirstUseHint() {
+    if (!_showFirstUseHint) return;
+    setState(() => _showFirstUseHint = false);
+    SharedPreferences.getInstance().then((p) => p.setBool('chat_hint_seen', true)).catchError((Object _) => false);
+  }
+
   Widget _buildShortcutChips(BuildContext context) {
     final p = VnPalette.of(context);
     final chips = <(IconData, String, VoidCallback)>[
@@ -1088,8 +1114,37 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   clipBehavior: Clip.antiAlias,
                   child: _SlashCommandList(commands: _filteredCommands, onSelected: _runCommand),
                 ),
-              _buildShortcutChips(context),
-              const SizedBox(height: 10),
+              // Shortcut chips only on a new, empty chat with the keyboard down; mid-conversation they are in the
+              // "+" sheet, so the text box and the messages get the room (UI/UX audit UX-08).
+              if (ref.watch(chatMessagesProvider).isEmpty && !keyboardOpen) ...[
+                _buildShortcutChips(context),
+                const SizedBox(height: 10),
+              ],
+              if (_showFirstUseHint)
+                Container(
+                  margin: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+                  padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+                  decoration: BoxDecoration(
+                    color: p.brandWash,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: p.brandBorder),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.lightbulb_outline_rounded, size: 18, color: p.brand),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text('Type how you feel and press send. Tap + for photos, lab results, medicines and '
+                            'first aid.', style: VnText.body(13, color: p.ink)),
+                      ),
+                      IconButton(
+                        tooltip: 'Got it',
+                        icon: Icon(Icons.close_rounded, size: 18, color: p.muted),
+                        onPressed: _dismissFirstUseHint,
+                      ),
+                    ],
+                  ),
+                ),
               if (_attachedFilePath != null)
                 Container(
                   margin: const EdgeInsets.fromLTRB(12, 0, 12, 10),
@@ -1130,7 +1185,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   children: [
                     VnIconButton(
                       icon: Icons.add_rounded,
-                      tooltip: 'Attach a photo, PDF or lab result',
+                      tooltip: 'More: photo, PDF, lab results, medicines, first aid',
                       size: 46,
                       radius: 10,
                       background: p.surfaceAlt,

@@ -16,20 +16,22 @@ class PatientVisitsScreen extends ConsumerWidget {
     final p = VnPalette.of(context);
     final casesAsync = ref.watch(patientCasesProvider);
 
+    // shared VitaNet components (UI/UX audit UX-13)
     return Scaffold(
       backgroundColor: p.page,
-      appBar: AppBar(
-        title: const Text('Hospital Admissions & Care', style: TextStyle(fontWeight: FontWeight.w700)),
-        backgroundColor: p.surface,
-        foregroundColor: p.ink,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-      ),
-      body: RefreshIndicator(
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 8, 16, 4),
+              child: VnTopBar(title: 'Hospital visits'),
+            ),
+            Expanded(child: RefreshIndicator(
         onRefresh: () => ref.refresh(patientCasesProvider.future),
         child: casesAsync.when(
           loading: () => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-          error: (e, _) => Center(
+          error: (e, _) => _fill(Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -37,16 +39,18 @@ class PatientVisitsScreen extends ConsumerWidget {
                 const SizedBox(height: 12),
                 Text('Could not load hospital care history', style: VnText.heading(16, color: p.ink)),
                 const SizedBox(height: 12),
-                ElevatedButton(
+                VnButton(
+                  label: 'Try again',
+                  icon: Icons.refresh_rounded,
+                  expand: false,
                   onPressed: () => ref.invalidate(patientCasesProvider),
-                  child: const Text('Retry'),
                 ),
               ],
             ),
-          ),
+          )),
           data: (cases) {
             if (cases.isEmpty) {
-              return Center(
+              return _fill(Center(
                 child: Padding(
                   padding: const EdgeInsets.all(32),
                   child: Column(
@@ -72,7 +76,7 @@ class PatientVisitsScreen extends ConsumerWidget {
                     ],
                   ),
                 ),
-              );
+              ));
             }
 
             final active = cases.where((c) => !c.isDischarged).toList();
@@ -101,6 +105,9 @@ class PatientVisitsScreen extends ConsumerWidget {
               ],
             );
           },
+        ),
+      )),
+          ],
         ),
       ),
     );
@@ -307,3 +314,11 @@ class _HospitalCaseCard extends StatelessWidget {
     );
   }
 }
+
+/// Centres a message but lets it scroll (large text on small phones; pull-to-refresh still works). UX-14.
+Widget _fill(Widget child) => LayoutBuilder(
+      builder: (context, box) => SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: ConstrainedBox(constraints: BoxConstraints(minHeight: box.maxHeight), child: child),
+      ),
+    );

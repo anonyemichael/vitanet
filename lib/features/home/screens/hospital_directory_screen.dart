@@ -48,89 +48,63 @@ class _HospitalDirectoryScreenState extends ConsumerState<HospitalDirectoryScree
     final p = VnPalette.of(context);
     final facilitiesAsync = ref.watch(nearbyFacilitiesProvider);
 
+    // shared VitaNet components (UI/UX audit UX-13): VnTopBar, VnTextField, VnChip, VnButton
     return Scaffold(
       backgroundColor: p.page,
-      appBar: AppBar(
-        title: const Text('Hospitals & Medical Centers', style: TextStyle(fontWeight: FontWeight.w700)),
-        backgroundColor: p.surface,
-        foregroundColor: p.ink,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-      ),
-      body: Column(
+      body: SafeArea(
+        bottom: false,
+        child: Column(
         children: [
           // Search & Filter header
           Container(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
             color: p.surface,
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                TextField(
+                const VnTopBar(title: 'Hospitals & clinics'),
+                const SizedBox(height: 8),
+                VnTextField(
                   controller: _searchCtrl,
+                  hint: 'Search hospital name, city, or district…',
+                  prefixIcon: Icons.search_rounded,
                   onChanged: (_) => setState(() {}),
-                  decoration: InputDecoration(
-                    hintText: 'Search hospital name, city, or district…',
-                    prefixIcon: const Icon(Icons.search_rounded, size: 20),
-                    suffixIcon: _searchCtrl.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear_rounded, size: 18),
-                            onPressed: () {
-                              _searchCtrl.clear();
-                              setState(() {});
-                            },
-                          )
-                        : null,
-                    filled: true,
-                    fillColor: p.surfaceAlt,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
+                  suffix: _searchCtrl.text.isEmpty
+                      ? null
+                      : VnIconButton(
+                          icon: Icons.clear_rounded,
+                          tooltip: 'Clear search',
+                          iconSize: 18,
+                          onPressed: () {
+                            _searchCtrl.clear();
+                            setState(() {});
+                          },
+                        ),
                 ),
                 const SizedBox(height: 10),
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
-                      FilterChip(
-                        label: const Text('24/7 ER Only'),
+                      VnChip(
+                        label: '24/7 emergency',
+                        icon: Icons.emergency_outlined,
                         selected: _emergencyOnly,
-                        onSelected: (val) => setState(() => _emergencyOnly = val),
-                        backgroundColor: p.surfaceAlt,
-                        selectedColor: const Color(0x2E10B981),
-                        labelStyle: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: _emergencyOnly ? const Color(0xFF047857) : p.ink,
-                        ),
+                        onTap: () => setState(() => _emergencyOnly = !_emergencyOnly),
                       ),
                       const SizedBox(width: 8),
-                      FilterChip(
-                        label: const Text('Beds Available'),
+                      VnChip(
+                        label: 'Beds available',
+                        icon: Icons.bed_outlined,
                         selected: _hasBedsOnly,
-                        onSelected: (val) => setState(() => _hasBedsOnly = val),
-                        backgroundColor: p.surfaceAlt,
-                        selectedColor: const Color(0x2E0284C7),
-                        labelStyle: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: _hasBedsOnly ? const Color(0xFF0369A1) : p.ink,
-                        ),
+                        onTap: () => setState(() => _hasBedsOnly = !_hasBedsOnly),
                       ),
                       const SizedBox(width: 8),
-                      FilterChip(
-                        label: const Text('Has ambulance'),
+                      VnChip(
+                        label: 'Has ambulance',
+                        icon: Icons.airport_shuttle_outlined,
                         selected: _ambulanceOnly,
-                        onSelected: (val) => setState(() => _ambulanceOnly = val),
-                        backgroundColor: p.surfaceAlt,
-                        selectedColor: const Color(0x2EF59E0B),
-                        labelStyle: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: _ambulanceOnly ? const Color(0xFFB45309) : p.ink,
-                        ),
+                        onTap: () => setState(() => _ambulanceOnly = !_ambulanceOnly),
                       ),
                     ],
                   ),
@@ -138,7 +112,7 @@ class _HospitalDirectoryScreenState extends ConsumerState<HospitalDirectoryScree
               ],
             ),
           ),
-          const Divider(height: 1),
+          Divider(height: 1, color: p.line),
 
           // Facilities List
           Expanded(
@@ -152,9 +126,11 @@ class _HospitalDirectoryScreenState extends ConsumerState<HospitalDirectoryScree
                     const SizedBox(height: 12),
                     Text('Failed to load facilities: ${apiErrorMessage(e)}'),
                     const SizedBox(height: 12),
-                    ElevatedButton(
+                    VnButton(
+                      label: 'Try again',
+                      icon: Icons.refresh_rounded,
+                      expand: false,
                       onPressed: () => ref.invalidate(nearbyFacilitiesProvider),
-                      child: const Text('Retry'),
                     ),
                   ],
                 ),
@@ -327,30 +303,25 @@ class _HospitalDirectoryScreenState extends ConsumerState<HospitalDirectoryScree
                           Row(
                             children: [
                               Expanded(
-                                child: ElevatedButton.icon(
+                                child: VnButton(
+                                  label: 'Emergency check-in',
+                                  icon: Icons.emergency_rounded,
+                                  height: 44,
+                                  fontSize: 13,
+                                  background: const Color(0xFFDC2626),
+                                  foreground: Colors.white,
                                   onPressed: () => _showPreArrivalModal(context, fac),
-                                  icon: const Icon(Icons.emergency_rounded, size: 16),
-                                  label: const Text('ER Pre-Arrival Check-In'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFFDC2626),
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(vertical: 10),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                    elevation: 0,
-                                    textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                                  ),
                                 ),
                               ),
                               const SizedBox(width: 8),
-                              OutlinedButton.icon(
+                              VnOutlineButton(
+                                label: 'Call',
+                                icon: Icons.call_rounded,
+                                height: 44,
+                                fontSize: 13,
+                                expand: false,
+                                padding: const EdgeInsets.symmetric(horizontal: 16),
                                 onPressed: () => _callHospital(context, fac.phoneNumber),
-                                icon: const Icon(Icons.call_rounded, size: 15),
-                                label: const Text('Call'),
-                                style: OutlinedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                                ),
                               ),
                             ],
                           ),
@@ -363,6 +334,7 @@ class _HospitalDirectoryScreenState extends ConsumerState<HospitalDirectoryScree
             ),
           ),
         ],
+      ),
       ),
     );
   }

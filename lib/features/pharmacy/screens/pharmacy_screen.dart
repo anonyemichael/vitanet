@@ -302,7 +302,7 @@ class _PharmacyScreenState extends State<PharmacyScreen> {
                       child: Row(
                         children: [
                           for (final f in _filters) ...[
-                            _FilterChip(
+                            VnChip(   // shared chip (UX-13)
                               label: f.$1,
                               selected: f.$1 == _filter,
                               onTap: () => setState(() => _filter = f.$1),
@@ -746,36 +746,6 @@ class _MapPin extends StatelessWidget {
             const SizedBox(width: 4),
             Text(hospital ? 'A&E' : place.shortDistance, style: VnText.body(12, weight: FontWeight.w700, color: fg)),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _FilterChip extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-  const _FilterChip({required this.label, required this.selected, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final p = VnPalette.of(context);
-    return Semantics(
-      selected: selected,
-      button: true,
-      child: Material(
-        color: selected ? p.ink : p.surface,
-        shape: StadiumBorder(side: BorderSide(color: selected ? p.ink : p.line)),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: Container(
-            height: 44,
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            alignment: Alignment.center,
-            child: Text(label, style: VnText.body(13, weight: FontWeight.w600, color: selected ? p.page : p.ink)),
-          ),
         ),
       ),
     );
