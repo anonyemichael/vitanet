@@ -86,7 +86,8 @@ Check after a restart: `https://your-address/videos/status` shows `"serving": "y
 - [x] **Mark the Twi check PDF** (done 17 Nov: 0 of 40 machine translations were Good, you chose "Neither",
       so VitaNet's Twi will be written by you, not by a computer).
 - [ ] **Translate 147 short sentences + the 12 test openings** in one sheet:
-      `vitanet-model/docs/review/twi_fill_in_v1.csv` (also sent in chat). About 2–3 hours; you can stop and go on later.
+      `vitanet-model/docs/review/VitaNet_Twi_Translate_v1.pdf` (PDF, numbered cards; sent in chat 18 Nov) or the same
+      sheet as `twi_fill_in_v1.csv`. Answer by number in chat ("12: …"), or write on a print-out and send photos. About 2–3 hours; you can stop and go on later.
   1. Google Drive → New → File upload → pick the file → open it with Google Sheets (or open it in Excel).
   2. Write the Twi in the **twi** column only. Do not change the id or english columns.
   3. Write it the way a Ghanaian would really say or type it, not word for word.
@@ -98,9 +99,9 @@ Check after a restart: `https://your-address/videos/status` shows `"serving": "y
      c for ɔ (texting style) and say so: the program converts them and shows every change.
   8. File → Download → Comma-separated values (.csv), and send the file to Claude in chat.
   Cost: free. These become VitaNet's Twi danger-sign training data and the Twi test.
-- [ ] **Rate 40 rows of the Ghana NLP Twi data** (you chose on 18 Nov to use this non-commercial data). Claude sends
-      the sheet `twi_nc_review.csv` when it is ready (10 rows from each source). Write Good / Small mistakes / Wrong in
-      the rating column, then File → Download → .csv and send it back. A source with many "Wrong" is left out.
+- [ ] **Rate 40 rows of the Ghana NLP Twi data** (you chose on 18 Nov to use this non-commercial data). Sheet:
+      `vitanet-model/docs/review/VitaNet_Twi_Rate_40.pdf` (sent in chat 18 Nov; 10 rows from each source). Reply in chat
+      by card number, e.g. "1 G, 2 S, 3 W" (G = Good, S = Small mistakes, W = Wrong). A source with many "Wrong" is left out.
       Remember: while this data is in the model, VitaNet must stay free (no paid version, no paid hospital portal).
 
 ## 8. Clinical reviewer (your cousin)
