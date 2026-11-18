@@ -115,6 +115,10 @@ Check after a restart: `https://your-address/videos/status` shows `"serving": "y
   - The symptom checker over-triages: "headache" alone and "dizziness" alone come out **urgent** (its built-in
     condition list). Which conditions should be urgent?
   - Danger-sign wording in `vitanet-backend/app/services/safety/safety_rules.yaml`.
+- [ ] **Trained model's answers (18 Nov), please check:** for a suspected stroke it said "Please do not let her
+      sleep; we need to check her now" (is that advice right, or should it be removed?), and for a month-long cough
+      it suggested a malaria test (is that sensible in Ghana, or should it only mention TB testing?). Replies are in
+      `vitanet-model/experiments/experiment_log.md`, EXP-008 quick eval v2.
 - [ ] Help write or check a bigger test set: at least 50 cases, 15 of them red flags.
 
 ## 9. Small clean-ups (whenever)
