@@ -87,7 +87,10 @@ Check after a restart: `https://your-address/videos/status` shows `"serving": "y
       so VitaNet's Twi will be written by you, not by a computer).
 - [ ] **Translate 147 short sentences + the 12 test openings** in one sheet:
       `vitanet-model/docs/review/VitaNet_Twi_Translate_v1.pdf` (PDF, numbered cards; sent in chat 18 Nov) or the same
-      sheet as `twi_fill_in_v1.csv`. Answer by number in chat ("12: …"), or write on a print-out and send photos. About 2–3 hours; you can stop and go on later.
+      sheet as `twi_fill_in_v1.csv`. Answer by number in chat ("12: …"), or write on a print-out and send photos.
+      **Easiest:** it is also in your Google Drive as the Google Sheet "VitaNet Twi – sentences to translate":
+      type the Twi in the **twi** column (works in the Google Sheets phone app) and tell Claude when done; Claude
+      reads it from Drive. About 2–3 hours; you can stop and go on later.
   1. Google Drive → New → File upload → pick the file → open it with Google Sheets (or open it in Excel).
   2. Write the Twi in the **twi** column only. Do not change the id or english columns.
   3. Write it the way a Ghanaian would really say or type it, not word for word.
@@ -101,7 +104,8 @@ Check after a restart: `https://your-address/videos/status` shows `"serving": "y
   Cost: free. These become VitaNet's Twi danger-sign training data and the Twi test.
 - [ ] **Rate 40 rows of the Ghana NLP Twi data** (you chose on 18 Nov to use this non-commercial data). Sheet:
       `vitanet-model/docs/review/VitaNet_Twi_Rate_40.pdf` (sent in chat 18 Nov; 10 rows from each source). Reply in chat
-      by card number, e.g. "1 G, 2 S, 3 W" (G = Good, S = Small mistakes, W = Wrong). A source with many "Wrong" is left out.
+      by card number, e.g. "1 G, 2 S, 3 W" (G = Good, S = Small mistakes, W = Wrong). Or fill the **rating** column of the Google Sheet "VitaNet Twi –
+      rate 40 rows" in your Google Drive and tell Claude. A source with many "Wrong" is left out.
       Remember: while this data is in the model, VitaNet must stay free (no paid version, no paid hospital portal).
 
 ## 8. Clinical reviewer (your cousin)
