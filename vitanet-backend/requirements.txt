@@ -29,3 +29,4 @@ openai
 PyYAML>=6.0
 africastalking
 python-multipart>=0.0.9
+httpx>=0.27

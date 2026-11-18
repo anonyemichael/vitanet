@@ -129,3 +129,18 @@ def test_profile_contacts_become_the_care_circle_once(db, user, monkeypatch):
     assert db.query(CareCircle).count() == 1
     sync([])                                                           # removed in the app
     assert db.query(CareCircle).count() == 0
+
+
+def test_tick_endpoint_needs_its_token(monkeypatch):
+    from fastapi.testclient import TestClient
+    from app.main import app
+    from app.routes import internal
+    monkeypatch.setattr(internal.settings, "TICK_TOKEN", "")
+    c = TestClient(app)
+    assert c.post("/internal/tick?token=x").status_code == 403          # off when no token is configured
+    monkeypatch.setattr(internal.settings, "TICK_TOKEN", "s3cret")
+    assert c.post("/internal/tick?token=wrong").status_code == 403
+    monkeypatch.setattr(internal.health_alert_service, "escalate_due", lambda db: 2)
+    monkeypatch.setattr(internal.video_service, "_ensure_fresh_in_background", lambda: None)
+    monkeypatch.setattr(internal.library_service, "_ensure_fresh_in_background", lambda: None)
+    assert c.post("/internal/tick?token=s3cret").json() == {"escalated": 2}
