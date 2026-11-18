@@ -141,8 +141,10 @@ Claude prepared everything that is free: a deploy workflow (`.github/workflows/d
 the backend, puts it on Cloud Run in the Firebase project `vitanet-62e40` (region europe-west1), and sets a free
 every-minute job for health alerts. It does nothing until the steps below are done.
 
-- [ ] **Approve Claude's workflows once.** GitHub → vitanet repo → Actions → "check-secrets" → "Approve and run".
-      (GitHub asks the owner the first time a workflow comes from the Claude app. It lists secret NAMES only.)
+- [ ] **Approve Claude's workflows once.** GitHub asks the owner the first time a workflow comes from the Claude app.
+      GitHub → vitanet repo → Actions → the "deploy-backend" run marked "Action required" → "Approve and run"
+      (until the secrets below exist it only prints "Not set up yet" and deploys nothing). Then Actions →
+      "check-secrets" → "Run workflow" → branch main → "Run workflow" (it lists secret NAMES only, never values).
 - [ ] **Decide on the Blaze plan (money).** Cloud Run needs the Firebase project on the pay-as-you-go "Blaze"
       plan with a card. A small app like this stays inside the free tier (2 million requests a month), so expect
       about $0–2 a month; the workflow caps it at 2 server copies. Firebase console → ⚙ → Usage and billing →
