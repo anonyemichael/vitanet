@@ -98,6 +98,10 @@ Check after a restart: `https://your-address/videos/status` shows `"serving": "y
      c for ɔ (texting style) and say so: the program converts them and shows every change.
   8. File → Download → Comma-separated values (.csv), and send the file to Claude in chat.
   Cost: free. These become VitaNet's Twi danger-sign training data and the Twi test.
+- [ ] **Rate 40 rows of the Ghana NLP Twi data** (you chose on 18 Nov to use this non-commercial data). Claude sends
+      the sheet `twi_nc_review.csv` when it is ready (10 rows from each source). Write Good / Small mistakes / Wrong in
+      the rating column, then File → Download → .csv and send it back. A source with many "Wrong" is left out.
+      Remember: while this data is in the model, VitaNet must stay free (no paid version, no paid hospital portal).
 
 ## 8. Clinical reviewer (your cousin)
 
