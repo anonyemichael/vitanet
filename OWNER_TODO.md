@@ -81,32 +81,30 @@ Check after a restart: `https://your-address/videos/status` shows `"serving": "y
   - [x] Model: https://github.com/anonyemichael/vitanet-model/pull/2 (merged 17 Nov)
       After merging, on your laptop: `git checkout main && git pull`.
 
-## 7. Twi (you are the native speaker)
+## 7. Twi (you do not speak Twi: Twi speakers fill Google Forms you send them)
 
-- [x] **Mark the Twi check PDF** (done 17 Nov: 0 of 40 machine translations were Good, you chose "Neither",
-      so VitaNet's Twi will be written by you, not by a computer).
-- [ ] **Translate 147 short sentences + the 12 test openings** in one sheet:
-      `vitanet-model/docs/review/VitaNet_Twi_Translate_v1.pdf` (PDF, numbered cards; sent in chat 18 Nov) or the same
-      sheet as `twi_fill_in_v1.csv`. Answer by number in chat ("12: …"), or write on a print-out and send photos.
-      **Easiest:** it is also in your Google Drive as the Google Sheet "VitaNet Twi – sentences to translate":
-      type the Twi in the **twi** column (works in the Google Sheets phone app) and tell Claude when done; Claude
-      reads it from Drive. About 2–3 hours; you can stop and go on later.
-  1. Google Drive → New → File upload → pick the file → open it with Google Sheets (or open it in Excel).
-  2. Write the Twi in the **twi** column only. Do not change the id or english columns.
-  3. Write it the way a Ghanaian would really say or type it, not word for word.
-  4. "he/she", "him/her": Twi uses one word for both, so write it once.
-  5. Keep numbers exactly (112, 193, ages, days). A question stays a question (ends with ?).
-     Keep **[SIGN]** where it is: a danger sign is put in there.
-  6. Rows marked "TEST ONLY" are the 12 test conversations. They are only for checking VitaNet, never for training.
-  7. Typing ɛ and ɔ: on a phone, Gboard → Settings → Languages → add "Twi". If that is hard, write 3 for ɛ and
-     c for ɔ (texting style) and say so: the program converts them and shows every change.
-  8. File → Download → Comma-separated values (.csv), and send the file to Claude in chat.
-  Cost: free. These become VitaNet's Twi danger-sign training data and the Twi test.
-- [ ] **Rate 40 rows of the Ghana NLP Twi data** (you chose on 18 Nov to use this non-commercial data). Sheet:
-      `vitanet-model/docs/review/VitaNet_Twi_Rate_40.pdf` (sent in chat 18 Nov; 10 rows from each source). Reply in chat
-      by card number, e.g. "1 G, 2 S, 3 W" (G = Good, S = Small mistakes, W = Wrong). Or fill the **rating** column of the Google Sheet "VitaNet Twi –
-      rate 40 rows" in your Google Drive and tell Claude. A source with many "Wrong" is left out.
-      Remember: while this data is in the model, VitaNet must stay free (no paid version, no paid hospital portal).
+- [x] **Twi check of computer translations** (done 17 Nov through your form: 0 of 40 were Good, "Neither" chosen,
+      so VitaNet's Twi comes from people, not from a computer).
+- [ ] **Make the Twi forms (2 minutes, free).** Claude wrote a script that builds them from the two Google Sheets
+      already in your Drive:
+  1. Open https://script.google.com → **New project**.
+  2. Delete what is there, paste all of `vitanet-model/docs/review/twi_forms.gs` (also sent in chat), click **Save**.
+  3. At the top choose **makeAllForms** → **Run**.
+  4. Google asks for permission: **Review permissions** → your account → **Advanced** → **Go to project** → **Allow**
+     (it only reads the two sheets and creates forms and answer sheets in your Drive).
+  5. Open **Execution log**: it lists 5 forms, each with a SHARE link (for Twi speakers) and an EDIT link (for you):
+     - "VitaNet Twi check: is this Twi good?" (40 rows to rate, ~15 min)
+     - "VitaNet Twi: translate" parts 1–4 (danger signs 68, questions 42, adult clinic-today 37, 12 test
+       conversations; ~30–45 min each).
+- [ ] **Send the SHARE links to Twi speakers** (WhatsApp is fine). Best: 2–3 people per form, so answers can be
+      compared; people who speak Asante or Akuapem Twi. Every form asks for their permission at the end; only
+      answers from people who say "Yes" are used.
+- [ ] **Tell Claude when answers are in.** They arrive in Google Sheets named "… (answers)" in your Drive; Claude
+      reads them, compares the helpers, and builds the Twi data. The rating form matters first: a source rated
+      mostly Wrong is left out of training. (Paper or chat also works: the PDFs `VitaNet_Twi_Rate_40.pdf` and
+      `VitaNet_Twi_Translate_v1.pdf` use the same card numbers.)
+- Note: the Ghana NLP Twi data you chose on 18 Nov is non-commercial: while it is in the model, VitaNet must stay
+  free (no paid version, no paid hospital portal).
 
 ## 8. Clinical reviewer (your cousin)
 
