@@ -58,7 +58,8 @@ def test_requires_token():
         ("get", "/portal/dashboard"),
         ("get", "/admin/staff-requests"),
         ("get", "/triage/symptoms"),
-        ("post", "/ai/chat/completions"),
+        ("post", "/chat/alice-uid"),          # the chat (the old /ai/chat/completions proxy was removed)
+        ("post", "/ai/health-report"),
     ]:
         r = getattr(client, method)(path)
         assert r.status_code == 401, (path, r.status_code)
