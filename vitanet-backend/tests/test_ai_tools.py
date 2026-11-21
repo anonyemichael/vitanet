@@ -252,3 +252,16 @@ def test_fever_with_stiff_neck_is_urgent():
     for syms in (["fever", "stiff_neck"], ["fever", "confusion"], ["sneezing", "stiff_neck"], ):
         r = ml_service.predict_triage(symptoms=syms, temperature=38.6)
         assert r["severity"] == "urgent", syms
+
+
+def test_not_alert_patient_is_always_urgent(monkeypatch):
+    """EXP-008 eval: the v1 model called 3 patients 'routine' / 'doctor' whose vitals said alert=false (a cut hand,
+    a red leg). The backend must never pass that through: the hard rule makes them urgent."""
+    monkeypatch.setattr(portal_ai.settings, "PORTAL_AI_URL", "http://model.test/v1")
+    inp = {"task": "triage_check", "age": 41, "sex": "female", "complaint": "Red, hot, swollen lower leg for 3 days",
+           "vitals": {"heart_rate": 76, "bp_systolic": 121, "spo2": 97, "temperature": 38.8, "alert": False},
+           "allergies": []}
+    for level in ("routine", "doctor"):
+        answer = {"level": level, "reasons": ["Cellulitis"], "red_flags_to_watch": [], "first_steps": ["Elevate"]}
+        out, info = portal_ai.run_task(inp, client=FakeClient({"choices": [{"message": {"content": json.dumps(answer)}}]}))
+        assert info["source"] == "rules" and out["level"] == "urgent" and "Not alert" in out["reasons"]
