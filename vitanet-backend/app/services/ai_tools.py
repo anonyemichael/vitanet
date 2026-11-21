@@ -126,8 +126,53 @@ def get_nearby_hospitals(db, user_id):
     return hospital_service.get_nearby_hospitals(db, loc[0], loc[1], limit=3)
 
 
+# Plain-English names the model uses instead of the app's codes (v1/v1.1 evaluation: "painful_urination",
+# "frequent_urgent_urination" for a urine infection). Explicit, because fuzzy matching alone is unsafe here:
+# "painful_urination" is closest in spelling to "frequent_urination", which is a different symptom.
+SYMPTOM_SYNONYMS = {
+    "painful_urination": ["burning_micturition"], "burning_urination": ["burning_micturition"],
+    "dysuria": ["burning_micturition"], "pain_when_urinating": ["burning_micturition"],
+    "frequent_urgent_urination": ["frequent_urination", "urinary_urgency"],
+    "urinary_frequency": ["frequent_urination"], "urgency": ["urinary_urgency"],
+    "convulsion": ["seizures"], "convulsions": ["seizures"], "fits": ["seizures"],
+    "breathlessness": ["shortness_of_breath"], "skin_rash": ["rash"], "loose_stools": ["diarrhea"],
+    "diarrhoea": ["diarrhea"], "stomach_pain": ["abdominal_pain"], "belly_pain": ["abdominal_pain"],
+}
+
+
+def normalise_symptoms(symptoms):
+    """(codes the symptom checker knows, {given: [codes]} for names that were translated, [names not known])."""
+    import difflib
+    from app.services.ml_service import SYMPTOM_MAP
+    known = set(SYMPTOM_MAP)
+    codes, translated, unknown = [], {}, []
+    for raw in symptoms or []:
+        name = str(raw).strip().lower().replace(" ", "_").replace("-", "_")
+        if not name:
+            continue
+        if name in known:
+            got = [name]
+        elif name in SYMPTOM_SYNONYMS:
+            got = SYMPTOM_SYNONYMS[name]
+        else:   # only near-identical spellings ("seizure" -> "seizures"), never a different symptom
+            got = difflib.get_close_matches(name, known, n=1, cutoff=0.9)
+        if not got:
+            unknown.append(name)
+            continue
+        if got != [name]:
+            translated[name] = got
+        codes += [c for c in got if c not in codes]
+    return codes, translated, unknown
+
+
 def check_symptoms_ml(db, user_id, symptoms):
-    """Only MEASURED vitals and known age/sex are passed; nothing is filled in with a normal value."""
+    """Only MEASURED vitals and known age/sex are passed; nothing is filled in with a normal value.
+    Symptom names are mapped to the checker's codes first; names it cannot map are reported back, not dropped
+    silently, so the assistant knows what was not checked."""
+    codes, translated, unknown = normalise_symptoms(symptoms)
+    if not codes:
+        return {"error": f"None of these symptoms are in the symptom checker's list: {unknown}. "
+                         "Describe them with simpler words, or answer without the checker."}
     latest = vitals_service.get_all_latest(db, user_id)
     measured = {}
     for key, vt in (("heart_rate", VitalType.HEART_RATE), ("temperature", VitalType.TEMPERATURE),
@@ -141,8 +186,12 @@ def check_symptoms_ml(db, user_id, symptoms):
         measured["age"] = _age(user.date_of_birth)
     if user and user.biological_sex:
         measured["gender"] = "F" if user.biological_sex.lower().startswith("f") else "M"
-    result = ml_service.predict_triage(symptoms=list(symptoms or []), **measured)
+    result = ml_service.predict_triage(symptoms=codes, **measured)
     result["vitals_used"] = sorted(k for k in measured if k not in ("age", "gender"))
+    if translated:
+        result["symptoms_understood_as"] = translated
+    if unknown:
+        result["symptoms_not_recognised"] = unknown
     return result
 
 

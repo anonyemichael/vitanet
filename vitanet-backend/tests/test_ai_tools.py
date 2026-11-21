@@ -265,3 +265,20 @@ def test_not_alert_patient_is_always_urgent(monkeypatch):
         answer = {"level": level, "reasons": ["Cellulitis"], "red_flags_to_watch": [], "first_steps": ["Elevate"]}
         out, info = portal_ai.run_task(inp, client=FakeClient({"choices": [{"message": {"content": json.dumps(answer)}}]}))
         assert info["source"] == "rules" and out["level"] == "urgent" and "Not alert" in out["reasons"]
+
+
+def test_symptom_names_are_mapped_not_dropped():
+    """v1/v1.1 evaluation: the model sent 'painful_urination' / 'frequent_urgent_urination' (not app codes) for a
+    urine infection. They must reach the checker as the right codes, and unknown names must be reported back."""
+    from app.services.ai_tools import normalise_symptoms
+    codes, translated, unknown = normalise_symptoms(
+        ["painful_urination", "frequent_urgent_urination", "Fever", "seizure", "feeling_strange_today"])
+    assert codes == ["burning_micturition", "frequent_urination", "urinary_urgency", "fever", "seizures"]
+    assert translated["painful_urination"] == ["burning_micturition"] and "frequent_urination" not in translated.get("painful_urination", [])
+    assert unknown == ["feeling_strange_today"]
+
+
+def test_symptom_checker_reports_when_nothing_is_known(db_session=None):
+    from app.services import ai_tools
+    out = ai_tools.check_symptoms_ml(None, None, ["feeling_strange_today"])
+    assert "error" in out and "feeling_strange_today" in out["error"]
